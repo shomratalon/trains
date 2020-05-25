@@ -190,7 +190,7 @@ class GitDetector(Detector):
 
     def _get_commands(self):
         return self.Commands(
-            url=["git", "remote", "get-url", "origin"],
+            url=["git", "ls-remote", "--get-url", "origin"],
             branch=["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
             commit=["git", "rev-parse", "HEAD"],
             root=["git", "rev-parse", "--show-toplevel"],
@@ -201,11 +201,13 @@ class GitDetector(Detector):
         )
 
     def _post_process_info(self, info):
-        if info.url and not info.url.endswith(".git"):
-            info.url += ".git"
+        # Deprecated code: this was intended to make sure git repository names always
+        # ended with ".git", but this is not always the case (e.g. Azure Repos)
+        # if info.url and not info.url.endswith(".git"):
+        #     info.url += ".git"
 
         if (info.branch or "").startswith("origin/"):
-            info.branch = info.branch[len("origin/") :]
+            info.branch = info.branch[len("origin/"):]
 
         return info
 
@@ -215,40 +217,38 @@ class EnvDetector(Detector):
         super(EnvDetector, self).__init__(type_name, "{} environment".format(type_name))
 
     def _is_repo_type(self, script_path):
-        return VCS_REPO_TYPE.get(default="").lower() == self.type_name and bool(
+        return VCS_REPO_TYPE.get().lower() == self.type_name and bool(
             VCS_REPOSITORY_URL.get()
         )
 
     @staticmethod
     def _normalize_root(root):
         """
-        Get the absolute location of the parent folder (where .git resides)
+        Convert to absolute and squash 'path/../folder'
         """
-        root_parts = list(reversed(Path(root).parts))
-        cwd_abs = list(reversed(Path.cwd().parts))
-        count = len(cwd_abs)
-        for i, p in enumerate(cwd_abs):
-            if i >= len(root_parts):
-                break
-            if p == root_parts[i]:
-                count -= 1
-        cwd_abs.reverse()
-        root_abs_path = Path().joinpath(*cwd_abs[:count])
-        return str(root_abs_path)
+        try:
+            return os.path.abspath((Path.cwd() / root).absolute().as_posix())
+        except:
+            return Path.cwd()
 
     def _get_info(self, _, include_diff=False):
         repository_url = VCS_REPOSITORY_URL.get()
 
         if not repository_url:
             raise DetectionError("No VCS environment data")
-
+        status = VCS_STATUS.get() or ''
+        diff = VCS_DIFF.get() or ''
+        modified = bool(diff or (status and [s for s in status.split('\n') if s.strip().startswith('M ')]))
+        if modified and not diff:
+            diff = '# Repository modified, but no git diff could be extracted.'
         return Result(
             url=repository_url,
             branch=VCS_BRANCH.get(),
             commit=VCS_COMMIT_ID.get(),
             root=VCS_ROOT.get(converter=self._normalize_root),
-            status=VCS_STATUS.get(),
-            diff=VCS_DIFF.get(),
+            status=status,
+            diff=diff,
+            modified=modified,
         )
 
 

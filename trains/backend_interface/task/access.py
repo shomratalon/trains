@@ -18,14 +18,14 @@ class AccessMixin(object):
         obj = self.data
         props = prop_path.split('.')
         for i in range(len(props)):
-            obj = getattr(obj, props[i], None)
-            if obj is None:
+            if not hasattr(obj, props[i]):
                 msg = 'Task has no %s section defined' % '.'.join(props[:i + 1])
                 if log_on_error:
                     self.log.info(msg)
                 if raise_on_error:
                     raise ValueError(msg)
                 return default
+            obj = getattr(obj, props[i], None)
         return obj
 
     def _set_task_property(self, prop_path, value, raise_on_error=True, log_on_error=True):
@@ -57,8 +57,8 @@ class AccessMixin(object):
         return self._get_task_property('execution.parameters')
 
     def get_label_num_description(self):
-        """ Get a dict of label number to a string representing all labels associated with this number on the
-            model labels
+        """ Get a dictionary of label number to a string pairs representing all labels associated with this number
+            on the model labels.
         """
         model_labels = self._get_task_property('execution.model_labels')
         label_getter = operator.itemgetter(0)
@@ -80,6 +80,6 @@ class AccessMixin(object):
             expected_num_of_classes += 1 if int(index) > 0 else 0
         num_of_classes = int(max(model_labels.values()))
         if num_of_classes != expected_num_of_classes:
-            self.log.warn('The highest label index is %d, while there are %d non-bg labels' %
-                          (num_of_classes, expected_num_of_classes))
+            self.log.warning('The highest label index is %d, while there are %d non-bg labels' %
+                             (num_of_classes, expected_num_of_classes))
         return num_of_classes + 1  # +1 is meant for bg!

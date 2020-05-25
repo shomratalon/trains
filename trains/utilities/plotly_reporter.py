@@ -1,9 +1,17 @@
 import numpy as np
+
+from ..errors import UsageError
+from ..utilities.dicts import merge_dicts
+
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
 from attr import attrs, attrib
 
 
 def create_2d_histogram_plot(np_row_wise, labels, title=None, xtitle=None, ytitle=None, series=None, xlabels=None,
-                             comment=None):
+                             comment=None, mode='group', layout_config=None):
     """
     Create a 2D Plotly histogram chart from a 2D numpy array
     :param np_row_wise: 2D numpy data array
@@ -12,10 +20,16 @@ def create_2d_histogram_plot(np_row_wise, labels, title=None, xtitle=None, ytitl
     :param xtitle: X-Series title
     :param ytitle: Y-Series title
     :param comment: comment underneath the title
+    :param mode: multiple histograms mode. valid options are: stack / group / relative. Default is 'group'.
+    :param layout_config: optional extra layout configuration
     :return: Plotly chart dict
     """
+    assert mode in ('stack', 'group', 'relative')
+
     np_row_wise = np.atleast_2d(np_row_wise)
     assert len(np_row_wise.shape) == 2, "Expected a 2D numpy array"
+    use_series = bool(labels)
+
     # using labels without xlabels leads to original behavior
     if labels is not None and xlabels is None:
         assert len(labels) == np_row_wise.shape[0], "Please provide a label for each data row"
@@ -26,10 +40,14 @@ def create_2d_histogram_plot(np_row_wise, labels, title=None, xtitle=None, ytitl
         if len(labels) == 1:
             labels = [labels] * np_row_wise.shape[0]
         assert len(xlabels) == np_row_wise.shape[1]
+    elif not labels and xlabels:
+        labels = [series]
 
     data = [_np_row_to_plotly_data_item(np_row=np_row_wise[i, :], label=labels[i] if labels else None, xlabels=xlabels)
             for i in range(np_row_wise.shape[0])]
-    return _plotly_hist_dict(title=title, xtitle=xtitle, ytitle=ytitle, data=data, comment=comment)
+    return _plotly_hist_dict(title=series if use_series else title,
+                             xtitle=xtitle, ytitle=ytitle, mode=mode, data=data, comment=comment,
+                             layout_config=layout_config)
 
 
 def _to_np_array(value):
@@ -61,7 +79,8 @@ class SeriesInfo(object):
             )
 
 
-def create_line_plot(title, series, xtitle, ytitle, mode='lines', reverse_xaxis=False, comment=None):
+def create_line_plot(title, series, xtitle, ytitle, mode='lines', reverse_xaxis=False,
+                     comment=None, MAX_SIZE=None, layout_config=None):
     plotly_obj = _plotly_scatter_layout_dict(
         title=title if not comment else (title + '<br><sup>' + comment + '</sup>'),
         xaxis_title=xtitle,
@@ -70,6 +89,33 @@ def create_line_plot(title, series, xtitle, ytitle, mode='lines', reverse_xaxis=
 
     if reverse_xaxis:
         plotly_obj["layout"]["xaxis"]["autorange"] = "reversed"
+
+    # check maximum size of data
+    MAX_SIZE = MAX_SIZE or 800000
+    series_sizes = [s.data.size for s in series]
+    total_size = sum(series_sizes)
+    if total_size > MAX_SIZE:
+        # we need to downscale
+        base_size = MAX_SIZE / len(series_sizes)
+        baseused_size = sum([min(s, base_size) for s in series_sizes])
+        leftover = MAX_SIZE - baseused_size
+        for s in series:
+            # if we need to down-sample, use low-pass average filter and sampling
+            if s.data.size >= base_size:
+                budget = int(leftover * s.data.size / (total_size - baseused_size))
+                step = int(np.ceil(s.data.size / float(budget)))
+                x = s.data[:, 0][::-step][::-1]
+                y = s.data[:, 1]
+                y_low_pass = np.convolve(y, np.ones(shape=(step,), dtype=y.dtype) / float(step), mode='same')
+                y = y_low_pass[::-step][::-1]
+                s.data = np.array([x, y], dtype=s.data.dtype).T
+
+            # decide on number of points between mean and max
+            s_max = np.max(np.abs(s.data), axis=0)
+            s_max = np.maximum(s_max, s_max * 0 + 0.01)
+            digits = np.maximum(np.array([1, 1]), np.array([6, 6]) - np.floor(np.abs(np.log10(s_max))))
+            s.data[:, 0] = np.round(s.data[:, 0] * (10 ** digits[0])) / (10 ** digits[0])
+            s.data[:, 1] = np.round(s.data[:, 1] * (10 ** digits[1])) / (10 ** digits[1])
 
     plotly_obj["data"].extend({
         "name": s.name,
@@ -80,11 +126,14 @@ def create_line_plot(title, series, xtitle, ytitle, mode='lines', reverse_xaxis=
         "type": "scatter",
     } for s in series)
 
+    if layout_config:
+        plotly_obj["layout"] = merge_dicts(plotly_obj["layout"], layout_config)
+
     return plotly_obj
 
 
 def create_2d_scatter_series(np_row_wise, title="Scatter", series_name="Series", xtitle="x", ytitle="y", mode="lines",
-                             labels=None, comment=None):
+                             labels=None, comment=None, layout_config=None):
     """
     Create a 2D scatter Plotly graph from a 2 column numpy array
     :param np_row_wise: 2 column numpy data array [(x0,y0), (x1,y1) ...]
@@ -95,6 +144,7 @@ def create_2d_scatter_series(np_row_wise, title="Scatter", series_name="Series",
     :param mode: scatter type mode ('lines' / 'markers' / 'lines+markers')
     :param labels: label (text) per point on the scatter graph
     :param comment: comment underneath the title
+    :param layout_config: optional dictionary for layout configuration, passed directly to plotly
     :return: Plotly chart dict
     :return:
     """
@@ -102,21 +152,25 @@ def create_2d_scatter_series(np_row_wise, title="Scatter", series_name="Series",
     assert np_row_wise.ndim == 2, "Expected a 2D numpy array"
     assert np_row_wise.shape[1] == 2, "Expected two columns X/Y e.g. [(x0,y0), (x1,y1) ...]"
 
-    this_scatter_data = {
-        "name": series_name,
-        "x": np_row_wise[:, 0].tolist(),
-        "y": np_row_wise[:, 1].tolist(),
-        "mode": mode,
-        "text": labels,
-        "type": "scatter"
-    }
-    plotly_obj["data"].append(this_scatter_data)
-    return plotly_obj
+    # this_scatter_data = {
+    #     "name": series_name,
+    #     "x": np_row_wise[:, 0].tolist(),
+    #     "y": np_row_wise[:, 1].tolist(),
+    #     "mode": mode,
+    #     "text": labels,
+    #     "type": "scatter"
+    # }
+    # plotly_obj["data"].append(this_scatter_data)
+    # return plotly_obj
+    series = SeriesInfo(name=series_name, data=np_row_wise, labels=labels)
+
+    return create_line_plot(title=title, series=[series], xtitle=xtitle, ytitle=ytitle, mode=mode,
+                            comment=comment, MAX_SIZE=100000, layout_config=layout_config)
 
 
 def create_3d_scatter_series(np_row_wise, title="Scatter", series_name="Series", xtitle="x", ytitle="y", ztitle="z",
                              mode="lines", color=((217, 217, 217, 0.14),), marker_size=5, line_width=0.8,
-                             labels=None, fill_axis=-1, plotly_obj=None):
+                             labels=None, fill_axis=-1, plotly_obj=None, layout_config=None):
     """
     Create a 3D scatter Plotly graph from a 3 column numpy array
     :param np_row_wise: 3 column numpy data array [(x0,y0,z0), (x1,y1,z1) ...]
@@ -127,11 +181,13 @@ def create_3d_scatter_series(np_row_wise, title="Scatter", series_name="Series",
     :param ztitle: Z-axis title
     :param labels: label (text) per point on the scatter graph
     :param fill_axis: fill area under the curve
+    :param layout_config: additional layout configuration
     :return: Plotly chart dict
     :return:
     """
     if not plotly_obj:
-        plotly_obj = plotly_scatter3d_layout_dict(title=title, xaxis_title=xtitle, yaxis_title=ytitle, zaxis_title=ztitle)
+        plotly_obj = plotly_scatter3d_layout_dict(
+            title=title, xaxis_title=xtitle, yaxis_title=ytitle, zaxis_title=ztitle)
     assert np_row_wise.ndim == 2, "Expected a 2D numpy array"
     assert np_row_wise.shape[1] == 3, "Expected three columns X/Y/Z e.g. [(x0,y0,z0), (x1,y1,z1) ...]"
 
@@ -155,11 +211,15 @@ def create_3d_scatter_series(np_row_wise, title="Scatter", series_name="Series",
         },
     }
     plotly_obj["data"].append(this_scatter_data)
+
+    if layout_config:
+        plotly_obj["layout"] = merge_dicts(plotly_obj["layout"], layout_config)
+
     return plotly_obj
 
 
 def create_value_matrix(np_value_matrix, title="Heatmap Matrix", xlabels=None, ylabels=None, xtitle="X", ytitle="Y",
-                        custom_colors=True, series=None, comment=None):
+                        custom_colors=True, series=None, comment=None, layout_config=None):
     conf_matrix_plot = {
         "data": [
             {
@@ -188,12 +248,15 @@ def create_value_matrix(np_value_matrix, title="Heatmap Matrix", xlabels=None, y
         conf_matrix_plot["data"][0].update({"colorscale": scale})
         conf_matrix_plot["data"][0].update({"colorbar": bar})
 
+    if layout_config:
+        conf_matrix_plot["layout"] = merge_dicts(conf_matrix_plot["layout"], layout_config)
+
     return conf_matrix_plot
 
 
 def create_3d_surface(np_value_matrix, title="3D Surface", xlabels=None, ylabels=None, xtitle="X", ytitle="Y",
-                      ztitle="Z", custom_colors=True, series=None, camera=None, comment=None):
-    conf_matrix_plot = {
+                      ztitle="Z", custom_colors=True, series=None, camera=None, comment=None, layout_config=None):
+    surface_plot = {
         "data": [
             {
                 "z": np_value_matrix.tolist(),
@@ -220,7 +283,7 @@ def create_3d_surface(np_value_matrix, title="3D Surface", xlabels=None, ylabels
                 "yaxis": {
                     "title": ytitle,
                     "showgrid": False,
-                    "nticks":  10,
+                    "nticks": 10,
                     "ticktext": ylabels,
                     "tickvals": list(range(len(ylabels))) if ylabels else ylabels,
                 },
@@ -235,14 +298,51 @@ def create_3d_surface(np_value_matrix, title="3D Surface", xlabels=None, ylabels
         }
     }
     if camera:
-        conf_matrix_plot['layout']['scene']['camera'] = {"eye": {"x": camera[0], "y": camera[1], "z": camera[2]}}
+        surface_plot['layout']['scene']['camera'] = {"eye": {"x": camera[0], "y": camera[1], "z": camera[2]}}
 
     if custom_colors:
         scale, bar = _get_z_colorbar_data()
-        conf_matrix_plot["data"][0].update({"colorscale": scale})
-        conf_matrix_plot["data"][0].update({"colorbar": bar})
+        surface_plot["data"][0].update({"colorscale": scale})
+        surface_plot["data"][0].update({"colorbar": bar})
 
-    return conf_matrix_plot
+    if layout_config:
+        surface_plot["layout"] = merge_dicts(surface_plot["layout"], layout_config)
+
+    return surface_plot
+
+
+def create_image_plot(image_src, title, width=640, height=480, series=None, comment=None, layout_config=None):
+    image_plot = {
+        "data": [],
+        "layout": {
+            "xaxis": {"visible": False, "range": [0, width]},
+            "yaxis": {"visible": False, "range": [0, height]},
+            # "width": width,
+            # "height": height,
+            "margin": {'l': 0, 'r': 0, 't': 0, 'b': 0},
+            "images": [{
+                "sizex": width,
+                "sizey": height,
+                "xref": "x",
+                "yref": "y",
+                "opacity": 1.0,
+                "x": 0,
+                "y": int(height / 2),
+                "yanchor": "middle",
+                "sizing": "contain",
+                "layer": "below",
+                "source": image_src
+            }],
+            "showlegend": False,
+            "title": title if not comment else (title + '<br><sup>' + comment + '</sup>'),
+            "name": series,
+        }
+    }
+
+    if layout_config:
+        image_plot["layout"] = merge_dicts(image_plot["layout"], layout_config)
+
+    return image_plot
 
 
 def _get_z_colorbar_data(z_data=None, values=None, colors=None):
@@ -266,17 +366,21 @@ def _get_z_colorbar_data(z_data=None, values=None, colors=None):
     return colorscale, colorbar
 
 
-def _plotly_hist_dict(title, xtitle, ytitle, data=None, comment=None):
+def _plotly_hist_dict(title, xtitle, ytitle, mode='group', data=None, comment=None, layout_config=None):
     """
     Create a basic Plotly chart dictionary
     :param title: Chart title
     :param xtitle: X-Series title
     :param ytitle: Y-Series title
+    :param mode: multiple histograms mode. optionals stack / group / relative. Default is 'group'.
     :param data: Data items
     :type data: list
+    :param layout_config: dict
     :return: Plotly chart dict
     """
-    return {
+    assert mode in ('stack', 'group', 'relative')
+
+    plotly_object = {
         "data": data or [],
         "layout": {
             "title": title if not comment else (title + '<br><sup>' + comment + '</sup>'),
@@ -286,11 +390,15 @@ def _plotly_hist_dict(title, xtitle, ytitle, data=None, comment=None):
             "yaxis": {
                 "title": ytitle
             },
-            "barmode": "stack",
+            "barmode": mode,
             "bargap": 0.08,
             "bargroupgap": 0
         }
     }
+    if layout_config:
+        plotly_object["layout"] = merge_dicts(plotly_object["layout"], layout_config)
+
+    return plotly_object
 
 
 def _np_row_to_plotly_data_item(np_row, label, xlabels=None):
@@ -337,8 +445,8 @@ def _plotly_scatter_layout_dict(title="Scatter", xaxis_title="X", yaxis_title="Y
 
 
 def plotly_scatter3d_layout_dict(title="Scatter", xaxis_title="X", yaxis_title="Y", zaxis_title="Z",
-                                 series=None, show_legend=True, comment=None):
-    return {
+                                 series=None, show_legend=True, comment=None, layout_config=None):
+    plotly_object = {
         "data": [],
         "layout": {
             "showlegend": show_legend,
@@ -351,3 +459,60 @@ def plotly_scatter3d_layout_dict(title="Scatter", xaxis_title="X", yaxis_title="
             "name": series,
         }
     }
+
+    if layout_config:
+        plotly_object["layout"] = merge_dicts(plotly_object["layout"], layout_config)
+
+    return plotly_object
+
+
+def create_plotly_table(table_plot, title, series, layout_config=None):
+    """
+    Create a basic Plotly table json style to be sent
+
+    :param table_plot: the output table in pandas.DataFrame structure
+    :return: dict with plotly data
+    :param title: Title (AKA metric)
+    :type title: str
+    :param series: Series (AKA variant)
+    :type series: str
+    :param layout_config: additional configuration layout
+    """
+    if not pd:
+        raise UsageError(
+            "pandas is required in order to support reporting tables using CSV or a URL, please install the pandas python package"
+        )
+    index_added = not isinstance(table_plot.index, pd.RangeIndex)
+    headers_values = list([col] for col in table_plot.columns)
+    cells_values = table_plot.T.values.tolist()
+    if index_added:
+        headers_values.insert(0, table_plot.index.name or "")
+        cells_values.insert(0, table_plot.index.values.tolist())
+
+    ret = {
+        "data": [{
+            'type': 'table',
+            'header': {
+                'values': headers_values,
+                'align': "left",
+                'line': {'width': 0.5, 'color': '#d4d6e0'},
+                'fill': {'color': "#fff"},
+                'font': {'family': "Heebo, verdana, arial, sans-serif", 'size': 12, 'color': "#333"}
+            },
+            'cells': {
+                'height': 30,
+                'values': cells_values,
+                'align': "left",
+                'line': {'color': "white", 'width': 1},
+                'font': {'family': "Heebo, verdana, arial, sans-serif", 'size': 14, 'color': "#384161"},
+            }
+        }],
+        "layout": {
+            "title": title,
+            "name": series,
+        }
+    }
+    if layout_config:
+        ret["layout"] = merge_dicts(ret["layout"], layout_config)
+
+    return ret

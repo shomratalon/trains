@@ -1,7 +1,7 @@
 from abc import abstractproperty
 
 from ..backend_config.bucket_config import S3BucketConfig
-from ..storage import StorageHelper
+from ..storage.helper import StorageHelper
 
 
 class SetupUploadMixin(object):
@@ -12,6 +12,7 @@ class SetupUploadMixin(object):
             self, bucket_name, host=None, access_key=None, secret_key=None, region=None, multipart=True, https=True):
         """
         Setup upload options (currently only S3 is supported)
+
         :param bucket_name: AWS bucket name
         :type bucket_name: str
         :param host: Hostname. Only required in case a Non-AWS S3 solution such as a local Minio server is used)

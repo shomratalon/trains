@@ -1,6 +1,8 @@
 import abc
 import warnings
+from copy import copy
 from operator import itemgetter
+from os import getenv
 
 import furl
 import six
@@ -49,7 +51,7 @@ class S3BucketConfig(object):
         configs = [cls(**entry) for entry in dict_list]
         valid_configs = [conf for conf in configs if conf.is_valid()]
         if log and len(valid_configs) < len(configs):
-            log.warn(
+            log.warning(
                 "Invalid bucket configurations detected for {}".format(
                     ", ".join(
                         "/".join((config.host, config.bucket))
@@ -101,9 +103,9 @@ class S3BucketConfigurations(BaseBucketConfigurations):
             s3_configuration.get("credentials", [])
         )
 
-        default_key = s3_configuration.get("key", "")
-        default_secret = s3_configuration.get("secret", "")
-        default_region = s3_configuration.get("region", "")
+        default_key = s3_configuration.get("key") or getenv("AWS_ACCESS_KEY_ID", "")
+        default_secret = s3_configuration.get("secret") or getenv("AWS_SECRET_ACCESS_KEY", "")
+        default_region = s3_configuration.get("region") or getenv("AWS_DEFAULT_REGION", "")
 
         default_key = _none_to_empty_string(default_key)
         default_secret = _none_to_empty_string(default_secret)
@@ -232,14 +234,16 @@ class GSBucketConfigurations(BaseBucketConfigurations):
 
     @classmethod
     def from_config(cls, gs_configuration):
-        if gs_configuration is None:
-            return cls()
+        default_credentials = getenv("GOOGLE_APPLICATION_CREDENTIALS") or {}
+
+        if not gs_configuration:
+            return cls(default_credentials=default_credentials)
 
         config_list = gs_configuration.get("credentials", [])
         buckets_configs = [GSBucketConfig(**entry) for entry in config_list]
 
-        default_project = gs_configuration.get("project", {})
-        default_credentials = gs_configuration.get("credentials_json", {})
+        default_project = gs_configuration.get("project") or {}
+        default_credentials = gs_configuration.get("credentials_json") or default_credentials
 
         return cls(buckets_configs, default_project, default_credentials)
 
@@ -289,3 +293,75 @@ class GSBucketConfigurations(BaseBucketConfigurations):
     def _get_prefix_from_bucket_config(self, config):
         prefix = furl.furl(scheme="gs", netloc=config.bucket, path=config.subdir)
         return str(prefix)
+
+
+@attrs
+class AzureContainerConfig(object):
+    account_name = attrib(type=str)
+    account_key = attrib(type=str)
+    container_name = attrib(type=str, default=None)
+
+
+class AzureContainerConfigurations(object):
+    def __init__(self, container_configs=None):
+        super(AzureContainerConfigurations, self).__init__()
+        self._container_configs = container_configs or []
+
+    @classmethod
+    def from_config(cls, configuration):
+        default_account = getenv("AZURE_STORAGE_ACCOUNT")
+        default_key = getenv("AZURE_STORAGE_KEY")
+
+        default_container_configs = []
+        if default_account and default_key:
+            default_container_configs.append(AzureContainerConfig(
+                account_name=default_account, account_key=default_key
+            ))
+
+        if configuration is None:
+            return cls(default_container_configs)
+
+        containers = configuration.get("containers", list())
+        container_configs = [AzureContainerConfig(**entry) for entry in containers] + default_container_configs
+
+        return cls(container_configs)
+
+    def get_config_by_uri(self, uri):
+        """
+        Get the credentials for an Azure Blob Storage container from the config
+        :param uri: URI of container or blob
+        :return: container config
+        :rtype: AzureContainerConfig
+        """
+        f = furl.furl(uri)
+        account_name = f.host.partition(".")[0]
+
+        if not f.path.segments:
+            raise ValueError(
+                "URI {} is missing a container name (expected "
+                "[https/azure]://<account-name>.../<container-name>)".format(
+                    uri
+                )
+            )
+
+        container = f.path.segments[0]
+
+        config = copy(self.get_config(account_name, container))
+
+        if config and not config.container_name:
+            config.container_name = container
+
+        return config
+
+    def get_config(self, account_name, container):
+        return next(
+            (
+                config
+                for config in self._container_configs
+                if config.account_name == account_name and (
+                    not config.container_name
+                    or config.container_name == container
+                )
+            ),
+            None
+        )

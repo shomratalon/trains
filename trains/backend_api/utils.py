@@ -4,7 +4,6 @@ import sys
 
 import requests
 from requests.adapters import HTTPAdapter
-## from requests.packages.urllib3.util.retry import Retry
 from urllib3.util import Retry
 from urllib3 import PoolManager
 import six
@@ -25,6 +24,35 @@ __disable_certificate_verification_warning = 0
 def get_config():
     from ..config import config_obj
     return config_obj
+
+
+class _RetryFilter(logging.Filter):
+    last_instance = None
+
+    def __init__(self, total, warning_after=5):
+        super(_RetryFilter, self).__init__()
+        self.total = total
+        self.display_warning_after = warning_after
+        _RetryFilter.last_instance = self
+
+    def filter(self, record):
+        if record.args and len(record.args) > 0 and isinstance(record.args[0], Retry):
+            left = (record.args[0].total, record.args[0].connect, record.args[0].read,
+                    record.args[0].redirect, record.args[0].status)
+            left = [l for l in left if isinstance(l, int)]
+            if left:
+                retry_left = max(left) - min(left)
+                return retry_left >= self.display_warning_after
+
+        return True
+
+
+def urllib_log_warning_setup(total_retries=10, display_warning_after=5):
+    for l in ('urllib3.connectionpool', 'requests.packages.urllib3.connectionpool'):
+        urllib3_log = logging.getLogger(l)
+        if urllib3_log:
+            urllib3_log.removeFilter(_RetryFilter.last_instance)
+            urllib3_log.addFilter(_RetryFilter(total_retries, display_warning_after))
 
 
 class TLSv1HTTPAdapter(HTTPAdapter):
@@ -67,6 +95,13 @@ def get_http_session_with_retry(
 
     session = requests.Session()
 
+    # HACK: with python 2.7 there is a potential race condition that can cause
+    # a deadlock when importing "netrc", inside the get_netrc_auth() function
+    # setting 'session.trust_env' to False will make sure the `get_netrc_auth()` is not called
+    # see details: https://github.com/psf/requests/issues/2925
+    if six.PY2:
+        session.trust_env = False
+
     if backoff_max is not None:
         Retry.BACKOFF_MAX = backoff_max
 
@@ -77,12 +112,12 @@ def get_http_session_with_retry(
     adapter = TLSv1HTTPAdapter(max_retries=retry, pool_connections=pool_connections, pool_maxsize=pool_maxsize)
     session.mount('http://', adapter)
     session.mount('https://', adapter)
-    # update verify host certiface
+    # update verify host certificate
     session.verify = ENV_HOST_VERIFY_CERT.get(default=get_config().get('api.verify_certificate', True))
     if not session.verify and __disable_certificate_verification_warning < 2:
         # show warning
         __disable_certificate_verification_warning += 1
-        logging.getLogger('TRAINS').warning(
+        logging.getLogger('trains').warning(
             msg='InsecureRequestWarning: Certificate verification is disabled! Adding '
                 'certificate verification is strongly advised. See: '
                 'https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings')

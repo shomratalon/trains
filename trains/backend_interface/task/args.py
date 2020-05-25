@@ -16,6 +16,7 @@ class _Arguments(object):
 
     class _ProxyDictWrite(dict):
         """ Dictionary wrapper that updates an arguments instance on any item set in the dictionary """
+
         def __init__(self, arguments, *args, **kwargs):
             super(_Arguments._ProxyDictWrite, self).__init__(*args, **kwargs)
             self._arguments = arguments
@@ -27,6 +28,7 @@ class _Arguments(object):
 
     class _ProxyDictReadOnly(dict):
         """ Dictionary wrapper that prevents modifications to the dictionary """
+
         def __init__(self, arguments, *args, **kwargs):
             super(_Arguments._ProxyDictReadOnly, self).__init__(*args, **kwargs)
             self._arguments = arguments
@@ -40,6 +42,10 @@ class _Arguments(object):
     def __init__(self, task):
         super(_Arguments, self).__init__()
         self._task = task
+        self._exclude_parser_args = {}
+
+    def exclude_parser_args(self, excluded_args):
+        self._exclude_parser_args = excluded_args or {}
 
     def set_defaults(self, *dicts, **kwargs):
         self._task.set_parameters(*dicts, **kwargs)
@@ -92,7 +98,7 @@ class _Arguments(object):
         ]
         for sub_parser in sub_parsers:
             if sub_parser.dest and sub_parser.dest != SUPPRESS:
-                defaults[sub_parser.dest] = full_args_dict.get(sub_parser.dest)
+                defaults[sub_parser.dest] = full_args_dict.get(sub_parser.dest) or ''
             for choice in sub_parser.choices.values():
                 # recursively parse
                 defaults = cls._add_to_defaults(
@@ -111,7 +117,8 @@ class _Arguments(object):
         if parsed_args:
             for k, v in parsed_args.__dict__.items():
                 if k not in task_defaults:
-                    if type(v) == None:
+                    # do not change this comparison because isinstance(type(v), type(None)) === False
+                    if type(v) == type(None):
                         task_defaults[k] = ''
                     elif type(v) in (str, int, float, bool, list):
                         task_defaults[k] = v
@@ -120,14 +127,16 @@ class _Arguments(object):
         for k, v in task_defaults.items():
             try:
                 if type(v) is list:
-                    task_defaults[k] = '[' + ', '.join(map("{0}".format, v)) + ']'
+                    task_defaults[k] = str(v)
                 elif type(v) not in (str, int, float, bool):
                     task_defaults[k] = str(v)
             except Exception:
                 del task_defaults[k]
-        # Add prefix, TODO: add argparse prefix
-        # task_defaults = dict([(self._prefix_args + k, v) for k, v in task_defaults.items()])
-        task_defaults = dict([(k, v) for k, v in task_defaults.items()])
+
+        # Skip excluded arguments, Add prefix, TODO: add argparse prefix
+        # task_defaults = dict([(self._prefix_args + k, v) for k, v in task_defaults.items()
+        #                       if k not in self._exclude_parser_args])
+        task_defaults = dict([(k, v) for k, v in task_defaults.items() if self._exclude_parser_args.get(k, True)])
         # Store to task
         self._task.update_parameters(task_defaults)
 
@@ -153,8 +162,15 @@ class _Arguments(object):
         # task_arguments = dict([(k[len(self._prefix_args):], v) for k, v in self._task.get_parameters().items()
         #                        if k.startswith(self._prefix_args)])
         task_arguments = dict([(k, v) for k, v in self._task.get_parameters().items()
-                               if not k.startswith(self._prefix_tf_defines)])
+                               if not k.startswith(self._prefix_tf_defines) and self._exclude_parser_args.get(k, True)])
+        arg_parser_argeuments = {}
         for k, v in task_arguments.items():
+            # python2 unicode support
+            try:
+                v = str(v)
+            except:
+                pass
+
             # if we have a StoreTrueAction and the value is either False or Empty or 0 change the default to False
             # with the rest we have to make sure the type is correct
             matched_actions = self._find_parser_action(parser, k)
@@ -185,16 +201,22 @@ class _Arguments(object):
                         current_action.const = const_value
                     except ValueError:
                         pass
-                    task_arguments[k] = const_value
-                elif current_action and current_action.nargs == '+':
+                    if current_action.default is not None or const_value not in (None, ''):
+                        arg_parser_argeuments[k] = const_value
+                elif current_action and (current_action.nargs in ('+', '*') or isinstance(current_action.nargs, int)):
                     try:
-                        v = yaml.load(v.strip())
-                        if current_action.type:
+                        v = yaml.load(v.strip(), Loader=yaml.SafeLoader)
+                        if not isinstance(v, (list, tuple)):
+                            # do nothing, we have no idea what happened
+                            pass
+                        elif current_action.type:
                             v = [current_action.type(a) for a in v]
                         elif current_action.default:
                             v_type = type(current_action.default[0])
                             v = [v_type(a) for a in v]
-                        task_arguments[k] = v
+
+                        if current_action.default is not None or v not in (None, ''):
+                            arg_parser_argeuments[k] = v
                     except Exception:
                         pass
                 elif current_action and not current_action.type:
@@ -203,45 +225,80 @@ class _Arguments(object):
                     # if we have an int, we should cast to float, because it is more generic
                     if var_type == int:
                         var_type = float
-                    elif var_type == type(None):
+                    elif var_type == type(None):  # do not change! because isinstance(var_type, type(None)) === False
                         var_type = str
                     # now we should try and cast the value if we can
                     try:
                         v = var_type(v)
-                        task_arguments[k] = v
+                        # cast back to int if it's the same value
+                        if type(current_action.default) == int and int(v) == v:
+                            arg_parser_argeuments[k] = v = int(v)
+                        elif current_action.default is None and v in (None, ''):
+                            # Do nothing, we should leave it as is.
+                            pass
+                        else:
+                            arg_parser_argeuments[k] = v
                     except Exception:
+                        # if we failed, leave as string
+                        arg_parser_argeuments[k] = v
+
+                elif current_action and current_action.type == bool:
+                    # parser.set_defaults cannot cast string `False`/`True` to boolean properly,
+                    # so we have to do it manually here
+                    strip_v = str(v).lower().strip()
+                    if strip_v == 'false' or not strip_v:
+                        v = False
+                    elif strip_v == 'true':
+                        v = True
+                    else:
+                        # else, try to cast to integer
+                        try:
+                            v = int(strip_v)
+                        except ValueError:
+                            pass
+                    if v not in (None, ''):
+                        arg_parser_argeuments[k] = v
+                elif current_action and current_action.type:
+                    arg_parser_argeuments[k] = v
+                    try:
+                        if current_action.default is None and current_action.type != str and not v:
+                            arg_parser_argeuments[k] = v = None
+                        elif current_action.default == current_action.type(v):
+                            # this will make sure that if we have type float and default value int,
+                            # we will keep the type as int, just like the original argparser
+                            arg_parser_argeuments[k] = v = current_action.default
+                        else:
+                            arg_parser_argeuments[k] = v = current_action.type(v)
+                    except:
                         pass
+
                 # add as default
                 try:
                     if current_action and isinstance(current_action, _SubParsersAction):
-                        current_action.default = v
+                        if v not in (None, '') or current_action.default not in (None, ''):
+                            current_action.default = v
                         current_action.required = False
                     elif current_action and isinstance(current_action, _StoreAction):
-                        current_action.default = v
+                        if v not in (None, '') or current_action.default not in (None, ''):
+                            current_action.default = v
                         current_action.required = False
                         # python2 doesn't support defaults for positional arguments, unless used with nargs=?
                         if PY2 and not current_action.nargs:
                             current_action.nargs = '?'
                     else:
                         # do not add parameters that do not exist in argparser, they might be the dict
-                        # # add new parameters to arg parser
-                        # parent_parser.add_argument(
-                        #     '--%s' % k,
-                        #     default=v,
-                        #     type=type(v),
-                        #     required=False,
-                        #     help='Task parameter %s (default %s)' % (k, v),
-                        # )
                         pass
                 except ArgumentError:
                     pass
                 except Exception:
                     pass
+
         # if we already have an instance of parsed args, we should update its values
         if parsed_args:
-            for k, v in task_arguments.items():
-                setattr(parsed_args, k, v)
-        parser.set_defaults(**task_arguments)
+            for k, v in arg_parser_argeuments.items():
+                if parsed_args.get(k) is not None or v not in (None, ''):
+                    setattr(parsed_args, k, v)
+        parser.set_defaults(**arg_parser_argeuments)
 
     def copy_from_dict(self, dictionary, prefix=None):
         # TODO: add dict prefix
@@ -269,6 +326,12 @@ class _Arguments(object):
                                if not k.startswith(self._prefix_tf_defines)])
 
         for k, v in dictionary.items():
+            # if key is not present in the task's parameters, assume we didn't get this far when running
+            # in non-remote mode, and just add it to the task's parameters
+            if k not in parameters:
+                self._task.set_parameter(k, v)
+                continue
+
             param = parameters.get(k, None)
             if param is None:
                 continue
@@ -291,7 +354,15 @@ class _Arguments(object):
             elif v_type == list:
                 try:
                     p = str(param).strip()
-                    param = yaml.load(p)
+                    param = yaml.load(p, Loader=yaml.SafeLoader)
+                except Exception:
+                    self._task.log.warning('Failed parsing task parameter %s=%s keeping default %s=%s' %
+                                           (str(k), str(param), str(k), str(v)))
+                    continue
+            elif v_type == tuple:
+                try:
+                    p = str(param).strip().replace('(', '[', 1)[::-1].replace(')', ']', 1)[::-1]
+                    param = tuple(yaml.load(p, Loader=yaml.SafeLoader))
                 except Exception:
                     self._task.log.warning('Failed parsing task parameter %s=%s keeping default %s=%s' %
                                            (str(k), str(param), str(k), str(v)))
@@ -299,16 +370,18 @@ class _Arguments(object):
             elif v_type == dict:
                 try:
                     p = str(param).strip()
-                    param = yaml.load(p)
+                    param = yaml.load(p, Loader=yaml.SafeLoader)
                 except Exception:
                     self._task.log.warning('Failed parsing task parameter %s=%s keeping default %s=%s' %
                                            (str(k), str(param), str(k), str(v)))
-            elif v_type == type(None):
-                v_type = str
 
             try:
-                dictionary[k] = v_type(param)
-            except ValueError:
+                # do not change this comparison because isinstance(v_type, type(None)) === False
+                if v_type == type(None):
+                    dictionary[k] = str(param) if param else None
+                else:
+                    dictionary[k] = v_type(param)
+            except Exception:
                 self._task.log.warning('Failed parsing task parameter %s=%s keeping default %s=%s' %
                                        (str(k), str(param), str(k), str(v)))
                 continue

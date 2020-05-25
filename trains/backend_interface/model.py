@@ -1,13 +1,17 @@
+import os
 from collections import namedtuple
 from functools import partial
+from tempfile import mkstemp
 
 import six
 from pathlib2 import Path
 
+from ..backend_api import Session
 from ..backend_api.services import models
 from .base import IdObjectBase
 from .util import make_message
-from ..storage import StorageHelper
+from ..storage import StorageManager
+from ..storage.helper import StorageHelper
 from ..utilities.async_manager import AsyncManagerMixin
 
 ModelPackage = namedtuple('ModelPackage', 'weights design')
@@ -28,14 +32,16 @@ class _StorageUriMixin(object):
         self._upload_storage_uri = value.rstrip('/') if value else None
 
 
-class DummyModel(models.Model, _StorageUriMixin):
-    def __init__(self, upload_storage_uri=None, *args, **kwargs):
-        super(DummyModel, self).__init__(*args, **kwargs)
-        self.upload_storage_uri = upload_storage_uri
+def create_dummy_model(upload_storage_uri=None, *args, **kwargs):
+    class DummyModel(models.Model, _StorageUriMixin):
+        def __init__(self, upload_storage_uri=None, *args, **kwargs):
+            super(DummyModel, self).__init__(*args, **kwargs)
+            self.upload_storage_uri = upload_storage_uri
 
-    def update(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
+        def update(self, **kwargs):
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+    return DummyModel(upload_storage_uri=upload_storage_uri, *args, **kwargs)
 
 
 class Model(IdObjectBase, AsyncManagerMixin, _StorageUriMixin):
@@ -43,13 +49,11 @@ class Model(IdObjectBase, AsyncManagerMixin, _StorageUriMixin):
 
     _EMPTY_MODEL_ID = 'empty'
 
+    _local_model_to_id_uri = {}
+
     @property
     def model_id(self):
         return self.id
-
-    @property
-    def storage(self):
-        return StorageHelper.get(self.upload_storage_uri)
 
     def __init__(self, upload_storage_uri, cache_dir, model_id=None,
                  upload_storage_suffix='models', session=None, log=None):
@@ -77,10 +81,9 @@ class Model(IdObjectBase, AsyncManagerMixin, _StorageUriMixin):
     def _upload_model(self, model_file, async_enable=False, target_filename=None, cb=None):
         if not self.upload_storage_uri:
             raise ValueError('Model has no storage URI defined (nowhere to upload to)')
-        helper = self.storage
         target_filename = target_filename or Path(model_file).name
         dest_path = '/'.join((self.upload_storage_uri, self._upload_storage_suffix or '.', target_filename))
-        result = helper.upload(
+        result = StorageHelper.get(dest_path).upload(
             src_path=model_file,
             dest_path=dest_path,
             async_enable=async_enable,
@@ -99,7 +102,7 @@ class Model(IdObjectBase, AsyncManagerMixin, _StorageUriMixin):
         elif res is False:
             self.log.info('Failed model upload')
         else:
-            self.log.info('Completed model upload to %s' % res)
+            self.log.info('Completed model upload to {}'.format(res))
         if cb:
             cb(res)
 
@@ -169,6 +172,11 @@ class Model(IdObjectBase, AsyncManagerMixin, _StorageUriMixin):
             if upload_storage_uri:
                 self.upload_storage_uri = upload_storage_uri
             self._create_empty_model(self.upload_storage_uri)
+        elif upload_storage_uri:
+            self.upload_storage_uri = upload_storage_uri
+
+        if model_file and uri:
+            Model._local_model_to_id_uri[str(model_file)] = (self.model_id, uri)
 
         # upload model file if needed and get uri
         uri = uri or (self._upload_model(model_file, target_filename=target_filename) if model_file else self.data.uri)
@@ -176,18 +184,21 @@ class Model(IdObjectBase, AsyncManagerMixin, _StorageUriMixin):
         design = self._wrap_design(design) if design else self.data.design
         name = name or self.data.name
         comment = comment or self.data.comment
-        tags = tags or self.data.tags
         labels = labels or self.data.labels
         task = task_id or self.data.task
         project = project_id or self.data.project
         parent = parent_id or self.data.parent
+        if tags:
+            extra = {'system_tags': tags or self.data.system_tags} \
+                if hasattr(self.data, 'system_tags') else {'tags': tags or self.data.tags}
+        else:
+            extra = {}
 
         self.send(models.EditRequest(
             model=self.id,
             uri=uri,
             name=name,
             comment=comment,
-            tags=tags,
             labels=labels,
             design=design,
             task=task,
@@ -195,6 +206,27 @@ class Model(IdObjectBase, AsyncManagerMixin, _StorageUriMixin):
             parent=parent,
             framework=framework or self.data.framework,
             iteration=iteration,
+            **extra
+        ))
+        self.reload()
+
+    def edit(self, design=None, labels=None, name=None, comment=None, tags=None,
+             uri=None, framework=None, iteration=None):
+        if tags:
+            extra = {'system_tags': tags or self.data.system_tags} \
+                if hasattr(self.data, 'system_tags') else {'tags': tags or self.data.tags}
+        else:
+            extra = {}
+        self.send(models.EditRequest(
+            model=self.id,
+            uri=uri,
+            name=name,
+            comment=comment,
+            labels=labels,
+            design=self._wrap_design(design) if design else None,
+            framework=framework,
+            iteration=iteration,
+            **extra
         ))
         self.reload()
 
@@ -210,6 +242,8 @@ class Model(IdObjectBase, AsyncManagerMixin, _StorageUriMixin):
                 # If not successful, mark model as failed_uploading
                 if uploaded_uri is False:
                     uploaded_uri = '{}/failed_uploading'.format(self._upload_storage_uri)
+
+                Model._local_model_to_id_uri[str(model_file)] = (self.model_id, uploaded_uri)
 
                 self.update(
                     uri=uploaded_uri,
@@ -228,10 +262,12 @@ class Model(IdObjectBase, AsyncManagerMixin, _StorageUriMixin):
                 if cb:
                     cb(model_file)
 
-            uri = self._upload_model(model_file, async_enable=async_enable, target_filename=target_filename, cb=callback)
+            uri = self._upload_model(model_file, async_enable=async_enable, target_filename=target_filename,
+                                     cb=callback)
             return uri
         else:
             uri = self._upload_model(model_file, async_enable=async_enable, target_filename=target_filename)
+            Model._local_model_to_id_uri[str(model_file)] = (self.model_id, uri)
             self.update(
                 uri=uri,
                 task_id=task_id,
@@ -252,12 +288,16 @@ class Model(IdObjectBase, AsyncManagerMixin, _StorageUriMixin):
         if self._data:
             name = name or self.data.name
             comment = comment or self.data.comment
-            tags = tags or self.data.tags
+            tags = tags or (self.data.system_tags if hasattr(self.data, 'system_tags') else self.data.tags)
             uri = (uri or self.data.uri) if not override_model_id else None
 
+        if tags:
+            extra = {'system_tags': tags} if Session.check_min_api_version('2.3') else {'tags': tags}
+        else:
+            extra = {}
         res = self.send(
-            models.UpdateForTaskRequest(task=task_id, uri=uri, name=name, comment=comment, tags=tags,
-                                        override_model_id=override_model_id))
+            models.UpdateForTaskRequest(task=task_id, uri=uri, name=name, comment=comment,
+                                        override_model_id=override_model_id, **extra))
         if self.id is None:
             # update the model id. in case it was just created, this will trigger a reload of the model object
             self.id = res.response.id
@@ -278,13 +318,19 @@ class Model(IdObjectBase, AsyncManagerMixin, _StorageUriMixin):
             callback = partial(
                 self._complete_update_for_task, task_id=task_id, name=name, comment=comment, tags=tags,
                 override_model_id=override_model_id, cb=cb)
-            uri = self._upload_model(model_file, target_filename=target_filename, async_enable=async_enable, cb=callback)
+            uri = self._upload_model(model_file, target_filename=target_filename,
+                                     async_enable=async_enable, cb=callback)
             return uri
         else:
             uri = self._upload_model(model_file, target_filename=target_filename, async_enable=async_enable)
             self._complete_update_for_task(uri, task_id, name, comment, tags, override_model_id)
-            _ = self.send(models.UpdateForTaskRequest(task=task_id, uri=uri, name=name, comment=comment, tags=tags,
-                                                      override_model_id=override_model_id, iteration=iteration))
+            if tags:
+                extra = {'system_tags': tags} if Session.check_min_api_version('2.3') else {'tags': tags}
+            else:
+                extra = {}
+            _ = self.send(models.UpdateForTaskRequest(task=task_id, uri=uri, name=name, comment=comment,
+                                                      override_model_id=override_model_id, iteration=iteration,
+                                                      **extra))
             return uri
 
     def update_for_task(self, task_id, uri=None, name=None, comment=None, tags=None, override_model_id=None):
@@ -325,7 +371,23 @@ class Model(IdObjectBase, AsyncManagerMixin, _StorageUriMixin):
 
     @property
     def tags(self):
-        return self.data.tags
+        return self.data.system_tags if hasattr(self.data, 'system_tags') else self.data.tags
+
+    @property
+    def task(self):
+        try:
+            return self.data.task
+        except ValueError:
+            # no task is yet specified
+            return None
+
+    @property
+    def uri(self):
+        try:
+            return self.data.uri
+        except ValueError:
+            # no uri is yet specified
+            return None
 
     @property
     def locked(self):
@@ -333,11 +395,37 @@ class Model(IdObjectBase, AsyncManagerMixin, _StorageUriMixin):
             return False
         return bool(self.data.ready)
 
-    def download_model_weights(self):
-        """ Download the model weights into a local file in our cache """
+    def download_model_weights(self, raise_on_error=False):
+        """
+        Download the model weights into a local file in our cache
+
+        :param bool raise_on_error: If True and the artifact could not be downloaded,
+            raise ValueError, otherwise return None on failure and output log warning.
+
+        :return: a local path to a downloaded copy of the model
+        """
         uri = self.data.uri
-        helper = StorageHelper.get(uri, logger=self._log, verbose=True)
-        return helper.download_to_file(uri, force_cache=True)
+        if not uri or not uri.strip():
+            return None
+
+        # check if we already downloaded the file
+        downloaded_models = [k for k, (i, u) in Model._local_model_to_id_uri.items() if i == self.id and u == uri]
+        for dl_file in downloaded_models:
+            if Path(dl_file).exists():
+                return dl_file
+            # remove non existing model file
+            Model._local_model_to_id_uri.pop(dl_file, None)
+
+        local_download = StorageManager.get_local_copy(uri, extract_archive=False)
+
+        # save local model, so we can later query what was the original one
+        if local_download is not None:
+            Model._local_model_to_id_uri[str(local_download)] = (self.model_id, uri)
+        elif raise_on_error:
+            raise ValueError("Could not retrieve a local copy of model weights {}, "
+                             "failed downloading {}".format(self.model_id, uri))
+
+        return local_download
 
     @property
     def cache_dir(self):
@@ -380,18 +468,20 @@ class Model(IdObjectBase, AsyncManagerMixin, _StorageUriMixin):
         data = self.data
         assert isinstance(data, models.Model)
         parent = self.id if child else None
+        extra = {'system_tags': tags or data.system_tags} \
+            if Session.check_min_api_version('2.3') else {'tags': tags or data.tags}
         req = models.CreateRequest(
             uri=data.uri,
             name=name,
             labels=data.labels,
             comment=comment or data.comment,
-            tags=tags or data.tags,
             framework=data.framework,
             design=data.design,
             ready=ready,
             project=data.project,
             parent=parent,
             task=task,
+            **extra
         )
         res = self.send(req)
         return res.response.id

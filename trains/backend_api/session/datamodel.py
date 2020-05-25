@@ -31,6 +31,22 @@ def schema_property(name):
     return init
 
 
+# Support both jsonschema >= 3.0.0 and <= 2.6.0
+_CustomValidator = None
+try:
+    from jsonschema import TypeChecker, Draft7Validator
+
+    def _is_array(checker, instance):
+        return isinstance(instance, (list, tuple))
+
+    _CustomValidator = jsonschema.validators.extend(
+        Draft7Validator,
+        type_checker=Draft7Validator.TYPE_CHECKER.redefine("array", _is_array)
+    )
+except ImportError:
+    pass
+
+
 class DataModel(object):
     """ Data Model"""
     _schema = None
@@ -43,7 +59,7 @@ class DataModel(object):
             props = {}
             for c in cls.__mro__:
                 props.update({k: getattr(v, 'name', k) for k, v in vars(c).items()
-                             if isinstance(v, property)})
+                              if isinstance(v, property)})
             cls._data_props_list = props
         return props.copy()
 
@@ -66,11 +82,18 @@ class DataModel(object):
         }
 
     def validate(self, schema=None):
-        jsonschema.validate(
-            self.to_dict(),
-            schema or self._schema,
-            types=dict(array=(list, tuple), integer=six.integer_types),
-        )
+        if _CustomValidator is None:
+            jsonschema.validate(
+                self.to_dict(),
+                schema or self._schema,
+                types=dict(array=(list, tuple), integer=six.integer_types),
+            )
+        else:
+            jsonschema.validate(
+                self.to_dict(),
+                schema or self._schema,
+                cls=_CustomValidator,
+            )
 
     def __repr__(self):
         return '<{}.{}: {}>'.format(
@@ -127,12 +150,16 @@ class NonStrictDataModelMixin(object):
 
     :summary: supplies an __init__ method that warns about unused keywords
     """
+
     def __init__(self, **kwargs):
-        unexpected = [key for key in kwargs if not key.startswith('_')]
-        if unexpected:
-            message = '{}: unused keyword argument(s) {}' \
-                .format(type(self).__name__, unexpected)
-            warnings.warn(message, UnusedKwargsWarning)
+        # unexpected = [key for key in kwargs if not key.startswith('_')]
+        # if unexpected:
+        #     message = '{}: unused keyword argument(s) {}' \
+        #         .format(type(self).__name__, unexpected)
+        #     warnings.warn(message, UnusedKwargsWarning)
+
+        # ignore extra data warnings
+        pass
 
 
 class NonStrictDataModel(DataModel, NonStrictDataModelMixin):

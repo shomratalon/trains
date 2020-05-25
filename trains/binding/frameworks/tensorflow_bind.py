@@ -1,16 +1,19 @@
 import base64
+import os
 import sys
 import threading
 from collections import defaultdict
-from logging import ERROR, WARNING, getLogger
+from functools import partial
+from io import BytesIO
+from mimetypes import guess_extension
 from typing import Any
 
-import cv2
 import numpy as np
 import six
-from pathlib2 import Path
+from PIL import Image
 
-from ..frameworks import _patched_call, WeightsFileHandler, _Empty, TrainsFrameworkAdapter
+from ...debugging.log import LoggerRoot
+from ..frameworks import _patched_call, WeightsFileHandler, _Empty
 from ..import_bind import PostImportHookPatching
 from ...config import running_remotely
 from ...model import InputModel, OutputModel, Framework
@@ -21,190 +24,101 @@ except ImportError:
     MessageToDict = None
 
 
-class EventTrainsWriter(object):
-    """
-    TF SummaryWriter implementation that converts the tensorboard's summary into
-    Trains events and reports the events (metrics) for an Trains task (logger).
-    """
-    _add_lock = threading.Lock()
-    _series_name_lookup = {}
+class TensorflowBinding(object):
+    @classmethod
+    def update_current_task(cls, task):
+        PatchSummaryToEventTransformer.update_current_task(task)
+        PatchTensorFlowEager.update_current_task(task)
+        PatchKerasModelIO.update_current_task(task)
+        PatchTensorflowModelIO.update_current_task(task)
+        PatchTensorflow2ModelIO.update_current_task(task)
 
-    @property
-    def variants(self):
-        return self._variants
 
-    def prepare_report(self):
-        return self.variants.copy()
+class IsTensorboardInit(object):
+    _tensorboard_initialized = False
+
+    @classmethod
+    def tensorboard_used(cls):
+        return cls._tensorboard_initialized
+
+    @classmethod
+    def set_tensorboard_used(cls):
+        cls._tensorboard_initialized = True
 
     @staticmethod
-    def tag_splitter(tag, num_split_parts, split_char='/', join_char='_', default_title='variant'):
-        """
-        Split a tf.summary tag line to variant and metric.
-        Variant is the first part of the split tag, metric is the second.
-        :param str tag:
-        :param int num_split_parts:
-        :param str split_char: a character to split the tag on
-        :param str join_char:  a character to join the the splits
-        :param str default_title: variant to use in case no variant can be inferred automatically
-        :return: (str, str) variant and metric
-        """
-        splitted_tag = tag.split(split_char)
-        series = join_char.join(splitted_tag[-num_split_parts:])
-        title = join_char.join(splitted_tag[:-num_split_parts]) or default_title
-        return title, series
+    def _patched_tb__init__(original_init, self, *args, **kwargs):
+        IsTensorboardInit._tensorboard_initialized = True
+        return original_init(self, *args, **kwargs)
 
-    def __init__(self, logger, report_freq=100, image_report_freq=None, histogram_update_freq_multiplier=10,
-                 histogram_granularity=50, max_keep_images=None):
-        """
-        Create a compatible Trains backend to the TensorFlow SummaryToEventTransformer
-        Everything will be serialized directly to the Trains backend, instead of to the standard TF FileWriter
 
-        :param logger: The task.logger to use for sending the metrics (def: task.get_logger())
-        :param report_freq: How often to update the statistics values
-        :param image_report_freq: How often to upload images (step % image_update_freq == 0)
-        :param histogram_update_freq_multiplier: How often to upload histogram
-               (step//update_freq) % histogram_update_freq_multiplier == 0
-        :param histogram_granularity: How many histograms (lines) to display in the 3d histogram plot
-        :param max_keep_images: Maximum number of images to save before starting to reuse files (per title/metric pair)
-        """
-        # We are the events_writer, so that's what we'll pass
-        self.max_keep_images = max_keep_images
-        self.report_freq = report_freq
-        self.image_report_freq = image_report_freq if image_report_freq else report_freq
-        self.histogram_granularity = histogram_granularity
-        self.histogram_update_freq_multiplier = histogram_update_freq_multiplier
+class WeightsGradientHistHelper(object):
+    def __init__(self, logger, report_freq=100, histogram_update_freq_multiplier=10, histogram_granularity=50):
         self._logger = logger
-        self._visualization_mode = 'BGR'
-        self._variants = defaultdict(lambda: ())
-        self._scalar_report_cache = {}
+        self.report_freq = report_freq
+        self._histogram_granularity = histogram_granularity
+        self._histogram_update_freq_multiplier = histogram_update_freq_multiplier
+        self._histogram_update_call_counter = 0
         self._hist_report_cache = {}
         self._hist_x_granularity = 50
-        self._max_step = 0
 
-    def _decode_image(self, img_str, width, height, color_channels):
-        # noinspection PyBroadException
-        try:
-            image_string = np.asarray(bytearray(base64.b64decode(img_str)), dtype=np.uint8)
-            image = cv2.imdecode(image_string, cv2.IMREAD_COLOR)
-            val = image.reshape(height, width, -1).astype(np.uint8)
-            if val.ndim == 3 and val.shape[2] == 3:
-                if self._visualization_mode == 'BGR':
-                    val = val[:, :, [2, 1, 0]]
-                else:
-                    val = val
-            elif (val.ndim == 2) or (val.ndim == 3 and val.shape[2] == 1):
-                val = np.tile(np.atleast_3d(val), (1, 1, 3))
-            elif val.ndim == 3 and val.shape[2] == 4:
-                if self._visualization_mode == 'BGR':
-                    val = val[:, :, [2, 1, 0]]
-                else:
-                    val = val[:, :, [0, 1, 2]]
-        except Exception:
-            self._logger.warning('Failed decoding debug image [%d, %d, %d]' % (width, height, color_channels))
-            val = None
-        return val
+    @staticmethod
+    def _sample_histograms(_hist_iters, _histogram_granularity):
+        # re-sample history based on distribution of samples across time (steps)
+        ratio = ((_hist_iters[-1] - _hist_iters[_histogram_granularity]) /
+                 (_hist_iters[_histogram_granularity - 1] - _hist_iters[0])) if \
+            _hist_iters.size > _histogram_granularity else 0.
+        cur_idx_below = np.arange(0, min(_hist_iters.size, _histogram_granularity - 1))
+        np.random.shuffle(cur_idx_below)
+        cur_idx_below = cur_idx_below[:int(_histogram_granularity * (1.0 - ratio / (1 + ratio)) + 0.5)]
+        if ratio > 0.0:
+            cur_idx_above = np.arange(_histogram_granularity - 1, _hist_iters.size)
+            np.random.shuffle(cur_idx_above)
+            cur_idx_above = cur_idx_above[:int(_histogram_granularity * ratio / (1 + ratio))]
+        else:
+            cur_idx_above = np.array([])
+        _cur_idx = np.unique(np.sort(np.concatenate((cur_idx_below, cur_idx_above)).astype(np.int)))
+        return _cur_idx
 
-    def _add_image_numpy(self, tag, step, img_data_np, max_keep_images=None):
-        # only report images every specific interval
-        if step % self.image_report_freq != 0:
-            return None
-
-        if img_data_np is None:
-            return
-
-        title, series = self.tag_splitter(tag, num_split_parts=3, default_title='Images')
-        if img_data_np.dtype != np.uint8:
-            # assume scale 0-1
-            img_data_np = (img_data_np * 255).astype(np.uint8)
-
-        # if 3d, pack into one big image
-        if img_data_np.ndim == 4:
-            dims = img_data_np.shape
-            stack_dim = int(np.sqrt(dims[0]))
-            res = img_data_np.reshape(stack_dim, stack_dim, *dims[1:]).transpose((0, 2, 1, 3, 4))
-            tile_size = res.shape[0] * res.shape[1]
-            img_data_np = res.reshape(tile_size, tile_size, -1)
-
-        self._logger.report_image_and_upload(
-            title=title,
-            series=series,
-            iteration=step,
-            matrix=img_data_np,
-            max_image_history=self.max_keep_images if max_keep_images is None else max_keep_images,
-        )
-
-    def _add_image(self, tag, step, img_data):
-        # only report images every specific interval
-        if step % self.image_report_freq != 0:
-            return None
-
-        width = img_data['width']
-        height = img_data['height']
-        colorspace = img_data['colorspace']
-        img_str = img_data['encodedImageString']
-        matrix = self._decode_image(img_str, width=width, height=height, color_channels=colorspace)
-        if matrix is None:
-            return
-
-        return self._add_image_numpy(tag=tag, step=step, img_data_np=matrix)
-
-    def _add_scalar(self, tag, step, scalar_data):
-        title, series = self.tag_splitter(tag, num_split_parts=1, default_title='Scalars')
-
-        # update scalar cache
-        num, value = self._scalar_report_cache.get((title, series), (0, 0))
-        self._scalar_report_cache[(title, series)] = (num + 1, value + scalar_data)
-
-        # only report images every specific interval
-        if step % self.report_freq != 0:
-            return None
-
-        # calculate mean and zero cache
-        num, value = self._scalar_report_cache.get((title, series), (0, 0))
-        scalar_data = value / num
-        self._scalar_report_cache[(title, series)] = (0, 0)
-
-        self._logger.report_scalar(
-            title=title,
-            series=series,
-            iteration=step,
-            value=scalar_data,
-        )
-
-    def _add_histogram(self, tag, step, histo_data):
-        def _sample_histograms(_hist_iters, _histogram_granularity):
-            # resample history based on distribution of samples across time (steps)
-            ratio = ((_hist_iters[-1] - _hist_iters[_histogram_granularity]) /
-                     (_hist_iters[_histogram_granularity - 1] - _hist_iters[0])) if \
-                _hist_iters.size > _histogram_granularity else 0.
-            cur_idx_below = np.arange(0, min(_hist_iters.size, _histogram_granularity - 1))
-            np.random.shuffle(cur_idx_below)
-            cur_idx_below = cur_idx_below[:int(_histogram_granularity * (1.0 - ratio / (1 + ratio)) + 0.5)]
-            if ratio > 0.0:
-                cur_idx_above = np.arange(_histogram_granularity - 1, _hist_iters.size)
-                np.random.shuffle(cur_idx_above)
-                cur_idx_above = cur_idx_above[:int(_histogram_granularity * ratio / (1 + ratio))]
-            else:
-                cur_idx_above = np.array([])
-            _cur_idx = np.unique(np.sort(np.concatenate((cur_idx_below, cur_idx_above)).astype(np.int)))
-            return _cur_idx
-
+    def add_histogram(self, title, series, step, hist_data):
         # only collect histogram every specific interval
-        if step % self.report_freq != 0 or step < self.report_freq - 1:
+        self._histogram_update_call_counter += 1
+        if self._histogram_update_call_counter % self.report_freq != 0 or \
+                self._histogram_update_call_counter < self.report_freq - 1:
+            return None
+
+        if isinstance(hist_data, dict):
+            pass
+        elif isinstance(hist_data, np.ndarray):
+            hist_data = np.histogram(hist_data)
+            hist_data = {'bucketLimit': hist_data[1].tolist(), 'bucket': hist_data[0].tolist()}
+        else:
+            # prepare the dictionary, assume numpy
+            # histo_data['bucketLimit'] is the histogram bucket right side limit, meaning X axis
+            # histo_data['bucket'] is the histogram height, meaning the Y axis
+            # notice hist_data[:, 1] is the right side limit, for backwards compatibility we take the left side
+            hist_data = {'bucketLimit': hist_data[:, 0].tolist(), 'bucket': hist_data[:, 2].tolist()}
+
+        self._add_histogram(title=title, series=series, step=step, hist_data=hist_data)
+
+    def _add_histogram(self, title, series, step, hist_data):
+        # only collect histogram every specific interval
+        self._histogram_update_call_counter += 1
+        if self._histogram_update_call_counter % self.report_freq != 0 or \
+                self._histogram_update_call_counter < self.report_freq - 1:
             return None
 
         # generate forward matrix of the histograms
         # Y-axis (rows) is iteration (from 0 to current Step)
         # X-axis averaged bins (conformed sample 'bucketLimit')
         # Z-axis actual value (interpolated 'bucket')
-        title, series = self.tag_splitter(tag, num_split_parts=1, default_title='Histograms')
+        step = EventTrainsWriter._fix_step_counter(title, series, step)
 
         # get histograms from cache
         hist_list, hist_iters, minmax = self._hist_report_cache.get((title, series), ([], np.array([]), None))
 
         # resample data so we are always constrained in number of histogram we keep
-        if hist_iters.size >= self.histogram_granularity ** 2:
-            idx = _sample_histograms(hist_iters, self.histogram_granularity)
+        if hist_iters.size >= self._histogram_granularity ** 2:
+            idx = self._sample_histograms(hist_iters, self._histogram_granularity)
             hist_iters = hist_iters[idx]
             hist_list = [hist_list[i] for i in idx]
 
@@ -214,7 +128,9 @@ class EventTrainsWriter(object):
 
         # add current sample, if not already here
         hist_iters = np.append(hist_iters, step)
-        hist = np.array(list(zip(histo_data['bucketLimit'], histo_data['bucket'])), dtype=np.float32)
+        # histo_data['bucketLimit'] is the histogram bucket right side limit, meaning X axis
+        # histo_data['bucket'] is the histogram height, meaning the Y axis
+        hist = np.array(list(zip(hist_data['bucketLimit'], hist_data['bucket'])), dtype=np.float32)
         hist = hist[~np.isinf(hist[:, 0]), :]
         hist_list.append(hist)
         # keep track of min/max values of histograms (for later re-binning)
@@ -227,8 +143,8 @@ class EventTrainsWriter(object):
         self._hist_report_cache[(title, series)] = hist_list, hist_iters, minmax
 
         # only report histogram every specific interval, but do report the first few, so you know there are histograms
-        if hist_iters.size < 1 or (hist_iters.size >= self.histogram_update_freq_multiplier and
-                                   hist_iters.size % self.histogram_update_freq_multiplier != 0):
+        if hist_iters.size < 1 or (hist_iters.size >= self._histogram_update_freq_multiplier and
+                                   hist_iters.size % self._histogram_update_freq_multiplier != 0):
             return None
 
         # resample histograms on a unified bin axis
@@ -236,7 +152,7 @@ class EventTrainsWriter(object):
         prev_xedge = np.arange(start=_minmax[0],
                                step=(_minmax[1] - _minmax[0]) / (self._hist_x_granularity - 2), stop=_minmax[1])
         # uniformly select histograms and the last one
-        cur_idx = _sample_histograms(hist_iters, self.histogram_granularity)
+        cur_idx = self._sample_histograms(hist_iters, self._histogram_granularity)
         report_hist = np.zeros(shape=(len(cur_idx), prev_xedge.size), dtype=np.float32)
         for i, n in enumerate(cur_idx):
             h = hist_list[n]
@@ -257,28 +173,315 @@ class EventTrainsWriter(object):
             title=title,
             series=series,
             iteration=0,
-            xtitle=' ',
-            ytitle='iteration',
+            xaxis=' ',
+            yaxis='iteration',
             xlabels=xlabels,
             ylabels=ylabels,
             matrix=report_hist,
             camera=(-0.1, +1.3, 1.4))
 
+
+class EventTrainsWriter(object):
+    """
+    TF SummaryWriter implementation that converts the tensorboard's summary into
+    Trains events and reports the events (metrics) for an Trains task (logger).
+    """
+    _add_lock = threading.RLock()
+    _series_name_lookup = {}
+
+    # store all the created tensorboard writers in the system
+    # this allows us to as weather a certain tile/series already exist on some EventWriter
+    # and if it does, then we add to the series name the last token from the logdir
+    # (so we can differentiate between the two)
+    # key, value: key=hash(title, graph), value=EventTrainsWriter._id
+    _title_series_writers_lookup = {}
+    _event_writers_id_to_logdir = {}
+
+    # Protect against step (iteration) reuse, for example,
+    # steps counter inside an epoch, but wrapping around when epoch ends
+    # i.e. step = 0..100 then epoch ends and again step = 0..100
+    # We store the first report per title/series combination, and if wraparound occurs
+    # we synthetically continue to increase the step/iteration based on the previous epoch counter
+    # example: _title_series_wraparound_counter[('title', 'series')] =
+    #           {'first_step':None, 'last_step':None, 'adjust_counter':0,}
+    _title_series_wraparound_counter = {}
+
+    @property
+    def variants(self):
+        return self._variants
+
+    def prepare_report(self):
+        return self.variants.copy()
+
+    def tag_splitter(self, tag, num_split_parts, split_char='/', join_char='_', default_title='variant',
+                     logdir_header='series', auto_reduce_num_split=False):
+        """
+        Split a tf.summary tag line to variant and metric.
+        Variant is the first part of the split tag, metric is the second.
+        :param str tag:
+        :param int num_split_parts:
+        :param str split_char: a character to split the tag on
+        :param str join_char:  a character to join the the splits
+        :param str default_title: variant to use in case no variant can be inferred automatically
+        :param str logdir_header: if 'series_last' then series=header: series, if 'series then series=series :header,
+            if 'title_last' then title=header title, if 'title' then title=title header
+        :param boolean auto_reduce_num_split: if True and the tag is split for less parts then requested,
+            then requested number of split parts is adjusted.
+        :return: (str, str) variant and metric
+        """
+        splitted_tag = tag.split(split_char)
+        if auto_reduce_num_split and num_split_parts > len(splitted_tag) - 1:
+            num_split_parts = max(1, len(splitted_tag) - 1)
+        series = join_char.join(splitted_tag[-num_split_parts:])
+        title = join_char.join(splitted_tag[:-num_split_parts]) or default_title
+
+        # check if we already decided that we need to change the title/series
+        graph_id = hash((title, series))
+        if graph_id in self._graph_name_lookup:
+            return self._graph_name_lookup[graph_id]
+
+        # check if someone other than us used this combination
+        with self._add_lock:
+            event_writer_id = self._title_series_writers_lookup.get(graph_id, None)
+            if not event_writer_id:
+                # put us there
+                self._title_series_writers_lookup[graph_id] = self._id
+            elif event_writer_id != self._id:
+                # if there is someone else, change our series name and store us
+                org_series = series
+                org_title = title
+                other_logdir = self._event_writers_id_to_logdir[event_writer_id]
+                split_logddir = self._logdir.split('/')
+                unique_logdir = set(split_logddir) - set(other_logdir.split('/'))
+                header = '/'.join(s for s in split_logddir if s in unique_logdir)
+                if logdir_header == 'series_last':
+                    series = header + ': ' + series
+                elif logdir_header == 'series':
+                    series = series + ' :' + header
+                elif logdir_header == 'title':
+                    title = title + ' ' + header
+                else:  # logdir_header == 'title_last':
+                    title = header + ' ' + title
+                graph_id = hash((title, series))
+                # check if for some reason the new series is already occupied
+                new_event_writer_id = self._title_series_writers_lookup.get(graph_id)
+                if new_event_writer_id is not None and new_event_writer_id != self._id:
+                    # well that's about it, nothing else we could do
+                    if logdir_header == 'series_last':
+                        series = str(self._logdir) + ': ' + org_series
+                    elif logdir_header == 'series':
+                        series = org_series + ' :' + str(self._logdir)
+                    elif logdir_header == 'title':
+                        title = org_title + ' ' + str(self._logdir)
+                    else:  # logdir_header == 'title_last':
+                        title = str(self._logdir) + ' ' + org_title
+                    graph_id = hash((title, series))
+
+                self._title_series_writers_lookup[graph_id] = self._id
+
+        # store for next time
+        self._graph_name_lookup[graph_id] = (title, series)
+        return title, series
+
+    def __init__(self, logger, logdir=None, report_freq=100, image_report_freq=None,
+                 histogram_update_freq_multiplier=10, histogram_granularity=50, max_keep_images=None):
+        """
+        Create a compatible Trains backend to the TensorFlow SummaryToEventTransformer
+        Everything will be serialized directly to the Trains backend, instead of to the standard TF FileWriter
+
+        :param logger: The task.logger to use for sending the metrics (def: task.get_logger())
+        :param report_freq: How often to update the statistics values
+        :param image_report_freq: How often to upload images (step % image_update_freq == 0)
+        :param histogram_update_freq_multiplier: How often to upload histogram
+               (step//update_freq) % histogram_update_freq_multiplier == 0
+        :param histogram_granularity: How many histograms (lines) to display in the 3d histogram plot
+        :param max_keep_images: Maximum number of images to save before starting to reuse files (per title/metric pair)
+        """
+        # We are the events_writer, so that's what we'll pass
+        IsTensorboardInit.set_tensorboard_used()
+        self._logdir = logdir or ('unknown %d' % len(self._event_writers_id_to_logdir))
+        # conform directory structure to unix
+        if os.path.sep == '\\':
+            self._logdir = self._logdir.replace('\\', '/')
+        self._id = hash(self._logdir)
+        self._event_writers_id_to_logdir[self._id] = self._logdir
+        self.max_keep_images = max_keep_images
+        self.report_freq = report_freq
+        self.image_report_freq = image_report_freq if image_report_freq else report_freq
+        self.histogram_granularity = histogram_granularity
+        self.histogram_update_freq_multiplier = histogram_update_freq_multiplier
+        self._histogram_update_call_counter = 0
+        self._logger = logger
+        self._visualization_mode = 'RGB'  # 'BGR'
+        self._variants = defaultdict(lambda: ())
+        self._scalar_report_cache = {}
+        self._hist_report_cache = {}
+        self._hist_x_granularity = 50
+        self._max_step = 0
+        self._graph_name_lookup = {}
+        self._generic_tensor_type_name_lookup = {}
+        self._grad_helper = WeightsGradientHistHelper(
+            logger=logger,
+            report_freq=report_freq,
+            histogram_update_freq_multiplier=histogram_update_freq_multiplier,
+            histogram_granularity=histogram_granularity
+        )
+
+    def _decode_image(self, img_str, width, height, color_channels):
+        # noinspection PyBroadException
+        try:
+            if isinstance(img_str, bytes):
+                imdata = img_str
+            else:
+                imdata = base64.b64decode(img_str)
+            output = BytesIO(imdata)
+            im = Image.open(output)
+            image = np.asarray(im)
+            output.close()
+            if height > 0 and width > 0:
+                val = image.reshape(height, width, -1).astype(np.uint8)
+            else:
+                val = image.astype(np.uint8)
+            if val.ndim == 3 and val.shape[2] == 3:
+                if self._visualization_mode == 'BGR':
+                    val = val[:, :, [2, 1, 0]]
+                else:
+                    val = val
+            elif (val.ndim == 2) or (val.ndim == 3 and val.shape[2] == 1):
+                val = np.tile(np.atleast_3d(val), (1, 1, 3))
+            elif val.ndim == 3 and val.shape[2] == 4:
+                if self._visualization_mode == 'BGR':
+                    val = val[:, :, [2, 1, 0]]
+                else:
+                    val = val[:, :, [0, 1, 2]]
+        except Exception:
+            LoggerRoot.get_base_logger(TensorflowBinding).warning('Failed decoding debug image [%d, %d, %d]'
+                                                                  % (width, height, color_channels))
+            val = None
+        return val
+
+    def _add_image_numpy(self, tag, step, img_data_np, max_keep_images=None):
+        # only report images every specific interval
+        if step % self.image_report_freq != 0:
+            return None
+
+        if img_data_np is None:
+            return
+
+        title, series = self.tag_splitter(tag, num_split_parts=3, default_title='Images', logdir_header='title',
+                                          auto_reduce_num_split=True)
+        step = self._fix_step_counter(title, series, step)
+
+        if img_data_np.dtype != np.uint8:
+            # assume scale 0-1
+            img_data_np = (img_data_np * 255).astype(np.uint8)
+
+        # if 3d, pack into one big image
+        if img_data_np.ndim == 4:
+            dims = img_data_np.shape
+            stack_dim = int(np.sqrt(dims[0]))
+            res = img_data_np.reshape(stack_dim, stack_dim, *dims[1:]).transpose((0, 2, 1, 3, 4))
+            tile_size = res.shape[0] * res.shape[1]
+            img_data_np = res.reshape(tile_size, tile_size, -1)
+
+        self._logger.report_image(
+            title=title,
+            series=series,
+            iteration=step,
+            image=img_data_np,
+            max_image_history=self.max_keep_images if max_keep_images is None else max_keep_images,
+        )
+
+    def _add_image(self, tag, step, img_data):
+        # only report images every specific interval
+        if step % self.image_report_freq != 0:
+            return None
+
+        width = img_data['width']
+        height = img_data['height']
+        colorspace = img_data['colorspace']
+        img_str = img_data['encodedImageString']
+        matrix = self._decode_image(img_str, width=width, height=height, color_channels=colorspace)
+        if matrix is None:
+            return
+
+        return self._add_image_numpy(tag=tag, step=step, img_data_np=matrix)
+
+    def _add_scalar(self, tag, step, scalar_data):
+        default_title = tag if not self._logger._get_tensorboard_auto_group_scalars() else 'Scalars'
+        series_per_graph = self._logger._get_tensorboard_single_series_per_graph()
+
+        title, series = self.tag_splitter(
+            tag, num_split_parts=1, default_title=default_title,
+            logdir_header='title' if series_per_graph else 'series_last'
+        )
+
+        step = self._fix_step_counter(title, series, step)
+        tag = self._get_add_scalars_event_tag(default_title)
+
+        possible_title = tag if series_per_graph else None
+        possible_tag = None if series_per_graph else tag
+
+        title = title + possible_title if possible_title else title
+        series = possible_tag or series
+        # update scalar cache
+        num, value = self._scalar_report_cache.get((title, series), (0, 0))
+        # nan outputs is a string, it's probably a NaN
+        if isinstance(scalar_data, six.string_types):
+            try:
+                scalar_data = float(scalar_data)
+            except:
+                scalar_data = float('nan')
+        # nan outputs nan
+        self._scalar_report_cache[(title, series)] = \
+            (num + 1,
+             (value + scalar_data) if scalar_data == scalar_data else scalar_data)
+
+        # only report images every specific interval
+        if step % self.report_freq != 0:
+            return None
+
+        # calculate mean and zero cache
+        num, value = self._scalar_report_cache.get((title, series), (0, 0))
+        scalar_data = value / num
+        self._scalar_report_cache[(title, series)] = (0, 0)
+
+        self._logger.report_scalar(
+            title=title,
+            series=series,
+            iteration=step,
+            value=scalar_data,
+        )
+
+    def _add_histogram(self, tag, step, histo_data):
+        title, series = self.tag_splitter(tag, num_split_parts=1, default_title='Histograms',
+                                          logdir_header='series')
+
+        self._grad_helper.add_histogram(
+            title=title,
+            series=series,
+            step=step,
+            hist_data=histo_data
+        )
+
     def _add_plot(self, tag, step, values, vdict):
         # noinspection PyBroadException
         try:
-            plot_values = np.frombuffer(base64.b64decode(values['tensorContent'].encode('utf-8')),
-                                        dtype=np.float32)
+            if values.get('floatVal'):
+                plot_values = np.array(values.get('floatVal'), dtype=np.float32)
+            else:
+                plot_values = np.frombuffer(base64.b64decode(values['tensorContent'].encode('utf-8')),
+                                            dtype=np.float32)
             plot_values = plot_values.reshape((int(values['tensorShape']['dim'][0]['size']),
                                                int(values['tensorShape']['dim'][1]['size'])))
             if 'metadata' in vdict:
                 if tag not in self._series_name_lookup:
-                    self._series_name_lookup[tag] = [(tag, vdict['metadata']['displayName'],
+                    self._series_name_lookup[tag] = [(tag, vdict['metadata'].get('displayName', ''),
                                                       vdict['metadata']['pluginData']['pluginName'])]
                 else:
                     # this should not happen, maybe it's another run, let increase the value
-                    self._series_name_lookup[tag] += [(tag + '_%d' % len(self._series_name_lookup[tag]) + 1,
-                                                       vdict['metadata']['displayName'],
+                    self._series_name_lookup[tag] += [(tag + '_%d' % (len(self._series_name_lookup[tag]) + 1),
+                                                       vdict['metadata'].get('displayName', ''),
                                                        vdict['metadata']['pluginData']['pluginName'])]
 
             tag, series, plugin_name = self._series_name_lookup.get(tag, [(tag, tag, '')])[-1]
@@ -288,7 +491,7 @@ class EventTrainsWriter(object):
                 #   width = 1.0 / (num_thresholds - 1)
                 #   thresholds = [0.0, 1*width, 2*width, 3*width, ..., 1.0]
                 num_thresholds = plot_values.shape[1]
-                width = 1.0 / (num_thresholds - 1)
+                width = 1.0 / num_thresholds
                 thresholds = np.arange(0.0, 1.0, width, dtype=plot_values.dtype)
                 data_points = ['TP     ', 'FP     ', 'TN     ', 'FN     ', 'Precision ', ' Recall']
                 series = [{'name': series, 'data': np.vstack((thresholds, plot_values[-2])).T,
@@ -304,9 +507,58 @@ class EventTrainsWriter(object):
         except Exception:
             pass
 
+    def _add_audio(self, tag, step, values, audio_data=None):
+        # only report images every specific interval
+        if step % self.image_report_freq != 0:
+            return None
+
+        if values:
+            audio_str = values['encodedAudioString']
+            audio_data = base64.b64decode(audio_str)
+        if audio_data is None:
+            return
+
+        title, series = self.tag_splitter(tag, num_split_parts=3, default_title='Audio', logdir_header='title',
+                                          auto_reduce_num_split=True)
+        step = self._fix_step_counter(title, series, step)
+
+        stream = BytesIO(audio_data)
+        if values:
+            file_extension = guess_extension(values['contentType']) or \
+                '.{}'.format(values['contentType'].split('/')[-1])
+        else:
+            # assume wav as default
+            file_extension = '.wav'
+        self._logger.report_media(
+            title=title,
+            series=series,
+            iteration=step,
+            stream=stream,
+            file_extension=file_extension,
+            max_history=self.max_keep_images,
+        )
+
+    @staticmethod
+    def _fix_step_counter(title, series, step):
+        key = (title, series)
+        if key not in EventTrainsWriter._title_series_wraparound_counter:
+            EventTrainsWriter._title_series_wraparound_counter[key] = {'first_step': step, 'last_step': step,
+                                                                       'adjust_counter': 0}
+            return step
+        wraparound_counter = EventTrainsWriter._title_series_wraparound_counter[key]
+        # we decide on wrap around if the current step is less than 10% of the previous step
+        # notice since counter is int and we want to avoid rounding error, we have double check in the if
+        if step < wraparound_counter['last_step'] and step < 0.9 * wraparound_counter['last_step']:
+            # adjust step base line
+            wraparound_counter['adjust_counter'] += wraparound_counter['last_step'] + (1 if step <= 0 else step)
+
+        # return adjusted step
+        wraparound_counter['last_step'] = step
+        return step + wraparound_counter['adjust_counter']
+
     def add_event(self, event, step=None, walltime=None, **kwargs):
         supported_metrics = {
-            'simpleValue', 'image', 'histo', 'tensor'
+            'simpleValue', 'image', 'histo', 'tensor', 'audio'
         }
 
         def get_data(value_dict, metric_search_order):
@@ -330,7 +582,8 @@ class EventTrainsWriter(object):
                 msg_dict.pop('wallTime', None)
                 keys_list = [key for key in msg_dict.keys() if len(key) > 0]
                 keys_list = ', '.join(keys_list)
-                self._logger.debug('event summary not found, message type unsupported: %s' % keys_list)
+                LoggerRoot.get_base_logger(TensorflowBinding).debug(
+                    'event summary not found, message type unsupported: %s' % keys_list)
                 return
             value_dicts = summary.get('value')
             walltime = walltime or msg_dict.get('step')
@@ -342,19 +595,21 @@ class EventTrainsWriter(object):
                     step = int(event.step)
                 else:
                     step = 0
-                    self._logger.debug('Recieved event without step, assuming step = {}'.format(step), WARNING)
+                    LoggerRoot.get_base_logger(TensorflowBinding).debug(
+                        'Received event without step, assuming step = {}'.format(step))
             else:
                 step = int(step)
             self._max_step = max(self._max_step, step)
             if value_dicts is None:
-                self._logger.debug("Summary with arrived without 'value'", ERROR)
+                LoggerRoot.get_base_logger(TensorflowBinding).debug("Summary arrived without 'value'")
                 return
 
             for vdict in value_dicts:
                 tag = vdict.pop('tag', None)
                 if tag is None:
                     # we should not get here
-                    self._logger.debug('No tag for \'value\' existing keys %s' % ', '.join(vdict.keys()))
+                    LoggerRoot.get_base_logger(TensorflowBinding).debug(
+                        'No tag for \'value\' existing keys %s' % ', '.join(vdict.keys()))
                     continue
                 metric, values = get_data(vdict, supported_metrics)
                 if metric == 'simpleValue':
@@ -363,14 +618,28 @@ class EventTrainsWriter(object):
                     self._add_histogram(tag=tag, step=step, histo_data=values)
                 elif metric == 'image':
                     self._add_image(tag=tag, step=step, img_data=values)
+                elif metric == 'audio':
+                    self._add_audio(tag, step, values)
                 elif metric == 'tensor' and values.get('dtype') == 'DT_STRING':
-                    # text, just print to console
-                    text = base64.b64decode('\n'.join(values['stringVal'])).decode('utf-8')
-                    self._logger.report_text(msg='SUMMARY LOG: {} {}'.format(tag, text), print_console=False)
+                    # generic tensor
+                    tensor_bytes = base64.b64decode('\n'.join(values['stringVal']))
+                    plugin_type = self._generic_tensor_type_name_lookup.get(tag) or \
+                        vdict.get('metadata', {}).get('pluginData', {}).get('pluginName', '').lower()
+                    if plugin_type == 'audio':
+                        self._generic_tensor_type_name_lookup[tag] = plugin_type
+                        self._add_audio(tag, step, None, tensor_bytes)
+                    elif plugin_type == 'text':
+                        # text, just print to console
+                        text = tensor_bytes.decode('utf-8', errors='replace')
+                        self._logger.report_text(msg='SUMMARY LOG: {} {}'.format(tag, text), print_console=False)
+                    else:
+                        # we do not support it
+                        pass
                 elif metric == 'tensor' and values.get('dtype') == 'DT_FLOAT':
                     self._add_plot(tag, step, values, vdict)
                 else:
-                    self._logger.debug('Event unsupported. tag = %s, vdict keys [%s]' % (tag, ', '.join(vdict.keys)))
+                    LoggerRoot.get_base_logger(TensorflowBinding).debug(
+                        'Event unsupported. tag = %s, vdict keys [%s]' % (tag, ', '.join(vdict.keys())))
                     continue
 
     def get_logdir(self):
@@ -404,9 +673,42 @@ class EventTrainsWriter(object):
         """
         pass
 
+    def _get_add_scalars_event_tag(self, title_prefix):
+        """
+
+        :param str title_prefix: the table title prefix that was added to the series.
+        :return: str same as tensorboard use
+        """
+        # HACK - this is tensorboard Summary util function, original path:
+        # ~/torch/utils/tensorboard/summary.py
+        def _clean_tag(name):
+            import re as _re
+            _INVALID_TAG_CHARACTERS = _re.compile(r'[^-/\w\.]')
+            if name is not None:
+                new_name = _INVALID_TAG_CHARACTERS.sub('_', name)
+                new_name = new_name.lstrip('/')  # Remove leading slashes
+                if new_name != name:
+                    LoggerRoot.get_base_logger(TensorflowBinding).debug(
+                        'Summary name %s is illegal; using %s instead.' % (name, new_name))
+                    name = new_name
+            return name
+
+        main_path = self._logdir
+        try:
+            main_path = _clean_tag(main_path)
+            origin_tag = main_path.rpartition("/")[2].replace(title_prefix, "", 1)
+            if title_prefix and origin_tag[0] == "_":  # add_scalars tag
+                origin_tag = origin_tag[1:]  # Remove the first "_" that was added by the main_tag in tensorboard
+            else:
+                return ""
+        except Exception:
+            origin_tag = ""
+        return origin_tag
+
 
 class ProxyEventsWriter(object):
     def __init__(self, events):
+        IsTensorboardInit.set_tensorboard_used()
         self._events = events
 
     def _get_sentinel_event(self):
@@ -499,7 +801,7 @@ class PatchSummaryToEventTransformer(object):
                     setattr(SummaryToEventTransformer, 'trains',
                             property(PatchSummaryToEventTransformer.trains_object))
             except Exception as ex:
-                getLogger(TrainsFrameworkAdapter).warning(str(ex))
+                LoggerRoot.get_base_logger(TensorflowBinding).debug(str(ex))
 
         if 'torch' in sys.modules:
             try:
@@ -513,7 +815,7 @@ class PatchSummaryToEventTransformer(object):
                 # this is a new version of TensorflowX
                 pass
             except Exception as ex:
-                getLogger(TrainsFrameworkAdapter).warning(str(ex))
+                LoggerRoot.get_base_logger(TensorflowBinding).debug(str(ex))
 
         if 'tensorboardX' in sys.modules:
             try:
@@ -529,7 +831,7 @@ class PatchSummaryToEventTransformer(object):
                 # this is a new version of TensorflowX
                 pass
             except Exception as ex:
-                getLogger(TrainsFrameworkAdapter).warning(str(ex))
+                LoggerRoot.get_base_logger(TensorflowBinding).debug(str(ex))
 
             if PatchSummaryToEventTransformer.__original_getattributeX is None:
                 try:
@@ -543,15 +845,19 @@ class PatchSummaryToEventTransformer(object):
                     # this is a new version of TensorflowX
                     pass
                 except Exception as ex:
-                    getLogger(TrainsFrameworkAdapter).warning(str(ex))
+                    LoggerRoot.get_base_logger(TensorflowBinding).debug(str(ex))
 
     @staticmethod
     def _patched_add_eventT(self, *args, **kwargs):
         if not hasattr(self, 'trains') or not PatchSummaryToEventTransformer.__main_task:
             return PatchSummaryToEventTransformer._original_add_eventT(self, *args, **kwargs)
         if not self.trains:
+            try:
+                logdir = self.get_logdir()
+            except Exception:
+                logdir = None
             self.trains = EventTrainsWriter(PatchSummaryToEventTransformer.__main_task.get_logger(),
-                                            **PatchSummaryToEventTransformer.defaults_dict)
+                                            logdir=logdir, **PatchSummaryToEventTransformer.defaults_dict)
         # noinspection PyBroadException
         try:
             self.trains.add_event(*args, **kwargs)
@@ -564,8 +870,12 @@ class PatchSummaryToEventTransformer(object):
         if not hasattr(self, 'trains') or not PatchSummaryToEventTransformer.__main_task:
             return PatchSummaryToEventTransformer._original_add_eventX(self, *args, **kwargs)
         if not self.trains:
+            try:
+                logdir = self.get_logdir()
+            except Exception:
+                logdir = None
             self.trains = EventTrainsWriter(PatchSummaryToEventTransformer.__main_task.get_logger(),
-                                            **PatchSummaryToEventTransformer.defaults_dict)
+                                            logdir=logdir, **PatchSummaryToEventTransformer.defaults_dict)
         # noinspection PyBroadException
         try:
             self.trains.add_event(*args, **kwargs)
@@ -597,8 +907,13 @@ class PatchSummaryToEventTransformer(object):
 
         # patch the events writer field, and add a double Event Logger (Trains and original)
         base_eventwriter = __dict__['event_writer']
+        try:
+            logdir = base_eventwriter.get_logdir()
+        except Exception:
+            logdir = None
         defaults_dict = __dict__.get('_trains_defaults') or PatchSummaryToEventTransformer.defaults_dict
-        trains_event = EventTrainsWriter(PatchSummaryToEventTransformer.__main_task.get_logger(), **defaults_dict)
+        trains_event = EventTrainsWriter(PatchSummaryToEventTransformer.__main_task.get_logger(),
+                                         logdir=logdir, **defaults_dict)
 
         # order is important, the return value of ProxyEventsWriter is the last object in the list
         __dict__['event_writer'] = ProxyEventsWriter([trains_event, base_eventwriter])
@@ -614,7 +929,7 @@ class _ModelAdapter(object):
         super(_ModelAdapter, self).__init__()
         super(_ModelAdapter, self).__setattr__('_model', model)
         super(_ModelAdapter, self).__setattr__('_output_model', output_model)
-        super(_ModelAdapter, self).__setattr__('_logger', getLogger('TrainsModelAdapter'))
+        super(_ModelAdapter, self).__setattr__('_logger', LoggerRoot.get_base_logger(TensorflowBinding))
 
     def __getattr__(self, attr):
         return getattr(self._model, attr)
@@ -697,7 +1012,7 @@ class PatchModelCheckPointCallback(object):
                         property(PatchModelCheckPointCallback.trains_object))
 
         except Exception as ex:
-            getLogger(TrainsFrameworkAdapter).warning(str(ex))
+            LoggerRoot.get_base_logger(TensorflowBinding).warning(str(ex))
 
     @staticmethod
     def _patched_getattribute(self, attr):
@@ -723,7 +1038,7 @@ class PatchModelCheckPointCallback(object):
             name=defaults_dict.get('name'),
             comment=defaults_dict.get('comment'),
             label_enumeration=defaults_dict.get('label_enumeration') or
-                              PatchModelCheckPointCallback.__main_task.get_labels_enumeration(),
+            PatchModelCheckPointCallback.__main_task.get_labels_enumeration(),
             framework=Framework.keras,
         )
         output_model.set_upload_destination(
@@ -740,7 +1055,7 @@ class PatchTensorFlowEager(object):
     __original_fn_scalar = None
     __original_fn_hist = None
     __original_fn_image = None
-    __trains_event_writer = None
+    __trains_event_writer = {}
     defaults_dict = dict(
         report_freq=1, image_report_freq=1, histogram_update_freq_multiplier=5,
         histogram_granularity=50)
@@ -768,55 +1083,140 @@ class PatchTensorFlowEager(object):
                 gen_summary_ops.write_image_summary = PatchTensorFlowEager._write_image_summary
                 PatchTensorFlowEager.__original_fn_hist = gen_summary_ops.write_histogram_summary
                 gen_summary_ops.write_histogram_summary = PatchTensorFlowEager._write_hist_summary
+                PatchTensorFlowEager.__write_summary = gen_summary_ops.write_summary
+                gen_summary_ops.write_summary = PatchTensorFlowEager._write_summary
+                gen_summary_ops.create_summary_file_writer = partial(IsTensorboardInit._patched_tb__init__,
+                                                                     gen_summary_ops.create_summary_file_writer)
+                gen_summary_ops.create_summary_db_writer = partial(IsTensorboardInit._patched_tb__init__,
+                                                                   gen_summary_ops.create_summary_db_writer)
             except ImportError:
                 pass
             except Exception as ex:
-                getLogger(TrainsFrameworkAdapter).warning(str(ex))
+                LoggerRoot.get_base_logger(TensorflowBinding).debug(str(ex))
 
     @staticmethod
-    def _get_event_writer():
+    def _get_event_writer(writer):
         if not PatchTensorFlowEager.__main_task:
             return None
-        if PatchTensorFlowEager.__trains_event_writer is None:
-            PatchTensorFlowEager.__trains_event_writer = EventTrainsWriter(
-                logger=PatchTensorFlowEager.__main_task.get_logger(), **PatchTensorFlowEager.defaults_dict)
-        return PatchTensorFlowEager.__trains_event_writer
+        if not PatchTensorFlowEager.__trains_event_writer.get(id(writer)):
+            try:
+                logdir = writer.get_logdir()
+            except Exception:
+                # check if we are in eager mode, let's get the global context lopdir
+                try:
+                    from tensorflow.python.eager import context
+                    logdir = context.context().summary_writer._init_op_fn.keywords.get('logdir')
+                except:
+                    try:
+                        from tensorflow.python.ops.summary_ops_v2 import _summary_state
+                        logdir = _summary_state.writer._init_op_fn.keywords.get('logdir')
+                    except:
+                        logdir = None
+                try:
+                    if logdir is not None:
+                        logdir = logdir.numpy().decode()
+                except:
+                    logdir = None
+
+            PatchTensorFlowEager.__trains_event_writer[id(writer)] = EventTrainsWriter(
+                logger=PatchTensorFlowEager.__main_task.get_logger(), logdir=logdir,
+                **PatchTensorFlowEager.defaults_dict)
+        return PatchTensorFlowEager.__trains_event_writer[id(writer)]
 
     @staticmethod
     def trains_object(self):
-        return PatchTensorFlowEager.__trains_event_writer
+        if not PatchTensorFlowEager.__trains_event_writer:
+            return None
+        return PatchTensorFlowEager.__trains_event_writer.get(
+            id(self), list(PatchTensorFlowEager.__trains_event_writer.values())[0])
+
+    @staticmethod
+    def _write_summary(writer, step, tensor, tag, summary_metadata, name=None, **kwargs):
+        event_writer = PatchTensorFlowEager._get_event_writer(writer)
+        if event_writer:
+            try:
+                plugin_type = summary_metadata.decode()
+                if plugin_type.endswith('scalars'):
+                    event_writer._add_scalar(tag=str(tag),
+                                             step=int(step.numpy()) if not isinstance(step, int) else step,
+                                             scalar_data=tensor.numpy())
+                elif plugin_type.endswith('images'):
+                    img_data_np = tensor.numpy()
+                    PatchTensorFlowEager._add_image_event_helper(event_writer, img_data_np=img_data_np,
+                                                                 tag=tag, step=step, **kwargs)
+                elif plugin_type.endswith('histograms'):
+                    event_writer._add_histogram(
+                        tag=str(tag), step=int(step.numpy()) if not isinstance(step, int) else step,
+                        hist_data=tensor.numpy()
+                    )
+                elif 'audio' in plugin_type:
+                    audio_bytes_list = [a for a in tensor.numpy().flatten() if a]
+                    for i, audio_bytes in enumerate(audio_bytes_list):
+                        event_writer._add_audio(tag=str(tag) + ('/{}'.format(i) if len(audio_bytes_list) > 1 else ''),
+                                                step=int(step.numpy()) if not isinstance(step, int) else step,
+                                                values=None, audio_data=audio_bytes)
+                else:
+                    pass  # print('unsupported plugin_type', plugin_type)
+            except Exception as ex:
+                pass
+        return PatchTensorFlowEager.__write_summary(writer, step, tensor, tag, summary_metadata, name, **kwargs)
 
     @staticmethod
     def _write_scalar_summary(writer, step, tag, value, name=None, **kwargs):
-        event_writer = PatchTensorFlowEager._get_event_writer()
+        event_writer = PatchTensorFlowEager._get_event_writer(writer)
         if event_writer:
             try:
-                event_writer._add_scalar(tag=str(tag), step=int(step.numpy()), scalar_data=value.numpy())
+                event_writer._add_scalar(tag=str(tag),
+                                         step=int(step.numpy()) if not isinstance(step, int) else step,
+                                         scalar_data=value.numpy())
             except Exception as ex:
-                getLogger(TrainsFrameworkAdapter).warning(str(ex))
+                LoggerRoot.get_base_logger(TensorflowBinding).warning(str(ex))
         return PatchTensorFlowEager.__original_fn_scalar(writer, step, tag, value, name, **kwargs)
 
     @staticmethod
     def _write_hist_summary(writer, step, tag, values, name, **kwargs):
-        event_writer = PatchTensorFlowEager._get_event_writer()
+        event_writer = PatchTensorFlowEager._get_event_writer(writer)
         if event_writer:
             try:
-                event_writer._add_histogram(tag=str(tag), step=int(step.numpy()), histo_data=values.numpy())
+                event_writer._add_histogram(
+                    tag=str(tag), step=int(step.numpy()) if not isinstance(step, int) else step,
+                    hist_data=values.numpy()
+                )
             except Exception as ex:
-                getLogger(TrainsFrameworkAdapter).warning(str(ex))
+                LoggerRoot.get_base_logger(TensorflowBinding).warning(str(ex))
         return PatchTensorFlowEager.__original_fn_hist(writer, step, tag, values, name, **kwargs)
 
     @staticmethod
     def _write_image_summary(writer, step, tag, tensor, bad_color, max_images, name, **kwargs):
-        event_writer = PatchTensorFlowEager._get_event_writer()
+        event_writer = PatchTensorFlowEager._get_event_writer(writer)
         if event_writer:
             try:
-                event_writer._add_image_numpy(tag=str(tag), step=int(step.numpy()), img_data_np=tensor.numpy(),
-                                              max_keep_images=max_images)
+                PatchTensorFlowEager._add_image_event_helper(event_writer, img_data_np=tensor.numpy(),
+                                                             tag=tag, step=step, **kwargs)
             except Exception as ex:
-                getLogger(TrainsFrameworkAdapter).warning(str(ex))
+                LoggerRoot.get_base_logger(TensorflowBinding).warning(str(ex))
         return PatchTensorFlowEager.__original_fn_image(writer, step, tag, tensor, bad_color, max_images, name,
                                                         **kwargs)
+
+    @staticmethod
+    def _add_image_event_helper(event_writer, img_data_np, tag, step, **kwargs):
+        if img_data_np.ndim == 1 and img_data_np.size >= 3 and \
+                (len(img_data_np[0]) < 10 and len(img_data_np[1]) < 10):
+            # this is just for making sure these are actually valid numbers
+            width = int(img_data_np[0].decode())
+            height = int(img_data_np[1].decode())
+            for i in range(2, img_data_np.size):
+                img_data = {'width': -1, 'height': -1,
+                            'colorspace': 'RGB', 'encodedImageString': img_data_np[i]}
+                image_tag = str(tag) + '/sample_{}'.format(i - 2) if img_data_np.size > 3 else str(tag)
+                event_writer._add_image(tag=image_tag,
+                                        step=int(step.numpy()) if not isinstance(step, int) else step,
+                                        img_data=img_data)
+        else:
+            event_writer._add_image_numpy(tag=str(tag),
+                                          step=int(step.numpy()) if not isinstance(step, int) else step,
+                                          img_data_np=img_data_np,
+                                          max_keep_images=kwargs.get('max_images'))
 
 
 class PatchKerasModelIO(object):
@@ -891,11 +1291,19 @@ class PatchKerasModelIO(object):
             if Sequential is not None:
                 Sequential._updated_config = _patched_call(Sequential._updated_config,
                                                            PatchKerasModelIO._updated_config)
-                Sequential.from_config = _patched_call(Sequential.from_config, PatchKerasModelIO._from_config)
+                if hasattr(Sequential.from_config, '__func__'):
+                    Sequential.from_config = classmethod(_patched_call(Sequential.from_config.__func__,
+                                                                       PatchKerasModelIO._from_config))
+                else:
+                    Sequential.from_config = _patched_call(Sequential.from_config, PatchKerasModelIO._from_config)
 
             if Network is not None:
                 Network._updated_config = _patched_call(Network._updated_config, PatchKerasModelIO._updated_config)
-                Network.from_config = _patched_call(Network.from_config, PatchKerasModelIO._from_config)
+                if hasattr(Sequential.from_config, '__func__'):
+                    Network.from_config = classmethod(_patched_call(Network.from_config.__func__,
+                                                                    PatchKerasModelIO._from_config))
+                else:
+                    Network.from_config = _patched_call(Network.from_config, PatchKerasModelIO._from_config)
                 Network.save = _patched_call(Network.save, PatchKerasModelIO._save)
                 Network.save_weights = _patched_call(Network.save_weights, PatchKerasModelIO._save_weights)
                 Network.load_weights = _patched_call(Network.load_weights, PatchKerasModelIO._load_weights)
@@ -904,7 +1312,7 @@ class PatchKerasModelIO(object):
                 keras_saving.save_model = _patched_call(keras_saving.save_model, PatchKerasModelIO._save_model)
                 keras_saving.load_model = _patched_call(keras_saving.load_model, PatchKerasModelIO._load_model)
         except Exception as ex:
-            getLogger(TrainsFrameworkAdapter).warning(str(ex))
+            LoggerRoot.get_base_logger(TensorflowBinding).warning(str(ex))
 
     @staticmethod
     def _updated_config(original_fn, self):
@@ -932,7 +1340,7 @@ class PatchKerasModelIO(object):
                     framework=Framework.keras,
                 )
         except Exception as ex:
-            getLogger(TrainsFrameworkAdapter).warning(str(ex))
+            LoggerRoot.get_base_logger(TensorflowBinding).warning(str(ex))
 
         return config
 
@@ -965,7 +1373,8 @@ class PatchKerasModelIO(object):
             PatchKerasModelIO.__main_task.connect(self.trains_in_model)
             # if we are running remotely we should deserialize the object
             # because someone might have changed the configuration
-            if running_remotely():
+            # Hack: disabled
+            if False and running_remotely():
                 # reload the model
                 model_config = self.trains_in_model.config_dict
                 # verify that this is the same model so we are not deserializing a diff model
@@ -981,7 +1390,7 @@ class PatchKerasModelIO(object):
                     return model
 
         except Exception as ex:
-            getLogger(TrainsFrameworkAdapter).warning(str(ex))
+            LoggerRoot.get_base_logger(TensorflowBinding).warning(str(ex))
 
         return self
 
@@ -993,7 +1402,8 @@ class PatchKerasModelIO(object):
 
         # get filepath
         filepath = kwargs['filepath'] if 'filepath' in kwargs else args[0]
-        if running_remotely():
+        # Hack: disabled
+        if False and running_remotely():
             # register/load model weights
             filepath = WeightsFileHandler.restore_weights_file(self, filepath, Framework.keras,
                                                                PatchKerasModelIO.__main_task)
@@ -1035,7 +1445,11 @@ class PatchKerasModelIO(object):
             filepath = kwargs['filepath'] if 'filepath' in kwargs else args[0]
 
             # this will already generate an output model
-            config = self._updated_config()
+            try:
+                config = self._updated_config()
+            except Exception as ex:
+                # we failed to convert the network to json, for some reason (most likely internal keras error)
+                config = {}
 
             # check if object already has InputModel
             if not hasattr(self, 'trains_out_model'):
@@ -1062,7 +1476,7 @@ class PatchKerasModelIO(object):
             # if anyone asks, we were here
             self.trains_out_model._processed = True
         except Exception as ex:
-            getLogger(TrainsFrameworkAdapter).warning(str(ex))
+            LoggerRoot.get_base_logger(TensorflowBinding).warning(str(ex))
 
     @staticmethod
     def _save_model(original_fn, model, filepath, *args, **kwargs):
@@ -1076,7 +1490,8 @@ class PatchKerasModelIO(object):
             return original_fn(filepath, *args, **kwargs)
 
         empty = _Empty()
-        if running_remotely():
+        # Hack: disabled
+        if False and running_remotely():
             # register/load model weights
             filepath = WeightsFileHandler.restore_weights_file(empty, filepath, Framework.keras,
                                                                PatchKerasModelIO.__main_task)
@@ -1133,31 +1548,30 @@ class PatchTensorflowModelIO(object):
         except ImportError:
             pass
         except Exception:
-            pass  # print('Failed patching tensorflow')
+            LoggerRoot.get_base_logger(TensorflowBinding).debug('Failed patching tensorflow')
 
         # noinspection PyBroadException
         try:
             # make sure we import the correct version of save
             import tensorflow
-            from tensorflow.saved_model.experimental import save
+            from tensorflow.saved_model import save
             # actual import
-            import tensorflow.saved_model.experimental as saved_model
+            from tensorflow.python.saved_model import save as saved_model
         except ImportError:
             # noinspection PyBroadException
             try:
                 # make sure we import the correct version of save
                 import tensorflow
-                from tensorflow.saved_model import save
+                from tensorflow.saved_model.experimental import save
                 # actual import
-                import tensorflow.saved_mode as saved_model
+                import tensorflow.saved_model.experimental as saved_model
             except ImportError:
                 saved_model = None
             except Exception:
                 saved_model = None
-                pass  # print('Failed patching tensorflow')
+
         except Exception:
             saved_model = None
-            pass  # print('Failed patching tensorflow')
 
         if saved_model is not None:
             saved_model.save = _patched_call(saved_model.save, PatchTensorflowModelIO._save_model)
@@ -1173,7 +1587,7 @@ class PatchTensorflowModelIO(object):
         except ImportError:
             pass
         except Exception:
-            pass  # print('Failed patching tensorflow')
+            LoggerRoot.get_base_logger(TensorflowBinding).debug('Failed patching tensorflow')
 
         # noinspection PyBroadException
         try:
@@ -1185,7 +1599,7 @@ class PatchTensorflowModelIO(object):
         except ImportError:
             pass
         except Exception:
-            pass  # print('Failed patching tensorflow')
+            LoggerRoot.get_base_logger(TensorflowBinding).debug('Failed patching tensorflow')
 
         # noinspection PyBroadException
         try:
@@ -1197,7 +1611,7 @@ class PatchTensorflowModelIO(object):
         except ImportError:
             pass
         except Exception:
-            pass  # print('Failed patching tensorflow')
+            LoggerRoot.get_base_logger(TensorflowBinding).debug('Failed patching tensorflow')
 
         # noinspection PyBroadException
         try:
@@ -1221,7 +1635,7 @@ class PatchTensorflowModelIO(object):
         except ImportError:
             pass
         except Exception:
-            pass  # print('Failed patching tensorflow')
+            LoggerRoot.get_base_logger(TensorflowBinding).debug('Failed patching tensorflow')
 
     @staticmethod
     def _save(original_fn, self, sess, save_path, *args, **kwargs):
@@ -1244,7 +1658,8 @@ class PatchTensorflowModelIO(object):
         if PatchTensorflowModelIO.__main_task is None:
             return original_fn(self, sess, save_path, *args, **kwargs)
 
-        if running_remotely():
+        # Hack: disabled
+        if False and running_remotely():
             # register/load model weights
             save_path = WeightsFileHandler.restore_weights_file(self, save_path, Framework.tensorflow,
                                                                 PatchTensorflowModelIO.__main_task)
@@ -1265,7 +1680,8 @@ class PatchTensorflowModelIO(object):
 
         # register input model
         empty = _Empty()
-        if running_remotely():
+        # Hack: disabled
+        if False and running_remotely():
             export_dir = WeightsFileHandler.restore_weights_file(empty, export_dir, Framework.tensorflow,
                                                                  PatchTensorflowModelIO.__main_task)
             model = original_fn(sess, tags, export_dir, *args, **saver_kwargs)
@@ -1308,7 +1724,8 @@ class PatchTensorflowModelIO(object):
 
         # register input model
         empty = _Empty()
-        if running_remotely():
+        # Hack: disabled
+        if False and running_remotely():
             save_path = WeightsFileHandler.restore_weights_file(empty, save_path, Framework.tensorflow,
                                                                 PatchTensorflowModelIO.__main_task)
             model = original_fn(self, save_path, *args, **kwargs)
@@ -1327,92 +1744,80 @@ class PatchTensorflowModelIO(object):
         return model
 
 
-class PatchPyTorchModelIO(object):
+class PatchTensorflow2ModelIO(object):
     __main_task = None
     __patched = None
 
     @staticmethod
     def update_current_task(task, **kwargs):
-        PatchPyTorchModelIO.__main_task = task
-        PatchPyTorchModelIO._patch_model_io()
-        PostImportHookPatching.add_on_import('torch', PatchPyTorchModelIO._patch_model_io)
+        PatchTensorflow2ModelIO.__main_task = task
+        PatchTensorflow2ModelIO._patch_model_checkpoint()
+        PostImportHookPatching.add_on_import('tensorflow', PatchTensorflow2ModelIO._patch_model_checkpoint)
 
     @staticmethod
-    def _patch_model_io():
-        if PatchPyTorchModelIO.__patched:
+    def _patch_model_checkpoint():
+        if PatchTensorflow2ModelIO.__patched:
             return
 
-        if 'torch' not in sys.modules:
+        if 'tensorflow' not in sys.modules:
             return
 
-        PatchPyTorchModelIO.__patched = True
+        PatchTensorflow2ModelIO.__patched = True
         # noinspection PyBroadException
         try:
             # hack: make sure tensorflow.__init__ is called
-            import torch
-            torch.save = _patched_call(torch.save, PatchPyTorchModelIO._save)
-            torch.load = _patched_call(torch.load, PatchPyTorchModelIO._load)
+            import tensorflow
+            from tensorflow.python.training.tracking import util
+            # noinspection PyBroadException
+            try:
+                util.TrackableSaver.save = _patched_call(util.TrackableSaver.save,
+                                                         PatchTensorflow2ModelIO._save)
+            except Exception:
+                pass
+            # noinspection PyBroadException
+            try:
+                util.TrackableSaver.restore = _patched_call(util.TrackableSaver.restore,
+                                                            PatchTensorflow2ModelIO._restore)
+            except Exception:
+                pass
         except ImportError:
             pass
         except Exception:
-            pass  # print('Failed patching pytorch')
+            LoggerRoot.get_base_logger(TensorflowBinding).debug('Failed patching tensorflow v2')
 
     @staticmethod
-    def _save(original_fn, obj, f, *args, **kwargs):
-        ret = original_fn(obj, f, *args, **kwargs)
-        if not PatchPyTorchModelIO.__main_task:
-            return ret
-
-        if isinstance(f, six.string_types):
-            filename = f
-        elif hasattr(f, 'name'):
-            filename = f.name
-            # noinspection PyBroadException
-            try:
-                f.flush()
-            except Exception:
-                pass
-        else:
-            filename = None
-
-        # give the model a descriptive name based on the file name
-        # noinspection PyBroadException
+    def _save(original_fn, self, file_prefix, *args, **kwargs):
+        model = original_fn(self, file_prefix, *args, **kwargs)
+        # store output Model
         try:
-            model_name = Path(filename).stem
+            WeightsFileHandler.create_output_model(self, file_prefix, Framework.tensorflow,
+                                                   PatchTensorflow2ModelIO.__main_task)
         except Exception:
-            model_name = None
-        WeightsFileHandler.create_output_model(obj, filename, Framework.pytorch, PatchPyTorchModelIO.__main_task,
-                                               singlefile=True, model_name=model_name)
-        return ret
+            pass
+        return model
 
     @staticmethod
-    def _load(original_fn, f, *args, **kwargs):
-        if isinstance(f, six.string_types):
-            filename = f
-        elif hasattr(f, 'name'):
-            filename = f.name
-        else:
-            filename = None
+    def _restore(original_fn, self, save_path, *args, **kwargs):
+        if PatchTensorflow2ModelIO.__main_task is None:
+            return original_fn(self, save_path, *args, **kwargs)
 
-        if not PatchPyTorchModelIO.__main_task:
-            return original_fn(f, *args, **kwargs)
-
-        # register input model
-        empty = _Empty()
-        if running_remotely():
-            filename = WeightsFileHandler.restore_weights_file(empty, filename, Framework.pytorch,
-                                                               PatchPyTorchModelIO.__main_task)
-            model = original_fn(filename or f, *args, **kwargs)
-        else:
-            # try to load model before registering, in case we fail
-            model = original_fn(filename or f, *args, **kwargs)
-            WeightsFileHandler.restore_weights_file(empty, filename, Framework.pytorch,
-                                                    PatchPyTorchModelIO.__main_task)
-
-        if empty.trains_in_model:
-            # noinspection PyBroadException
+        # Hack: disabled
+        if False and running_remotely():
+            # register/load model weights
             try:
-                model.trains_in_model = empty.trains_in_model
+                save_path = WeightsFileHandler.restore_weights_file(self, save_path, Framework.tensorflow,
+                                                                    PatchTensorflow2ModelIO.__main_task)
             except Exception:
                 pass
+            # load model
+            return original_fn(self, save_path, *args, **kwargs)
+
+        # load model, if something is wrong, exception will be raised before we register the input model
+        model = original_fn(self, save_path, *args, **kwargs)
+        # register/load model weights
+        try:
+            WeightsFileHandler.restore_weights_file(self, save_path, Framework.tensorflow,
+                                                    PatchTensorflow2ModelIO.__main_task)
+        except Exception:
+            pass
         return model

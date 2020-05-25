@@ -3,6 +3,19 @@
 _epsilon = 0.00001
 
 
+class ReadOnlyDict(dict):
+    def __readonly__(self, *args, **kwargs):
+        raise ValueError("This is a read only dictionary")
+    __setitem__ = __readonly__
+    __delitem__ = __readonly__
+    pop = __readonly__
+    popitem = __readonly__
+    clear = __readonly__
+    update = __readonly__
+    setdefault = __readonly__
+    del __readonly__
+
+
 class Logs:
     _logs_instances = []
 
@@ -26,6 +39,7 @@ class BlobsDict(dict):
     """
     Overloading getitem so that the 'data' copy is only done when the dictionary item is accessed.
     """
+
     def __init__(self, *args, **kwargs):
         super(BlobsDict, self).__init__(*args, **kwargs)
 
@@ -47,6 +61,7 @@ class BlobsDict(dict):
 class NestedBlobsDict(BlobsDict):
     """A dictionary that applies an arbitrary key-altering function
        before accessing the keys."""
+
     def __init__(self, *args, **kwargs):
         super(NestedBlobsDict, self).__init__(*args, **kwargs)
 
@@ -83,16 +98,28 @@ class NestedBlobsDict(BlobsDict):
         for key in cur_keys:
             if isinstance(cur_dict[key], dict):
                 if len(path) > 0:
-                    deep_keys.extend(self._keys(cur_dict[key], path+ '.' + key))
+                    deep_keys.extend(self._keys(cur_dict[key], path + '.' + key))
                 else:
                     deep_keys.extend(self._keys(cur_dict[key], key))
             else:
                 if len(path) > 0:
                     deep_keys.append(path + '.' + key)
                 else:
-                    deep_keys.append( key)
+                    deep_keys.append(key)
 
         return deep_keys
 
     def keys(self):
         return self._keys(self, '')
+
+
+def merge_dicts(dict1, dict2):
+    """ Recursively merges dict2 into dict1 """
+    if not isinstance(dict1, dict) or not isinstance(dict2, dict):
+        return dict2
+    for k in dict2:
+        if k in dict1:
+            dict1[k] = merge_dicts(dict1[k], dict2[k])
+        else:
+            dict1[k] = dict2[k]
+    return dict1
