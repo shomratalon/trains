@@ -1,7 +1,7 @@
 version: 2.1
 description: Trains ci workflow
 jobs:
-    python3.7:
+    python3_7:
       docker:
           - image: circleci/python:3.7.4
           - image: debian:latest
@@ -44,7 +44,7 @@ jobs:
           - store_artifacts:
               path: examples/logs.txt
 
-    python3.6:
+    python3_6:
       docker:
           - image: circleci/python:3.6.7
           - image: debian:latest
@@ -87,7 +87,7 @@ jobs:
           - store_artifacts:
               path: examples/logs.txt
 
-    python3.5:
+    python3_5:
       docker:
           - image: circleci/python:3.6.7
           - image: debian:latest
@@ -132,9 +132,9 @@ jobs:
 workflows:
   main:
     jobs:
-      - "python3.5"
-      - "python3.6"
-      - "python3.7"
+      - "python3_5"
+      - "python3_6"
+      - "python3_7"
 
 #
 #
