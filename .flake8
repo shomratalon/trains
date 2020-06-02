@@ -90,6 +90,7 @@ ignore =
 select =
     E,
     W,
+    F,
 # Enable off-by-default extensions.
 #enable-extensions =
 
