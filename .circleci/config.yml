@@ -32,7 +32,7 @@ jobs:
 
     python3_7_windows:
       docker:
-          - image: python:3.7-windowsservercore
+          - image: python:windowsservercore-ltsc2016
       working_directory: ~/repo
       steps:
           # Step 1 : checkout source code to working directory
