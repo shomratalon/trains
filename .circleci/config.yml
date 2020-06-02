@@ -3,8 +3,7 @@ description: Trains ci workflow
 jobs:
     python3_7:
       docker:
-          - image: circleci/python:3.7.4
-          - image: debian:latest
+          - image: python:3.7.4-stretch
       working_directory: ~/repo
       steps:
           # Step 1 : checkout source code to working directory
@@ -33,7 +32,7 @@ jobs:
 
     python3_7_windows:
       docker:
-          - image: python:3.7.7-windowsservercore
+          - image: winamd64/python:3.7-windowsservercore
       working_directory: ~/repo
       steps:
           # Step 1 : checkout source code to working directory
@@ -62,8 +61,7 @@ jobs:
 
     python3_6:
       docker:
-          - image: circleci/python:3.6.7
-          - image: debian:latest
+          - image: python:3.6.10-alpine3.11
       working_directory: ~/repo
       steps:
           # Step 1 : checkout source code to working directory
@@ -93,8 +91,7 @@ jobs:
 
     python3_5:
       docker:
-          - image: circleci/python:3.5.7
-          - image: debian:latest
+          - image: python:3.5.9-slim
       working_directory: ~/repo
       steps:
           # Step 1 : checkout source code to working directory
