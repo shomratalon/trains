@@ -30,35 +30,6 @@ jobs:
           - store_artifacts:
               path: examples/logs.txt
 
-    python3_7_windows:
-      docker:
-          - image: python:windowsservercore-ltsc2016
-      working_directory: ~/repo
-      steps:
-          # Step 1 : checkout source code to working directory
-          - checkout
-          # Step 2: create virtual env and install dependencies
-          - run:
-              name: install dependencies
-              command: |
-                python3 -m venv venv
-                . venv/bin/activate
-                pip install -r requirements.txt
-          # Step 3: Run example
-          - run:
-              name: run example for internal check
-              command: |
-                . venv/bin/activate
-                pip install pandas
-                pip install absl-py
-                export PYTHONPATH=${PWD}
-                cd examples
-                python artifacts_toy.py |& tee -a logs.txt
-                python hyper_parameters_example.py |& tee -a logs.txt
-                python manual_reporting.py |& tee -a logs.txt
-          - store_artifacts:
-              path: examples/logs.txt
-
     python3_6:
       docker:
           - image: python:3.6.10-alpine3.11
@@ -151,5 +122,4 @@ workflows:
       - "python3_5"
       - "python3_6"
       - "python3_7"
-      - "python3_7_windows"
       - "code_style"
