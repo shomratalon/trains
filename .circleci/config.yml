@@ -117,9 +117,19 @@ jobs:
               command: |
                 git config user.email "AutoPEP8@allegro.ai"
                 git config user.name "AutoPEP8"
-                git status
-                git commit -am "[ci skip] AutoPEP8 changes via CircleCI"
-                git push --set-upstream origin ${CIRCLE_BRANCH}
+                set +e  # Grep succeeds with nonzero exit codes to show results.
+                git status | grep modified
+                if [ $? -eq 0 ]
+                then
+                    set -e
+                    git add .
+                    git commit -m "[ci skip] AutoPEP8 changes via CircleCI"
+                    git push --set-upstream origin ${CIRCLE_BRANCH}
+                    echo "Pushed changes updated on - $(date)"
+                else
+                    set -e
+                    echo "No changes since last run"
+                fi
 
 #    code_style:
 #      docker:
