@@ -1,4 +1,4 @@
-from os import getenv, environ
+from os import environ, getenv
 
 from .converters import text_to_bool
 from .entry import Entry, NotSet
@@ -13,7 +13,7 @@ class EnvEntry(Entry):
 
     def __init__(self, key, *more_keys, **kwargs):
         super(EnvEntry, self).__init__(key, *more_keys, **kwargs)
-        self._ignore_errors = kwargs.pop('ignore_errors', False)
+        self._ignore_errors = kwargs.pop("ignore_errors", False)
 
     def _get(self, key):
         value = getenv(key, "").strip()

@@ -90,7 +90,7 @@ class StorageManager(object):
         :return str: cached folder containing the extracted archive content
         """
         # only zip files
-        if not cached_file or not str(cached_file).lower().endswith('.zip'):
+        if not cached_file or not str(cached_file).lower().endswith(".zip"):
             return cached_file
 
         archive_suffix = cached_file.rpartition(".")[0]

@@ -3,8 +3,8 @@ import pkgutil
 import re
 from typing import Any
 
-from .session import Session
 from ..utilities.check_updates import Version
+from .session import Session
 
 
 class ApiServiceProxy(object):
@@ -19,23 +19,38 @@ class ApiServiceProxy(object):
         if attr in ["__wrapped_name__", "__wrapped__", "__wrapped_version__"]:
             return self.__dict__.get(attr)
 
-        if not self.__dict__.get("__wrapped__") or self.__dict__.get("__wrapped_version__") != Session.api_version:
+        if (
+            not self.__dict__.get("__wrapped__")
+            or self.__dict__.get("__wrapped_version__") != Session.api_version
+        ):
             if not ApiServiceProxy._max_available_version:
                 from ..backend_api import services
-                ApiServiceProxy._max_available_version = max([
-                    Version(name[1:].replace("_", "."))
-                    for name in [
-                        module_name
-                        for _, module_name, _ in pkgutil.iter_modules(services.__path__)
-                        if re.match(r"^v[0-9]+_[0-9]+$", module_name)
-                    ]])
 
-            version = str(min(Version(Session.api_version), ApiServiceProxy._max_available_version))
+                ApiServiceProxy._max_available_version = max(
+                    [
+                        Version(name[1:].replace("_", "."))
+                        for name in [
+                            module_name
+                            for _, module_name, _ in pkgutil.iter_modules(
+                                services.__path__
+                            )
+                            if re.match(r"^v[0-9]+_[0-9]+$", module_name)
+                        ]
+                    ]
+                )
+
+            version = str(
+                min(
+                    Version(Session.api_version), ApiServiceProxy._max_available_version
+                )
+            )
             self.__dict__["__wrapped_version__"] = Session.api_version
             name = ".v{}.{}".format(
                 version.replace(".", "_"), self.__dict__.get("__wrapped_name__")
             )
-            self.__dict__["__wrapped__"] = self._import_module(name, self._main_services_module)
+            self.__dict__["__wrapped__"] = self._import_module(
+                name, self._main_services_module
+            )
 
         return getattr(self.__dict__["__wrapped__"], attr)
 
@@ -43,7 +58,7 @@ class ApiServiceProxy(object):
         # type: (str, str) -> Any
         try:
             return importlib.import_module(name, package=package)
-        except:
+        except BaseException:
             return None
 
 

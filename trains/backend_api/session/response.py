@@ -1,9 +1,8 @@
-import requests
-
-import six
-import jsonmodels.models
-import jsonmodels.fields
 import jsonmodels.errors
+import jsonmodels.fields
+import jsonmodels.models
+import requests
+import six
 
 from .apimodel import ApiModel
 from .datamodel import NonStrictDataModelMixin
@@ -13,7 +12,10 @@ class FloatOrStringField(jsonmodels.fields.BaseField):
 
     """String field."""
 
-    types = (float, six.string_types,)
+    types = (
+        float,
+        six.string_types,
+    )
 
 
 class Response(ApiModel, NonStrictDataModelMixin):
@@ -33,8 +35,13 @@ class ResponseMeta(jsonmodels.models.Base):
 
     @classmethod
     def from_raw_data(cls, status_code, text, endpoint=None):
-        return cls(is_valid=False, result_code=status_code, result_subcode=0, result_msg=text,
-                   endpoint=_ResponseEndpoint(name=(endpoint or 'unknown')))
+        return cls(
+            is_valid=False,
+            result_code=status_code,
+            result_subcode=0,
+            result_msg=text,
+            endpoint=_ResponseEndpoint(name=(endpoint or "unknown")),
+        )
 
     def __init__(self, is_valid=True, **kwargs):
         super(ResponseMeta, self).__init__(**kwargs)
@@ -50,8 +57,22 @@ class ResponseMeta(jsonmodels.models.Base):
 
     def __str__(self):
         if self.result_code == requests.codes.ok:
-            return "<%d: %s/v%s>" % (self.result_code, self.endpoint.name, self.endpoint.actual_version)
+            return "<%d: %s/v%s>" % (
+                self.result_code,
+                self.endpoint.name,
+                self.endpoint.actual_version,
+            )
         elif self._is_valid:
-            return "<%d/%d: %s/v%s (%s)>" % (self.result_code, self.result_subcode, self.endpoint.name,
-                                             self.endpoint.actual_version, self.result_msg)
-        return "<%d/%d: %s (%s)>" % (self.result_code, self.result_subcode, self.endpoint.name, self.result_msg)
+            return "<%d/%d: %s/v%s (%s)>" % (
+                self.result_code,
+                self.result_subcode,
+                self.endpoint.name,
+                self.endpoint.actual_version,
+                self.result_msg,
+            )
+        return "<%d/%d: %s (%s)>" % (
+            self.result_code,
+            self.result_subcode,
+            self.endpoint.name,
+            self.result_msg,
+        )

@@ -5,6 +5,7 @@ import six
 
 class SendError(Exception):
     """ A session send() error class """
+
     @property
     def result(self):
         return self._result

@@ -1,7 +1,7 @@
+import inspect
 import os
 import sys
 import threading
-import inspect
 import time
 import zipfile
 
@@ -15,13 +15,14 @@ __thread_so = None
 
 
 def _thread_linux_id():
-    # System dependent, see e.g. /usr/include/x86_64-linux-gnu/asm/unistd_64.h (system call 186)
+    # System dependent, see e.g. /usr/include/x86_64-linux-gnu/asm/unistd_64.h
+    # (system call 186)
     return __thread_so.syscall(186)
 
 
 def _thread_py_id():
     # return threading.get_ident()
-    return zipfile.crc32(int(threading.get_ident()).to_bytes(8, 'little'))
+    return zipfile.crc32(int(threading.get_ident()).to_bytes(8, "little"))
 
 
 def _log_stderr(name, fnc, args, kwargs, is_return):
@@ -31,23 +32,34 @@ def _log_stderr(name, fnc, args, kwargs, is_return):
             return
         if __trace_level not in (1, 2, -1, -2):
             return
-        fnc_address = str(fnc).split(' at ')
-        fnc_address = '{}'.format(fnc_address[-1].replace('>', '')) if len(fnc_address) > 1 else ''
+        fnc_address = str(fnc).split(" at ")
+        fnc_address = (
+            "{}".format(fnc_address[-1].replace(">", ""))
+            if len(fnc_address) > 1
+            else ""
+        )
         if __trace_level == 1 or __trace_level == -1:
-            t = '{:14} {}'.format(fnc_address, name)
+            t = "{:14} {}".format(fnc_address, name)
         elif __trace_level == 2 or __trace_level == -2:
-            a_args = str(args)[1:-1] if args else ''
-            a_kwargs = ' {}'.format(kwargs) if kwargs else ''
-            t = '{:14} {} ({}{})'.format(fnc_address, name, a_args, a_kwargs)
+            a_args = str(args)[1:-1] if args else ""
+            a_kwargs = " {}".format(kwargs) if kwargs else ""
+            t = "{:14} {} ({}{})".format(fnc_address, name, a_args, a_kwargs)
         # get a nicer thread id
         h = int(__thread_id())
         ts = time.time() - __trace_start
-        __stream_write('{}{:<9.3f}:{:5}:{:8x}: [{}] {}\n'.format(
-            '-' if is_return else '', ts, os.getpid(),
-            h, threading.current_thread().name, t))
+        __stream_write(
+            "{}{:<9.3f}:{:5}:{:8x}: [{}] {}\n".format(
+                "-" if is_return else "",
+                ts,
+                os.getpid(),
+                h,
+                threading.current_thread().name,
+                t,
+            )
+        )
         if __stream_flush:
             __stream_flush()
-    except:
+    except BaseException:
         pass
 
 
@@ -63,6 +75,7 @@ def _traced_call_method(name, fnc):
         if r:
             raise r
         return ret
+
     return _traced_call_int
 
 
@@ -81,7 +94,7 @@ def _traced_call_cls(name, fnc):
                 raise r
             return ret
 
-    return WrapperClass.__dict__['_traced_call_int']
+    return WrapperClass.__dict__["_traced_call_int"]
 
 
 def _traced_call_static(name, fnc):
@@ -98,7 +111,8 @@ def _traced_call_static(name, fnc):
             if r:
                 raise r
             return ret
-    return WrapperStatic.__dict__['_traced_call_int']
+
+    return WrapperStatic.__dict__["_traced_call_int"]
 
 
 def _traced_call_func(name, fnc):
@@ -113,24 +127,30 @@ def _traced_call_func(name, fnc):
         if r:
             raise r
         return ret
+
     return _traced_call_int
 
 
-def _patch_module(module, prefix='', basepath=None, basemodule=None):
+def _patch_module(module, prefix="", basepath=None, basemodule=None):
     if isinstance(module, str):
         if basemodule is None:
-            basemodule = module + '.'
+            basemodule = module + "."
             import importlib
+
             importlib.import_module(module)
         module = sys.modules.get(module)
         if not module:
             return
         if not basepath:
-            basepath = os.path.sep.join(module.__file__.split(os.path.sep)[:-1]) + os.path.sep
+            basepath = (
+                os.path.sep.join(module.__file__.split(os.path.sep)[:-1]) + os.path.sep
+            )
 
     # only sub modules
-    if not hasattr(module, '__file__') or (inspect.ismodule(module) and not module.__file__.startswith(basepath)):
-        if hasattr(module, '__module__') and module.__module__.startswith(basemodule):
+    if not hasattr(module, "__file__") or (
+        inspect.ismodule(module) and not module.__file__.startswith(basepath)
+    ):
+        if hasattr(module, "__module__") and module.__module__.startswith(basemodule):
             # this is one of ours
             pass
         else:
@@ -138,25 +158,28 @@ def _patch_module(module, prefix='', basepath=None, basemodule=None):
             return
 
     # Do not patch ourselves
-    if hasattr(module, '__file__') and module.__file__ == __file__:
+    if hasattr(module, "__file__") and module.__file__ == __file__:
         return
 
-    prefix += module.__name__.split('.')[-1] + '.'
+    prefix += module.__name__.split(".")[-1] + "."
 
     # Do not patch low level network layer
-    if prefix.startswith('trains.backend_api.session.') and prefix != 'trains.backend_api.session.':
-        if not prefix.endswith('.Session.') and '.token_manager.' not in prefix:
+    if (
+        prefix.startswith("trains.backend_api.session.")
+        and prefix != "trains.backend_api.session."
+    ):
+        if not prefix.endswith(".Session.") and ".token_manager." not in prefix:
             # print('SKIPPING: {}'.format(prefix))
             return
-    if prefix.startswith('trains.backend_api.services.'):
+    if prefix.startswith("trains.backend_api.services."):
         return
 
-    for fn in (m for m in dir(module) if not m.startswith('__')):
-        if fn in ('schema_property') or fn.startswith('_PostImportHookPatching__'):
+    for fn in (m for m in dir(module) if not m.startswith("__")):
+        if fn in ("schema_property") or fn.startswith("_PostImportHookPatching__"):
             continue
         try:
             fnc = getattr(module, fn)
-        except:
+        except BaseException:
             continue
         if inspect.ismodule(fnc):
             _patch_module(fnc, prefix=prefix, basepath=basepath, basemodule=basemodule)
@@ -166,9 +189,11 @@ def _patch_module(module, prefix='', basepath=None, basemodule=None):
             pass  # _log_stderr('Patching: {}'.format(prefix+fn))
             if inspect.isclass(module):
                 # check if this is even in our module
-                if hasattr(fnc, '__module__') and fnc.__module__ != module.__module__:
+                if hasattr(fnc, "__module__") and fnc.__module__ != module.__module__:
                     pass  # print('not ours {} {}'.format(module, fnc))
-                elif hasattr(fnc, '__qualname__') and fnc.__qualname__.startswith(module.__name__ + '.'):
+                elif hasattr(fnc, "__qualname__") and fnc.__qualname__.startswith(
+                    module.__name__ + "."
+                ):
                     if isinstance(module.__dict__[fn], classmethod):
                         setattr(module, fn, _traced_call_cls(prefix + fn, fnc))
                     elif isinstance(module.__dict__[fn], staticmethod):
@@ -177,7 +202,9 @@ def _patch_module(module, prefix='', basepath=None, basemodule=None):
                         setattr(module, fn, _traced_call_method(prefix + fn, fnc))
                 else:
                     # probably not ours hopefully static function
-                    if hasattr(fnc, '__qualname__') and not fnc.__qualname__.startswith(module.__name__ + '.'):
+                    if hasattr(fnc, "__qualname__") and not fnc.__qualname__.startswith(
+                        module.__name__ + "."
+                    ):
                         pass  # print('not ours {} {}'.format(module, fnc))
                     else:
                         # we should not get here
@@ -209,17 +236,22 @@ def trace_trains(stream=None, level=1):
         return
     __patched_trace = True
     if not __thread_id:
-        if sys.platform == 'linux':
+        if sys.platform == "linux":
             import ctypes
-            __thread_so = ctypes.cdll.LoadLibrary('libc.so.6')
+
+            __thread_so = ctypes.cdll.LoadLibrary("libc.so.6")
             __thread_id = _thread_linux_id
         else:
             __thread_id = _thread_py_id
 
-    stderr_write = sys.stderr._original_write if hasattr(sys.stderr, '_original_write') else sys.stderr.write
+    stderr_write = (
+        sys.stderr._original_write
+        if hasattr(sys.stderr, "_original_write")
+        else sys.stderr.write
+    )
     if stream:
         if isinstance(stream, str):
-            stream = open(stream, 'w')
+            stream = open(stream, "w")
         __stream_write = stream.write
         __stream_flush = stream.flush
     else:
@@ -227,16 +259,17 @@ def trace_trains(stream=None, level=1):
         __stream_flush = None
 
     from ..version import __version__
-    msg = 'Trains v{} - Starting Trace\n\n'.format(__version__)
+
+    msg = "Trains v{} - Starting Trace\n\n".format(__version__)
     # print to actual stderr
     stderr_write(msg)
     # store to stream
     __stream_write(msg)
-    __stream_write('{:9}:{:5}:{:8}: {:14}\n'.format('seconds', 'pid', 'tid', 'self'))
-    __stream_write('{:9}:{:5}:{:8}:{:15}\n'.format('-' * 9, '-' * 5, '-' * 8, '-' * 15))
+    __stream_write("{:9}:{:5}:{:8}: {:14}\n".format("seconds", "pid", "tid", "self"))
+    __stream_write("{:9}:{:5}:{:8}:{:15}\n".format("-" * 9, "-" * 5, "-" * 8, "-" * 15))
     __trace_start = time.time()
 
-    _patch_module('trains')
+    _patch_module("trains")
 
 
 def trace_level(level=1):
@@ -258,7 +291,9 @@ def trace_level(level=1):
     return True
 
 
-def print_traced_files(glob_mask, lines_per_tid=5, stream=sys.stdout, specify_pids=None):
+def print_traced_files(
+    glob_mask, lines_per_tid=5, stream=sys.stdout, specify_pids=None
+):
     """
     Collect trace lines from files (glob mask), sort by pid/tid and print ordered by time
 
@@ -270,24 +305,24 @@ def print_traced_files(glob_mask, lines_per_tid=5, stream=sys.stdout, specify_pi
     from glob import glob
 
     def hash_line(a_line):
-        return hash(':'.join(a_line.split(':')[1:]))
+        return hash(":".join(a_line.split(":")[1:]))
 
     pids = {}
     orphan_calls = set()
     print_orphans = False
     for fname in glob(glob_mask, recursive=False):
-        with open(fname, 'rt') as fd:
+        with open(fname, "rt") as fd:
             lines = fd.readlines()
         for l in lines:
             try:
-                _, pid, tid = l.split(':')[:3]
+                _, pid, tid = l.split(":")[:3]
                 pid = int(pid)
-            except:
+            except BaseException:
                 continue
             if specify_pids and pid not in specify_pids:
                 continue
 
-            if l.startswith('-'):
+            if l.startswith("-"):
                 print_orphans = True
                 l = l[1:]
                 h = hash_line(l)
@@ -306,16 +341,16 @@ def print_traced_files(glob_mask, lines_per_tid=5, stream=sys.stdout, specify_pi
     by_time = {}
     for p, tids in pids.items():
         for t, lines in tids.items():
-            ts = float(lines[-1].split(':')[0].strip()) + 0.000001 * len(by_time)
+            ts = float(lines[-1].split(":")[0].strip()) + 0.000001 * len(by_time)
             if print_orphans:
                 for i, l in enumerate(lines):
                     if i > 0 and hash_line(l) in orphan_calls:
-                        lines[i] = ' ### Orphan ### {}'.format(l)
-            by_time[ts] = ''.join(lines) + '\n'
+                        lines[i] = " ### Orphan ### {}".format(l)
+            by_time[ts] = "".join(lines) + "\n"
 
-    out_stream = open(stream, 'w') if isinstance(stream, str) else stream
+    out_stream = open(stream, "w") if isinstance(stream, str) else stream
     for k in sorted(by_time.keys()):
-        out_stream.write(by_time[k] + '\n')
+        out_stream.write(by_time[k] + "\n")
     if isinstance(stream, str):
         out_stream.close()
 
@@ -325,8 +360,8 @@ def end_of_program():
     pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # from trains import Task
     # task = Task.init(project_name="examples", task_name="trace test")
     # trace_trains('_trace.txt', level=2)
-    print_traced_files('_trace_*.txt', lines_per_tid=10)
+    print_traced_files("_trace_*.txt", lines_per_tid=10)

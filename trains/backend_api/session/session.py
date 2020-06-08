@@ -10,15 +10,22 @@ import six
 from requests.auth import HTTPBasicAuth
 from six.moves.urllib.parse import urlparse, urlunparse
 
-from .callresult import CallResult
-from .defs import ENV_VERBOSE, ENV_HOST, ENV_ACCESS_KEY, ENV_SECRET_KEY, ENV_WEB_HOST, ENV_FILES_HOST
-from .request import Request, BatchRequest
-from .token_manager import TokenManager
-from ..config import load
-from ..utils import get_http_session_with_retry, urllib_log_warning_setup
 from ...debugging import get_logger
 from ...utilities.pyhocon import ConfigTree
 from ...version import __version__
+from ..config import load
+from ..utils import get_http_session_with_retry, urllib_log_warning_setup
+from .callresult import CallResult
+from .defs import (
+    ENV_ACCESS_KEY,
+    ENV_FILES_HOST,
+    ENV_HOST,
+    ENV_SECRET_KEY,
+    ENV_VERBOSE,
+    ENV_WEB_HOST,
+)
+from .request import BatchRequest, Request
+from .token_manager import TokenManager
 
 try:
     from OpenSSL.SSL import Error as SSLError
@@ -44,16 +51,16 @@ class Session(TokenManager):
 
     _async_status_code = 202
     _session_requests = 0
-    _session_initial_timeout = (3.0, 10.)
-    _session_timeout = (10.0, 300.)
+    _session_initial_timeout = (3.0, 10.0)
+    _session_timeout = (10.0, 300.0)
     _write_session_data_size = 15000
-    _write_session_timeout = (300.0, 300.)
+    _write_session_timeout = (300.0, 300.0)
     _sessions_created = 0
     _ssl_error_count_verbosity = 2
 
     _client = [(__package__.partition(".")[0], __version__)]
 
-    api_version = '2.1'
+    api_version = "2.1"
     default_host = "https://demoapi.trains.allegro.ai"
     default_web = "https://demoapp.trains.allegro.ai"
     default_files = "https://demofiles.trains.allegro.ai"
@@ -117,7 +124,9 @@ class Session(TokenManager):
         self._logger = logger
 
         self.__access_key = api_key or ENV_ACCESS_KEY.get(
-            default=(self.config.get("api.credentials.access_key", None) or self.default_key)
+            default=(
+                self.config.get("api.credentials.access_key", None) or self.default_key
+            )
         )
         if not self.access_key:
             raise ValueError(
@@ -125,7 +134,10 @@ class Session(TokenManager):
             )
 
         self.__secret_key = secret_key or ENV_SECRET_KEY.get(
-            default=(self.config.get("api.credentials.secret_key", None) or self.default_secret)
+            default=(
+                self.config.get("api.credentials.secret_key", None)
+                or self.default_secret
+            )
         )
         if not self.secret_key:
             raise ValueError(
@@ -137,11 +149,14 @@ class Session(TokenManager):
             raise ValueError("host is required in init or config")
 
         self._ssl_error_count_verbosity = self.config.get(
-            "api.ssl_error_count_verbosity", self._ssl_error_count_verbosity)
+            "api.ssl_error_count_verbosity", self._ssl_error_count_verbosity
+        )
 
         self.__host = host.strip("/")
-        http_retries_config = http_retries_config or self.config.get(
-            "api.http.retries", ConfigTree()).as_plain_ordered_dict()
+        http_retries_config = (
+            http_retries_config
+            or self.config.get("api.http.retries", ConfigTree()).as_plain_ordered_dict()
+        )
         http_retries_config["status_forcelist"] = self._retry_codes
         self.__http_session = get_http_session_with_retry(**http_retries_config)
 
@@ -158,11 +173,17 @@ class Session(TokenManager):
         # update api version from server response
         try:
             token_dict = jwt.decode(self.token, verify=False)
-            api_version = token_dict.get('api_version')
+            api_version = token_dict.get("api_version")
             if not api_version:
-                api_version = '2.2' if token_dict.get('env', '') == 'prod' else Session.api_version
-            if token_dict.get('server_version'):
-                Session._client.append(('trains-server', token_dict.get('server_version'), ))
+                api_version = (
+                    "2.2"
+                    if token_dict.get("env", "") == "prod"
+                    else Session.api_version
+                )
+            if token_dict.get("server_version"):
+                Session._client.append(
+                    ("trains-server", token_dict.get("server_version"),)
+                )
 
             Session.api_version = str(api_version)
         except (jwt.DecodeError, ValueError):
@@ -171,7 +192,9 @@ class Session(TokenManager):
         # now setup the session reporting, so one consecutive retries will show warning
         # we do that here, so if we have problems authenticating, we see them immediately
         # notice: this is across the board warning omission
-        urllib_log_warning_setup(total_retries=http_retries_config.get('total', 0), display_warning_after=3)
+        urllib_log_warning_setup(
+            total_retries=http_retries_config.get("total", 0), display_warning_after=3
+        )
 
         self.__class__._sessions_created += 1
 
@@ -217,13 +240,22 @@ class Session(TokenManager):
                 timeout = self._session_timeout
             try:
                 res = self.__http_session.request(
-                    method, url, headers=headers, auth=auth, data=data, json=json, timeout=timeout)
+                    method,
+                    url,
+                    headers=headers,
+                    auth=auth,
+                    data=data,
+                    json=json,
+                    timeout=timeout,
+                )
             # except Exception as ex:
             except SSLError as ex:
                 retry_counter += 1
                 # we should retry
                 if retry_counter >= self._ssl_error_count_verbosity:
-                    (self._logger or get_logger()).warning("SSLError Retrying {}".format(ex))
+                    (self._logger or get_logger()).warning(
+                        "SSLError Retrying {}".format(ex)
+                    )
                 sleep(0.1)
                 continue
 
@@ -282,9 +314,7 @@ class Session(TokenManager):
         :param async_enable: whether request is asynchronous
         :return: requests Response instance
         """
-        headers = self.add_auth_headers(
-            headers.copy() if headers else {}
-        )
+        headers = self.add_auth_headers(headers.copy() if headers else {})
         if async_enable:
             headers[self._ASYNC_HEADER] = "1"
         return self._send_request(
@@ -343,20 +373,24 @@ class Session(TokenManager):
         results = []
         while True:
             size = self.__max_req_size
-            slice = req_data[cur: cur + size]
+            slice = req_data[cur : cur + size]
             if not slice:
                 break
             if len(slice) < size:
                 # this is the remainder, no need to search for newline
                 pass
             elif slice[-1] != "\n":
-                # search for the last newline in order to send a coherent request
+                # search for the last newline in order to send a coherent
+                # request
                 size = slice.rfind("\n") + 1
                 # readjust the slice
-                slice = req_data[cur: cur + size]
+                slice = req_data[cur : cur + size]
                 if not slice:
-                    raise MaxRequestSizeError('Error: {}.{} request exceeds limit {} > {} bytes'.format(
-                        service, action, len(req_data), self.__max_req_size))
+                    raise MaxRequestSizeError(
+                        "Error: {}.{} request exceeds limit {} > {} bytes".format(
+                            service, action, len(req_data), self.__max_req_size
+                        )
+                    )
             res = self.send_request(
                 method=method,
                 service=service,
@@ -376,7 +410,8 @@ class Session(TokenManager):
 
         try:
             # make sure we're using a compatible version for this request
-            # validate the request (checks required fields and specific field version restrictions)
+            # validate the request (checks required fields and specific field
+            # version restrictions)
             validate = req_obj.validate
         except AttributeError:
             raise TypeError(
@@ -453,18 +488,27 @@ class Session(TokenManager):
     def get_api_server_host(cls, config=None):
         if not config:
             from ...config import config_obj
+
             config = config_obj
-        return ENV_HOST.get(default=(config.get("api.api_server", None) or
-                                     config.get("api.host", None) or cls.default_host)).rstrip('/')
+        return ENV_HOST.get(
+            default=(
+                config.get("api.api_server", None)
+                or config.get("api.host", None)
+                or cls.default_host
+            )
+        ).rstrip("/")
 
     @classmethod
     def get_app_server_host(cls, config=None):
         if not config:
             from ...config import config_obj
+
             config = config_obj
 
         # get from config/environment
-        web_host = ENV_WEB_HOST.get(default=config.get("api.web_server", "")).rstrip('/')
+        web_host = ENV_WEB_HOST.get(default=config.get("api.web_server", "")).rstrip(
+            "/"
+        )
         if web_host:
             return web_host
 
@@ -474,24 +518,27 @@ class Session(TokenManager):
             return cls.default_web
 
         # compose ourselves
-        if '://demoapi.' in host:
-            return host.replace('://demoapi.', '://demoapp.', 1)
-        if '://api.' in host:
-            return host.replace('://api.', '://app.', 1)
+        if "://demoapi." in host:
+            return host.replace("://demoapi.", "://demoapp.", 1)
+        if "://api." in host:
+            return host.replace("://api.", "://app.", 1)
 
         parsed = urlparse(host)
         if parsed.port == 8008:
-            return host.replace(':8008', ':8080', 1)
+            return host.replace(":8008", ":8080", 1)
 
-        raise ValueError('Could not detect TRAINS web application server')
+        raise ValueError("Could not detect TRAINS web application server")
 
     @classmethod
     def get_files_server_host(cls, config=None):
         if not config:
             from ...config import config_obj
+
             config = config_obj
         # get from config/environment
-        files_host = ENV_FILES_HOST.get(default=(config.get("api.files_server", ""))).rstrip('/')
+        files_host = ENV_FILES_HOST.get(
+            default=(config.get("api.files_server", ""))
+        ).rstrip("/")
         if files_host:
             return files_host
 
@@ -504,13 +551,17 @@ class Session(TokenManager):
         app_host = cls.get_app_server_host(config)
         parsed = urlparse(app_host)
         if parsed.port:
-            parsed = parsed._replace(netloc=parsed.netloc.replace(':%d' % parsed.port, ':8081', 1))
-        elif parsed.netloc.startswith('demoapp.'):
-            parsed = parsed._replace(netloc=parsed.netloc.replace('demoapp.', 'demofiles.', 1))
-        elif parsed.netloc.startswith('app.'):
-            parsed = parsed._replace(netloc=parsed.netloc.replace('app.', 'files.', 1))
+            parsed = parsed._replace(
+                netloc=parsed.netloc.replace(":%d" % parsed.port, ":8081", 1)
+            )
+        elif parsed.netloc.startswith("demoapp."):
+            parsed = parsed._replace(
+                netloc=parsed.netloc.replace("demoapp.", "demofiles.", 1)
+            )
+        elif parsed.netloc.startswith("app."):
+            parsed = parsed._replace(netloc=parsed.netloc.replace("app.", "files.", 1))
         else:
-            parsed = parsed._replace(netloc=parsed.netloc + ':8081')
+            parsed = parsed._replace(netloc=parsed.netloc + ":8081")
 
         return urlunparse(parsed)
 
@@ -519,11 +570,13 @@ class Session(TokenManager):
         """
         Return True if Session.api_version is greater or equal >= to min_api_version
         """
+
         def version_tuple(v):
             v = tuple(map(int, (v.split("."))))
             return v + (0,) * max(0, 3 - len(v))
 
-        # If no session was created, create a default one, in order to get the backend api version.
+        # If no session was created, create a default one, in order to get the
+        # backend api version.
         if cls._sessions_created <= 0:
             try:
                 dummy = cls()
@@ -535,6 +588,7 @@ class Session(TokenManager):
     @classmethod
     def get_worker_host_name(cls):
         from ...config import dev_worker_name
+
         return dev_worker_name() or gethostname()
 
     def _do_refresh_token(self, old_token, exp=None):
@@ -577,15 +631,22 @@ class Session(TokenManager):
         except LoginError:
             six.reraise(*sys.exc_info())
         except KeyError as ex:
-            # check if this is a misconfigured api server (getting 200 without the data section)
+            # check if this is a misconfigured api server (getting 200 without
+            # the data section)
             if res and res.status_code == 200:
-                raise ValueError('It seems *api_server* is misconfigured. '
-                                 'Is this the TRAINS API server {} ?'.format(self.host))
+                raise ValueError(
+                    "It seems *api_server* is misconfigured. "
+                    "Is this the TRAINS API server {} ?".format(self.host)
+                )
             else:
-                raise LoginError("Response data mismatch: No 'token' in 'data' value from res, receive : {}, "
-                                 "exception: {}".format(res, ex))
+                raise LoginError(
+                    "Response data mismatch: No 'token' in 'data' value from res, receive : {}, "
+                    "exception: {}".format(res, ex)
+                )
         except Exception as ex:
-            raise LoginError('Unrecognized Authentication Error: {} {}'.format(type(ex), ex))
+            raise LoginError(
+                "Unrecognized Authentication Error: {} {}".format(type(ex), ex)
+            )
 
     def __str__(self):
         return "{self.__class__.__name__}[{self.host}, {self.access_key}/{secret_key}]".format(

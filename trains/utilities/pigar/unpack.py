@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function, division, absolute_import
+from __future__ import absolute_import, division, print_function
 
-import tarfile
-import zipfile
+import io
 import re
 import string
-import io
+import tarfile
+import zipfile
 
 
 class Archive(object):
@@ -30,7 +30,7 @@ class Archive(object):
         """If name list is not required, do not get it."""
         if self._file is None:
             self._prepare()
-        if not hasattr(self, '_namelist'):
+        if not hasattr(self, "_namelist"):
             self._namelist = self._names()
         return self._namelist
 
@@ -38,7 +38,7 @@ class Archive(object):
         """Close file object."""
         if self._file is not None:
             self._file.close()
-        if hasattr(self, '_namelist'):
+        if hasattr(self, "_namelist"):
             del self._namelist
         self._filename = self._fileobj = None
         self._file = self._names = self._read = None
@@ -56,16 +56,16 @@ class Archive(object):
         self._safe_extractall(to_path)
 
     def _prepare(self):
-        if self._filename.endswith(('.tar.gz', '.tar.bz2', '.tar.xz')):
+        if self._filename.endswith((".tar.gz", ".tar.bz2", ".tar.xz")):
             self._prepare_tarball()
         # An .egg file is actually just a .zip file
         # with a different extension, .whl too.
-        elif self._filename.endswith(('.zip', '.egg', '.whl')):
+        elif self._filename.endswith((".zip", ".egg", ".whl")):
             self._prepare_zip()
         else:
             raise ValueError("unreadable: {0}".format(self._filename))
 
-    def _safe_extractall(self, to_path='.'):
+    def _safe_extractall(self, to_path="."):
         unsafe = []
         for name in self.names:
             if not self.is_safe(name):
@@ -85,15 +85,20 @@ class Archive(object):
             f = self._file.extractfile(filename)
             return f.read()
 
-        self._file = tarfile.open(mode='r:*', fileobj=self._fileobj)
+        self._file = tarfile.open(mode="r:*", fileobj=self._fileobj)
         self._names = self._file.getnames
         self._read = _read
 
     def is_safe(self, filename):
-        return not (filename.startswith(("/", "\\")) or
-                    (len(filename) > 1 and filename[1] == ":" and
-                     filename[0] in string.ascii_letter) or
-                    re.search(r"[.][.][/\\]", filename))
+        return not (
+            filename.startswith(("/", "\\"))
+            or (
+                len(filename) > 1
+                and filename[1] == ":"
+                and filename[0] in string.ascii_letter
+            )
+            or re.search(r"[.][.][/\\]", filename)
+        )
 
     def __enter__(self):
         return self
@@ -109,10 +114,10 @@ def top_level(url, data):
     with Archive(url, sb) as archive:
         file = None
         for name in archive.names:
-            if name.lower().endswith('top_level.txt'):
+            if name.lower().endswith("top_level.txt"):
                 file = name
                 break
         if file:
-            txt = archive.read(file).decode('utf-8')
+            txt = archive.read(file).decode("utf-8")
     sb.close()
-    return [name.replace('/', '.') for name in txt.splitlines()] if txt else []
+    return [name.replace("/", ".") for name in txt.splitlines()] if txt else []

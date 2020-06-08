@@ -1,5 +1,4 @@
 class IOCallsManager(object):
-
     def __init__(self):
         self.threads_io = {}
 
@@ -28,4 +27,4 @@ class IOCallsManager(object):
 
     @staticmethod
     def _io_has_canvas_figure(io_object):
-        return hasattr(io_object, 'canvas') and hasattr(io_object.canvas, 'figure')
+        return hasattr(io_object, "canvas") and hasattr(io_object.canvas, "figure")

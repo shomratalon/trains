@@ -1,25 +1,24 @@
 import hashlib
 from datetime import datetime
 from logging import getLogger
-from time import time, sleep
-from typing import Optional, Mapping, Sequence, Any
+from time import sleep, time
+from typing import Any, Mapping, Optional, Sequence
 
-from ..task import Task
 from ..backend_api.services import tasks as tasks_service
+from ..task import Task
 
-
-logger = getLogger('trains.automation.job')
+logger = getLogger("trains.automation.job")
 
 
 class TrainsJob(object):
     def __init__(
-            self,
-            base_task_id,  # type: str
-            parameter_override=None,  # type: Optional[Mapping[str, str]]
-            task_overrides=None,  # type: Optional[Mapping[str, str]]
-            tags=None,  # type: Optional[Sequence[str]]
-            parent=None,  # type: Optional[str]
-            **kwargs  # type: Any
+        self,
+        base_task_id,  # type: str
+        parameter_override=None,  # type: Optional[Mapping[str, str]]
+        task_overrides=None,  # type: Optional[Mapping[str, str]]
+        tags=None,  # type: Optional[Sequence[str]]
+        parent=None,  # type: Optional[str]
+        **kwargs  # type: Any
     ):
         # type: (...) -> TrainsJob
         """
@@ -55,23 +54,23 @@ class TrainsJob(object):
         :param str series: Series on the specific graph (variant)
         :return tuple: min value, max value, last value
         """
-        title = hashlib.md5(str(title).encode('utf-8')).hexdigest()
-        series = hashlib.md5(str(series).encode('utf-8')).hexdigest()
-        metric = 'last_metrics.{}.{}.'.format(title, series)
-        values = ['min_value', 'max_value', 'value']
+        title = hashlib.md5(str(title).encode("utf-8")).hexdigest()
+        series = hashlib.md5(str(series).encode("utf-8")).hexdigest()
+        metric = "last_metrics.{}.{}.".format(title, series)
+        values = ["min_value", "max_value", "value"]
         metrics = [metric + v for v in values]
 
         res = self.task.send(
             tasks_service.GetAllRequest(
-                id=[self.task.id],
-                page=0,
-                page_size=1,
-                only_fields=['id', ] + metrics
+                id=[self.task.id], page=0, page_size=1, only_fields=["id",] + metrics
             )
         )
         response = res.wait()
 
-        return tuple(response.response_data['tasks'][0]['last_metrics'][title][series][v] for v in values)
+        return tuple(
+            response.response_data["tasks"][0]["last_metrics"][title][series][v]
+            for v in values
+        )
 
     def launch(self, queue_name=None):
         # type: (str) -> ()
@@ -102,7 +101,10 @@ class TrainsJob(object):
 
         :return float: seconds from start
         """
-        if not self.task_started and str(self.task.status) != Task.TaskStatusEnum.in_progress:
+        if (
+            not self.task_started
+            and str(self.task.status) != Task.TaskStatusEnum.in_progress
+        ):
             return -1
         self.task_started = True
         return (datetime.now() - self.task.data.started).timestamp()
@@ -114,7 +116,10 @@ class TrainsJob(object):
 
         :return int: Task last iteration
         """
-        if not self.task_started and self.task.status != Task.TaskStatusEnum.in_progress:
+        if (
+            not self.task_started
+            and self.task.status != Task.TaskStatusEnum.in_progress
+        ):
             return -1
         self.task_started = True
         return self.task.get_last_iteration()
@@ -137,7 +142,7 @@ class TrainsJob(object):
         """
         return self.task.status
 
-    def wait(self, timeout=None, pool_period=30.):
+    def wait(self, timeout=None, pool_period=30.0):
         # type: (Optional[float], float) -> bool
         """
         Wait until the task is fully executed (i.e. aborted/completed/failed)
@@ -147,7 +152,7 @@ class TrainsJob(object):
         :return bool: Return True is Task finished.
         """
         tic = time()
-        while timeout is None or time() - tic < timeout * 60.:
+        while timeout is None or time() - tic < timeout * 60.0:
             if self.is_stopped():
                 return True
             sleep(pool_period)
@@ -163,7 +168,9 @@ class TrainsJob(object):
         :param int number_of_reports: number of reports to return, default 1, the last (most updated) console output
         :return list: List of strings each entry corresponds to one report.
         """
-        return self.task.get_reported_console_output(number_of_reports=number_of_reports)
+        return self.task.get_reported_console_output(
+            number_of_reports=number_of_reports
+        )
 
     def worker(self):
         # type: () -> str
@@ -180,7 +187,7 @@ class TrainsJob(object):
             self.get_console_output(number_of_reports=1)
             # if we still do not have it, store empty string
             if not self._worker:
-                self._worker = ''
+                self._worker = ""
 
         return self._worker
 
@@ -201,8 +208,11 @@ class TrainsJob(object):
         :return bool: True the task is currently one of these states, stopped / completed / failed
         """
         return self.task.status in (
-            Task.TaskStatusEnum.stopped, Task.TaskStatusEnum.completed,
-            Task.TaskStatusEnum.failed, Task.TaskStatusEnum.published)
+            Task.TaskStatusEnum.stopped,
+            Task.TaskStatusEnum.completed,
+            Task.TaskStatusEnum.failed,
+            Task.TaskStatusEnum.published,
+        )
 
     def is_pending(self):
         # type: () -> bool
@@ -211,7 +221,10 @@ class TrainsJob(object):
 
         :return bool: True the task is currently is currently queued
         """
-        return self.task.status in (Task.TaskStatusEnum.queued, Task.TaskStatusEnum.created)
+        return self.task.status in (
+            Task.TaskStatusEnum.queued,
+            Task.TaskStatusEnum.created,
+        )
 
 
 # noinspection PyMethodMayBeStatic, PyUnusedLocal
@@ -219,14 +232,15 @@ class _JobStub(object):
     """
     This is a Job Stub, use only for debugging
     """
+
     def __init__(
-            self,
-            base_task_id,  # type: str
-            parameter_override=None,  # type: Optional[Mapping[str, str]]
-            task_overrides=None,  # type: Optional[Mapping[str, str]]
-            tags=None,  # type: Optional[Sequence[str]]
-            **kwargs  # type: Any
-     ):
+        self,
+        base_task_id,  # type: str
+        parameter_override=None,  # type: Optional[Mapping[str, str]]
+        task_overrides=None,  # type: Optional[Mapping[str, str]]
+        tags=None,  # type: Optional[Sequence[str]]
+        **kwargs  # type: Any
+    ):
         # type: (...) -> _JobStub
         self.task = None
         self.base_task_id = base_task_id
@@ -240,7 +254,7 @@ class _JobStub(object):
         # type: (str) -> ()
         self.iteration = 0
         self.task_started = time()
-        print('launching', self.parameter_override, 'in', queue_name)
+        print("launching", self.parameter_override, "in", queue_name)
 
     def abort(self):
         # type: () -> ()
@@ -280,7 +294,7 @@ class _JobStub(object):
 
     def task_id(self):
         # type: () -> str
-        return 'stub'
+        return "stub"
 
     def worker(self):
         # type: () -> ()
@@ -288,9 +302,9 @@ class _JobStub(object):
 
     def status(self):
         # type: () -> str
-        return 'in_progress'
+        return "in_progress"
 
-    def wait(self, timeout=None, pool_period=30.):
+    def wait(self, timeout=None, pool_period=30.0):
         # type: (Optional[float], float) -> bool
         """
         Wait for the task to be processed (i.e. aborted/completed/failed)

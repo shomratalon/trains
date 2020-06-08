@@ -3,14 +3,23 @@ events service
 
 Provides an API for running tasks to report events collected by the system.
 """
-import six
+import enum
 import types
 from datetime import datetime
-import enum
 
+import six
 from dateutil.parser import parse as parse_datetime
 
-from ....backend_api.session import Request, BatchRequest, Response, DataModel, NonStrictDataModel, CompoundRequest, schema_property, StringEnum
+from ....backend_api.session import (
+    BatchRequest,
+    CompoundRequest,
+    DataModel,
+    NonStrictDataModel,
+    Request,
+    Response,
+    StringEnum,
+    schema_property,
+)
 
 
 class MetricsScalarEvent(NonStrictDataModel):
@@ -30,34 +39,44 @@ class MetricsScalarEvent(NonStrictDataModel):
     :param value:
     :type value: float
     """
+
     _schema = {
-        'description': 'Used for reporting scalar metrics during training task',
-        'properties': {
-            'iter': {'description': 'Iteration', 'type': 'integer'},
-            'metric': {
-                'description': "Metric name, e.g. 'count', 'loss', 'accuracy'",
-                'type': 'string',
+        "description": "Used for reporting scalar metrics during training task",
+        "properties": {
+            "iter": {"description": "Iteration", "type": "integer"},
+            "metric": {
+                "description": "Metric name, e.g. 'count', 'loss', 'accuracy'",
+                "type": "string",
             },
-            'task': {'description': 'Task ID (required)', 'type': 'string'},
-            'timestamp': {
-                'description': 'Epoch milliseconds UTC, will be set by the server if not set.',
-                'type': ['number', 'null'],
+            "task": {"description": "Task ID (required)", "type": "string"},
+            "timestamp": {
+                "description": "Epoch milliseconds UTC, will be set by the server if not set.",
+                "type": ["number", "null"],
             },
-            'type': {
-                'const': 'training_stats_scalar',
-                'description': 'training_stats_vector',
+            "type": {
+                "const": "training_stats_scalar",
+                "description": "training_stats_vector",
             },
-            'value': {'description': '', 'type': 'number'},
-            'variant': {
-                'description': "E.g. 'class_1', 'total', 'average",
-                'type': 'string',
+            "value": {"description": "", "type": "number"},
+            "variant": {
+                "description": "E.g. 'class_1', 'total', 'average",
+                "type": "string",
             },
         },
-        'required': ['task', 'type'],
-        'type': 'object',
+        "required": ["task", "type"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, timestamp=None, iter=None, metric=None, variant=None, value=None, **kwargs):
+        self,
+        task,
+        timestamp=None,
+        iter=None,
+        metric=None,
+        variant=None,
+        value=None,
+        **kwargs
+    ):
         super(MetricsScalarEvent, self).__init__(**kwargs)
         self.timestamp = timestamp
         self.task = task
@@ -66,7 +85,7 @@ class MetricsScalarEvent(NonStrictDataModel):
         self.variant = variant
         self.value = value
 
-    @schema_property('timestamp')
+    @schema_property("timestamp")
     def timestamp(self):
         return self._property_timestamp
 
@@ -79,11 +98,11 @@ class MetricsScalarEvent(NonStrictDataModel):
         self.assert_isinstance(value, "timestamp", six.integer_types + (float,))
         self._property_timestamp = value
 
-    @schema_property('type')
+    @schema_property("type")
     def type(self):
         return "training_stats_scalar"
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -96,7 +115,7 @@ class MetricsScalarEvent(NonStrictDataModel):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('iter')
+    @schema_property("iter")
     def iter(self):
         return self._property_iter
 
@@ -111,7 +130,7 @@ class MetricsScalarEvent(NonStrictDataModel):
         self.assert_isinstance(value, "iter", six.integer_types)
         self._property_iter = value
 
-    @schema_property('metric')
+    @schema_property("metric")
     def metric(self):
         return self._property_metric
 
@@ -124,7 +143,7 @@ class MetricsScalarEvent(NonStrictDataModel):
         self.assert_isinstance(value, "metric", six.string_types)
         self._property_metric = value
 
-    @schema_property('variant')
+    @schema_property("variant")
     def variant(self):
         return self._property_variant
 
@@ -137,7 +156,7 @@ class MetricsScalarEvent(NonStrictDataModel):
         self.assert_isinstance(value, "variant", six.string_types)
         self._property_variant = value
 
-    @schema_property('value')
+    @schema_property("value")
     def value(self):
         return self._property_value
 
@@ -168,38 +187,48 @@ class MetricsVectorEvent(NonStrictDataModel):
     :param values: vector of float values
     :type values: Sequence[float]
     """
+
     _schema = {
-        'description': 'Used for reporting vector metrics during training task',
-        'properties': {
-            'iter': {'description': 'Iteration', 'type': 'integer'},
-            'metric': {
-                'description': "Metric name, e.g. 'count', 'loss', 'accuracy'",
-                'type': 'string',
+        "description": "Used for reporting vector metrics during training task",
+        "properties": {
+            "iter": {"description": "Iteration", "type": "integer"},
+            "metric": {
+                "description": "Metric name, e.g. 'count', 'loss', 'accuracy'",
+                "type": "string",
             },
-            'task': {'description': 'Task ID (required)', 'type': 'string'},
-            'timestamp': {
-                'description': 'Epoch milliseconds UTC, will be set by the server if not set.',
-                'type': ['number', 'null'],
+            "task": {"description": "Task ID (required)", "type": "string"},
+            "timestamp": {
+                "description": "Epoch milliseconds UTC, will be set by the server if not set.",
+                "type": ["number", "null"],
             },
-            'type': {
-                'const': 'training_stats_vector',
-                'description': 'training_stats_vector',
+            "type": {
+                "const": "training_stats_vector",
+                "description": "training_stats_vector",
             },
-            'values': {
-                'description': 'vector of float values',
-                'items': {'type': 'number'},
-                'type': 'array',
+            "values": {
+                "description": "vector of float values",
+                "items": {"type": "number"},
+                "type": "array",
             },
-            'variant': {
-                'description': "E.g. 'class_1', 'total', 'average",
-                'type': 'string',
+            "variant": {
+                "description": "E.g. 'class_1', 'total', 'average",
+                "type": "string",
             },
         },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, timestamp=None, iter=None, metric=None, variant=None, values=None, **kwargs):
+        self,
+        task,
+        timestamp=None,
+        iter=None,
+        metric=None,
+        variant=None,
+        values=None,
+        **kwargs
+    ):
         super(MetricsVectorEvent, self).__init__(**kwargs)
         self.timestamp = timestamp
         self.task = task
@@ -208,7 +237,7 @@ class MetricsVectorEvent(NonStrictDataModel):
         self.variant = variant
         self.values = values
 
-    @schema_property('timestamp')
+    @schema_property("timestamp")
     def timestamp(self):
         return self._property_timestamp
 
@@ -221,11 +250,11 @@ class MetricsVectorEvent(NonStrictDataModel):
         self.assert_isinstance(value, "timestamp", six.integer_types + (float,))
         self._property_timestamp = value
 
-    @schema_property('type')
+    @schema_property("type")
     def type(self):
         return "training_stats_vector"
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -238,7 +267,7 @@ class MetricsVectorEvent(NonStrictDataModel):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('iter')
+    @schema_property("iter")
     def iter(self):
         return self._property_iter
 
@@ -253,7 +282,7 @@ class MetricsVectorEvent(NonStrictDataModel):
         self.assert_isinstance(value, "iter", six.integer_types)
         self._property_iter = value
 
-    @schema_property('metric')
+    @schema_property("metric")
     def metric(self):
         return self._property_metric
 
@@ -266,7 +295,7 @@ class MetricsVectorEvent(NonStrictDataModel):
         self.assert_isinstance(value, "metric", six.string_types)
         self._property_metric = value
 
-    @schema_property('variant')
+    @schema_property("variant")
     def variant(self):
         return self._property_variant
 
@@ -279,7 +308,7 @@ class MetricsVectorEvent(NonStrictDataModel):
         self.assert_isinstance(value, "variant", six.string_types)
         self._property_variant = value
 
-    @schema_property('values')
+    @schema_property("values")
     def values(self):
         return self._property_values
 
@@ -291,7 +320,9 @@ class MetricsVectorEvent(NonStrictDataModel):
 
         self.assert_isinstance(value, "values", (list, tuple))
 
-        self.assert_isinstance(value, "values", six.integer_types + (float,), is_array=True)
+        self.assert_isinstance(
+            value, "values", six.integer_types + (float,), is_array=True
+        )
         self._property_values = value
 
 
@@ -314,32 +345,43 @@ class MetricsImageEvent(NonStrictDataModel):
     :param url: File URL
     :type url: str
     """
+
     _schema = {
-        'description': 'An image or video was dumped to storage for debugging',
-        'properties': {
-            'iter': {'description': 'Iteration', 'type': 'integer'},
-            'key': {'description': 'File key', 'type': 'string'},
-            'metric': {
-                'description': "Metric name, e.g. 'count', 'loss', 'accuracy'",
-                'type': 'string',
+        "description": "An image or video was dumped to storage for debugging",
+        "properties": {
+            "iter": {"description": "Iteration", "type": "integer"},
+            "key": {"description": "File key", "type": "string"},
+            "metric": {
+                "description": "Metric name, e.g. 'count', 'loss', 'accuracy'",
+                "type": "string",
             },
-            'task': {'description': 'Task ID (required)', 'type': 'string'},
-            'timestamp': {
-                'description': 'Epoch milliseconds UTC, will be set by the server if not set.',
-                'type': ['number', 'null'],
+            "task": {"description": "Task ID (required)", "type": "string"},
+            "timestamp": {
+                "description": "Epoch milliseconds UTC, will be set by the server if not set.",
+                "type": ["number", "null"],
             },
-            'type': {'const': 'training_debug_image', 'description': ''},
-            'url': {'description': 'File URL', 'type': 'string'},
-            'variant': {
-                'description': "E.g. 'class_1', 'total', 'average",
-                'type': 'string',
+            "type": {"const": "training_debug_image", "description": ""},
+            "url": {"description": "File URL", "type": "string"},
+            "variant": {
+                "description": "E.g. 'class_1', 'total', 'average",
+                "type": "string",
             },
         },
-        'required': ['task', 'type'],
-        'type': 'object',
+        "required": ["task", "type"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, timestamp=None, iter=None, metric=None, variant=None, key=None, url=None, **kwargs):
+        self,
+        task,
+        timestamp=None,
+        iter=None,
+        metric=None,
+        variant=None,
+        key=None,
+        url=None,
+        **kwargs
+    ):
         super(MetricsImageEvent, self).__init__(**kwargs)
         self.timestamp = timestamp
         self.task = task
@@ -349,7 +391,7 @@ class MetricsImageEvent(NonStrictDataModel):
         self.key = key
         self.url = url
 
-    @schema_property('timestamp')
+    @schema_property("timestamp")
     def timestamp(self):
         return self._property_timestamp
 
@@ -362,11 +404,11 @@ class MetricsImageEvent(NonStrictDataModel):
         self.assert_isinstance(value, "timestamp", six.integer_types + (float,))
         self._property_timestamp = value
 
-    @schema_property('type')
+    @schema_property("type")
     def type(self):
         return "training_debug_image"
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -379,7 +421,7 @@ class MetricsImageEvent(NonStrictDataModel):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('iter')
+    @schema_property("iter")
     def iter(self):
         return self._property_iter
 
@@ -394,7 +436,7 @@ class MetricsImageEvent(NonStrictDataModel):
         self.assert_isinstance(value, "iter", six.integer_types)
         self._property_iter = value
 
-    @schema_property('metric')
+    @schema_property("metric")
     def metric(self):
         return self._property_metric
 
@@ -407,7 +449,7 @@ class MetricsImageEvent(NonStrictDataModel):
         self.assert_isinstance(value, "metric", six.string_types)
         self._property_metric = value
 
-    @schema_property('variant')
+    @schema_property("variant")
     def variant(self):
         return self._property_variant
 
@@ -420,7 +462,7 @@ class MetricsImageEvent(NonStrictDataModel):
         self.assert_isinstance(value, "variant", six.string_types)
         self._property_variant = value
 
-    @schema_property('key')
+    @schema_property("key")
     def key(self):
         return self._property_key
 
@@ -433,7 +475,7 @@ class MetricsImageEvent(NonStrictDataModel):
         self.assert_isinstance(value, "key", six.string_types)
         self._property_key = value
 
-    @schema_property('url')
+    @schema_property("url")
     def url(self):
         return self._property_url
 
@@ -466,34 +508,44 @@ class MetricsPlotEvent(NonStrictDataModel):
         for plotting ROC curves, confidence matrices, etc. when evaluating the net.
     :type plot_str: str
     """
+
     _schema = {
-        'description': " An entire plot (not single datapoint) and it's layout.\n            Used for plotting ROC curves, confidence matrices, etc. when evaluating the net.",
-        'properties': {
-            'iter': {'description': 'Iteration', 'type': 'integer'},
-            'metric': {
-                'description': "Metric name, e.g. 'count', 'loss', 'accuracy'",
-                'type': 'string',
+        "description": " An entire plot (not single datapoint) and it's layout.\n            Used for plotting ROC curves, confidence matrices, etc. when evaluating the net.",
+        "properties": {
+            "iter": {"description": "Iteration", "type": "integer"},
+            "metric": {
+                "description": "Metric name, e.g. 'count', 'loss', 'accuracy'",
+                "type": "string",
             },
-            'plot_str': {
-                'description': "An entire plot (not single datapoint) and it's layout.\n                    Used for plotting ROC curves, confidence matrices, etc. when evaluating the net.\n                    ",
-                'type': 'string',
+            "plot_str": {
+                "description": "An entire plot (not single datapoint) and it's layout.\n                    Used for plotting ROC curves, confidence matrices, etc. when evaluating the net.\n                    ",
+                "type": "string",
             },
-            'task': {'description': 'Task ID (required)', 'type': 'string'},
-            'timestamp': {
-                'description': 'Epoch milliseconds UTC, will be set by the server if not set.',
-                'type': ['number', 'null'],
+            "task": {"description": "Task ID (required)", "type": "string"},
+            "timestamp": {
+                "description": "Epoch milliseconds UTC, will be set by the server if not set.",
+                "type": ["number", "null"],
             },
-            'type': {'const': 'plot', 'description': "'plot'"},
-            'variant': {
-                'description': "E.g. 'class_1', 'total', 'average",
-                'type': 'string',
+            "type": {"const": "plot", "description": "'plot'"},
+            "variant": {
+                "description": "E.g. 'class_1', 'total', 'average",
+                "type": "string",
             },
         },
-        'required': ['task', 'type'],
-        'type': 'object',
+        "required": ["task", "type"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, timestamp=None, iter=None, metric=None, variant=None, plot_str=None, **kwargs):
+        self,
+        task,
+        timestamp=None,
+        iter=None,
+        metric=None,
+        variant=None,
+        plot_str=None,
+        **kwargs
+    ):
         super(MetricsPlotEvent, self).__init__(**kwargs)
         self.timestamp = timestamp
         self.task = task
@@ -502,7 +554,7 @@ class MetricsPlotEvent(NonStrictDataModel):
         self.variant = variant
         self.plot_str = plot_str
 
-    @schema_property('timestamp')
+    @schema_property("timestamp")
     def timestamp(self):
         return self._property_timestamp
 
@@ -515,11 +567,11 @@ class MetricsPlotEvent(NonStrictDataModel):
         self.assert_isinstance(value, "timestamp", six.integer_types + (float,))
         self._property_timestamp = value
 
-    @schema_property('type')
+    @schema_property("type")
     def type(self):
         return "plot"
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -532,7 +584,7 @@ class MetricsPlotEvent(NonStrictDataModel):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('iter')
+    @schema_property("iter")
     def iter(self):
         return self._property_iter
 
@@ -547,7 +599,7 @@ class MetricsPlotEvent(NonStrictDataModel):
         self.assert_isinstance(value, "iter", six.integer_types)
         self._property_iter = value
 
-    @schema_property('metric')
+    @schema_property("metric")
     def metric(self):
         return self._property_metric
 
@@ -560,7 +612,7 @@ class MetricsPlotEvent(NonStrictDataModel):
         self.assert_isinstance(value, "metric", six.string_types)
         self._property_metric = value
 
-    @schema_property('variant')
+    @schema_property("variant")
     def variant(self):
         return self._property_variant
 
@@ -573,7 +625,7 @@ class MetricsPlotEvent(NonStrictDataModel):
         self.assert_isinstance(value, "variant", six.string_types)
         self._property_variant = value
 
-    @schema_property('plot_str')
+    @schema_property("plot_str")
     def plot_str(self):
         return self._property_plot_str
 
@@ -620,30 +672,33 @@ class TaskLogEvent(NonStrictDataModel):
     :param msg: Log message.
     :type msg: str
     """
+
     _schema = {
-        'description': 'A log event associated with a task.',
-        'properties': {
-            'level': {
-                '$ref': '#/definitions/log_level_enum',
-                'description': 'Log level.',
+        "description": "A log event associated with a task.",
+        "properties": {
+            "level": {
+                "$ref": "#/definitions/log_level_enum",
+                "description": "Log level.",
             },
-            'msg': {'description': 'Log message.', 'type': 'string'},
-            'task': {'description': 'Task ID (required)', 'type': 'string'},
-            'timestamp': {
-                'description': 'Epoch milliseconds UTC, will be set by the server if not set.',
-                'type': ['number', 'null'],
+            "msg": {"description": "Log message.", "type": "string"},
+            "task": {"description": "Task ID (required)", "type": "string"},
+            "timestamp": {
+                "description": "Epoch milliseconds UTC, will be set by the server if not set.",
+                "type": ["number", "null"],
             },
-            'type': {'const': 'log', 'description': "'log'"},
-            'worker': {
-                'description': 'Name of machine running the task.',
-                'type': 'string',
+            "type": {"const": "log", "description": "'log'"},
+            "worker": {
+                "description": "Name of machine running the task.",
+                "type": "string",
             },
         },
-        'required': ['task', 'type'],
-        'type': 'object',
+        "required": ["task", "type"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, timestamp=None, level=None, worker=None, msg=None, **kwargs):
+        self, task, timestamp=None, level=None, worker=None, msg=None, **kwargs
+    ):
         super(TaskLogEvent, self).__init__(**kwargs)
         self.timestamp = timestamp
         self.task = task
@@ -651,7 +706,7 @@ class TaskLogEvent(NonStrictDataModel):
         self.worker = worker
         self.msg = msg
 
-    @schema_property('timestamp')
+    @schema_property("timestamp")
     def timestamp(self):
         return self._property_timestamp
 
@@ -664,11 +719,11 @@ class TaskLogEvent(NonStrictDataModel):
         self.assert_isinstance(value, "timestamp", six.integer_types + (float,))
         self._property_timestamp = value
 
-    @schema_property('type')
+    @schema_property("type")
     def type(self):
         return "log"
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -681,7 +736,7 @@ class TaskLogEvent(NonStrictDataModel):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('level')
+    @schema_property("level")
     def level(self):
         return self._property_level
 
@@ -699,7 +754,7 @@ class TaskLogEvent(NonStrictDataModel):
             self.assert_isinstance(value, "level", enum.Enum)
         self._property_level = value
 
-    @schema_property('worker')
+    @schema_property("worker")
     def worker(self):
         return self._property_worker
 
@@ -712,7 +767,7 @@ class TaskLogEvent(NonStrictDataModel):
         self.assert_isinstance(value, "worker", six.string_types)
         self._property_worker = value
 
-    @schema_property('msg')
+    @schema_property("msg")
     def msg(self):
         return self._property_msg
 
@@ -737,174 +792,160 @@ class AddRequest(CompoundRequest):
     _version = "2.1"
     _item_prop_name = "event"
     _schema = {
-        'anyOf': [
-            {'$ref': '#/definitions/metrics_scalar_event'},
-            {'$ref': '#/definitions/metrics_vector_event'},
-            {'$ref': '#/definitions/metrics_image_event'},
-            {'$ref': '#/definitions/metrics_plot_event'},
-            {'$ref': '#/definitions/task_log_event'},
+        "anyOf": [
+            {"$ref": "#/definitions/metrics_scalar_event"},
+            {"$ref": "#/definitions/metrics_vector_event"},
+            {"$ref": "#/definitions/metrics_image_event"},
+            {"$ref": "#/definitions/metrics_plot_event"},
+            {"$ref": "#/definitions/task_log_event"},
         ],
-        'definitions': {
-            'log_level_enum': {
-                'enum': [
-                    'notset',
-                    'debug',
-                    'verbose',
-                    'info',
-                    'warn',
-                    'warning',
-                    'error',
-                    'fatal',
-                    'critical',
+        "definitions": {
+            "log_level_enum": {
+                "enum": [
+                    "notset",
+                    "debug",
+                    "verbose",
+                    "info",
+                    "warn",
+                    "warning",
+                    "error",
+                    "fatal",
+                    "critical",
                 ],
-                'type': 'string',
+                "type": "string",
             },
-            'metrics_image_event': {
-                'description': 'An image or video was dumped to storage for debugging',
-                'properties': {
-                    'iter': {'description': 'Iteration', 'type': 'integer'},
-                    'key': {'description': 'File key', 'type': 'string'},
-                    'metric': {
-                        'description': "Metric name, e.g. 'count', 'loss', 'accuracy'",
-                        'type': 'string',
+            "metrics_image_event": {
+                "description": "An image or video was dumped to storage for debugging",
+                "properties": {
+                    "iter": {"description": "Iteration", "type": "integer"},
+                    "key": {"description": "File key", "type": "string"},
+                    "metric": {
+                        "description": "Metric name, e.g. 'count', 'loss', 'accuracy'",
+                        "type": "string",
                     },
-                    'task': {
-                        'description': 'Task ID (required)',
-                        'type': 'string',
+                    "task": {"description": "Task ID (required)", "type": "string",},
+                    "timestamp": {
+                        "description": "Epoch milliseconds UTC, will be set by the server if not set.",
+                        "type": ["number", "null"],
                     },
-                    'timestamp': {
-                        'description': 'Epoch milliseconds UTC, will be set by the server if not set.',
-                        'type': ['number', 'null'],
-                    },
-                    'type': {'const': 'training_debug_image', 'description': ''},
-                    'url': {'description': 'File URL', 'type': 'string'},
-                    'variant': {
-                        'description': "E.g. 'class_1', 'total', 'average",
-                        'type': 'string',
+                    "type": {"const": "training_debug_image", "description": ""},
+                    "url": {"description": "File URL", "type": "string"},
+                    "variant": {
+                        "description": "E.g. 'class_1', 'total', 'average",
+                        "type": "string",
                     },
                 },
-                'required': ['task', 'type'],
-                'type': 'object',
+                "required": ["task", "type"],
+                "type": "object",
             },
-            'metrics_plot_event': {
-                'description': " An entire plot (not single datapoint) and it's layout.\n            Used for plotting ROC curves, confidence matrices, etc. when evaluating the net.",
-                'properties': {
-                    'iter': {'description': 'Iteration', 'type': 'integer'},
-                    'metric': {
-                        'description': "Metric name, e.g. 'count', 'loss', 'accuracy'",
-                        'type': 'string',
+            "metrics_plot_event": {
+                "description": " An entire plot (not single datapoint) and it's layout.\n            Used for plotting ROC curves, confidence matrices, etc. when evaluating the net.",
+                "properties": {
+                    "iter": {"description": "Iteration", "type": "integer"},
+                    "metric": {
+                        "description": "Metric name, e.g. 'count', 'loss', 'accuracy'",
+                        "type": "string",
                     },
-                    'plot_str': {
-                        'description': "An entire plot (not single datapoint) and it's layout.\n                    Used for plotting ROC curves, confidence matrices, etc. when evaluating the net.\n                    ",
-                        'type': 'string',
+                    "plot_str": {
+                        "description": "An entire plot (not single datapoint) and it's layout.\n                    Used for plotting ROC curves, confidence matrices, etc. when evaluating the net.\n                    ",
+                        "type": "string",
                     },
-                    'task': {
-                        'description': 'Task ID (required)',
-                        'type': 'string',
+                    "task": {"description": "Task ID (required)", "type": "string",},
+                    "timestamp": {
+                        "description": "Epoch milliseconds UTC, will be set by the server if not set.",
+                        "type": ["number", "null"],
                     },
-                    'timestamp': {
-                        'description': 'Epoch milliseconds UTC, will be set by the server if not set.',
-                        'type': ['number', 'null'],
-                    },
-                    'type': {'const': 'plot', 'description': "'plot'"},
-                    'variant': {
-                        'description': "E.g. 'class_1', 'total', 'average",
-                        'type': 'string',
+                    "type": {"const": "plot", "description": "'plot'"},
+                    "variant": {
+                        "description": "E.g. 'class_1', 'total', 'average",
+                        "type": "string",
                     },
                 },
-                'required': ['task', 'type'],
-                'type': 'object',
+                "required": ["task", "type"],
+                "type": "object",
             },
-            'metrics_scalar_event': {
-                'description': 'Used for reporting scalar metrics during training task',
-                'properties': {
-                    'iter': {'description': 'Iteration', 'type': 'integer'},
-                    'metric': {
-                        'description': "Metric name, e.g. 'count', 'loss', 'accuracy'",
-                        'type': 'string',
+            "metrics_scalar_event": {
+                "description": "Used for reporting scalar metrics during training task",
+                "properties": {
+                    "iter": {"description": "Iteration", "type": "integer"},
+                    "metric": {
+                        "description": "Metric name, e.g. 'count', 'loss', 'accuracy'",
+                        "type": "string",
                     },
-                    'task': {
-                        'description': 'Task ID (required)',
-                        'type': 'string',
+                    "task": {"description": "Task ID (required)", "type": "string",},
+                    "timestamp": {
+                        "description": "Epoch milliseconds UTC, will be set by the server if not set.",
+                        "type": ["number", "null"],
                     },
-                    'timestamp': {
-                        'description': 'Epoch milliseconds UTC, will be set by the server if not set.',
-                        'type': ['number', 'null'],
+                    "type": {
+                        "const": "training_stats_scalar",
+                        "description": "training_stats_vector",
                     },
-                    'type': {
-                        'const': 'training_stats_scalar',
-                        'description': 'training_stats_vector',
-                    },
-                    'value': {'description': '', 'type': 'number'},
-                    'variant': {
-                        'description': "E.g. 'class_1', 'total', 'average",
-                        'type': 'string',
+                    "value": {"description": "", "type": "number"},
+                    "variant": {
+                        "description": "E.g. 'class_1', 'total', 'average",
+                        "type": "string",
                     },
                 },
-                'required': ['task', 'type'],
-                'type': 'object',
+                "required": ["task", "type"],
+                "type": "object",
             },
-            'metrics_vector_event': {
-                'description': 'Used for reporting vector metrics during training task',
-                'properties': {
-                    'iter': {'description': 'Iteration', 'type': 'integer'},
-                    'metric': {
-                        'description': "Metric name, e.g. 'count', 'loss', 'accuracy'",
-                        'type': 'string',
+            "metrics_vector_event": {
+                "description": "Used for reporting vector metrics during training task",
+                "properties": {
+                    "iter": {"description": "Iteration", "type": "integer"},
+                    "metric": {
+                        "description": "Metric name, e.g. 'count', 'loss', 'accuracy'",
+                        "type": "string",
                     },
-                    'task': {
-                        'description': 'Task ID (required)',
-                        'type': 'string',
+                    "task": {"description": "Task ID (required)", "type": "string",},
+                    "timestamp": {
+                        "description": "Epoch milliseconds UTC, will be set by the server if not set.",
+                        "type": ["number", "null"],
                     },
-                    'timestamp': {
-                        'description': 'Epoch milliseconds UTC, will be set by the server if not set.',
-                        'type': ['number', 'null'],
+                    "type": {
+                        "const": "training_stats_vector",
+                        "description": "training_stats_vector",
                     },
-                    'type': {
-                        'const': 'training_stats_vector',
-                        'description': 'training_stats_vector',
+                    "values": {
+                        "description": "vector of float values",
+                        "items": {"type": "number"},
+                        "type": "array",
                     },
-                    'values': {
-                        'description': 'vector of float values',
-                        'items': {'type': 'number'},
-                        'type': 'array',
-                    },
-                    'variant': {
-                        'description': "E.g. 'class_1', 'total', 'average",
-                        'type': 'string',
+                    "variant": {
+                        "description": "E.g. 'class_1', 'total', 'average",
+                        "type": "string",
                     },
                 },
-                'required': ['task'],
-                'type': 'object',
+                "required": ["task"],
+                "type": "object",
             },
-            'task_log_event': {
-                'description': 'A log event associated with a task.',
-                'properties': {
-                    'level': {
-                        '$ref': '#/definitions/log_level_enum',
-                        'description': 'Log level.',
+            "task_log_event": {
+                "description": "A log event associated with a task.",
+                "properties": {
+                    "level": {
+                        "$ref": "#/definitions/log_level_enum",
+                        "description": "Log level.",
                     },
-                    'msg': {'description': 'Log message.', 'type': 'string'},
-                    'task': {
-                        'description': 'Task ID (required)',
-                        'type': 'string',
+                    "msg": {"description": "Log message.", "type": "string"},
+                    "task": {"description": "Task ID (required)", "type": "string",},
+                    "timestamp": {
+                        "description": "Epoch milliseconds UTC, will be set by the server if not set.",
+                        "type": ["number", "null"],
                     },
-                    'timestamp': {
-                        'description': 'Epoch milliseconds UTC, will be set by the server if not set.',
-                        'type': ['number', 'null'],
-                    },
-                    'type': {'const': 'log', 'description': "'log'"},
-                    'worker': {
-                        'description': 'Name of machine running the task.',
-                        'type': 'string',
+                    "type": {"const": "log", "description": "'log'"},
+                    "worker": {
+                        "description": "Name of machine running the task.",
+                        "type": "string",
                     },
                 },
-                'required': ['task', 'type'],
-                'type': 'object',
+                "required": ["task", "type"],
+                "type": "object",
             },
         },
-        'type': 'object',
+        "type": "object",
     }
+
     def __init__(self, event):
         super(AddRequest, self).__init__()
         self.event = event
@@ -915,7 +956,17 @@ class AddRequest(CompoundRequest):
 
     @event.setter
     def event(self, value):
-        self.assert_isinstance(value, "event", (MetricsScalarEvent, MetricsVectorEvent, MetricsImageEvent, MetricsPlotEvent, TaskLogEvent))
+        self.assert_isinstance(
+            value,
+            "event",
+            (
+                MetricsScalarEvent,
+                MetricsVectorEvent,
+                MetricsImageEvent,
+                MetricsPlotEvent,
+                TaskLogEvent,
+            ),
+        )
         self._property_event = value
 
 
@@ -924,11 +975,12 @@ class AddResponse(Response):
     Response of events.add endpoint.
 
     """
+
     _service = "events"
     _action = "add"
     _version = "2.1"
 
-    _schema = {'additionalProperties': True, 'definitions': {}, 'type': 'object'}
+    _schema = {"additionalProperties": True, "definitions": {}, "type": "object"}
 
 
 class AddBatchRequest(BatchRequest):
@@ -952,25 +1004,26 @@ class AddBatchResponse(Response):
     :param errors:
     :type errors: int
     """
+
     _service = "events"
     _action = "add_batch"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'added': {'type': ['integer', 'null']},
-            'errors': {'type': ['integer', 'null']},
+        "definitions": {},
+        "properties": {
+            "added": {"type": ["integer", "null"]},
+            "errors": {"type": ["integer", "null"]},
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, added=None, errors=None, **kwargs):
+
+    def __init__(self, added=None, errors=None, **kwargs):
         super(AddBatchResponse, self).__init__(**kwargs)
         self.added = added
         self.errors = errors
 
-    @schema_property('added')
+    @schema_property("added")
     def added(self):
         return self._property_added
 
@@ -985,7 +1038,7 @@ class AddBatchResponse(Response):
         self.assert_isinstance(value, "added", six.integer_types)
         self._property_added = value
 
-    @schema_property('errors')
+    @schema_property("errors")
     def errors(self):
         return self._property_errors
 
@@ -1017,29 +1070,29 @@ class DebugImagesRequest(Request):
     _action = "debug_images"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'iters': {
-                'description': 'Max number of latest iterations for which to return debug images',
-                'type': 'integer',
+        "definitions": {},
+        "properties": {
+            "iters": {
+                "description": "Max number of latest iterations for which to return debug images",
+                "type": "integer",
             },
-            'scroll_id': {
-                'description': 'Scroll ID of previous call (used for getting more results)',
-                'type': 'string',
+            "scroll_id": {
+                "description": "Scroll ID of previous call (used for getting more results)",
+                "type": "string",
             },
-            'task': {'description': 'Task ID', 'type': 'string'},
+            "task": {"description": "Task ID", "type": "string"},
         },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
-    def __init__(
-            self, task, iters=None, scroll_id=None, **kwargs):
+
+    def __init__(self, task, iters=None, scroll_id=None, **kwargs):
         super(DebugImagesRequest, self).__init__(**kwargs)
         self.task = task
         self.iters = iters
         self.scroll_id = scroll_id
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -1052,7 +1105,7 @@ class DebugImagesRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('iters')
+    @schema_property("iters")
     def iters(self):
         return self._property_iters
 
@@ -1067,7 +1120,7 @@ class DebugImagesRequest(Request):
         self.assert_isinstance(value, "iters", six.integer_types)
         self._property_iters = value
 
-    @schema_property('scroll_id')
+    @schema_property("scroll_id")
     def scroll_id(self):
         return self._property_scroll_id
 
@@ -1096,36 +1149,45 @@ class DebugImagesResponse(Response):
     :param scroll_id: Scroll ID for getting more results
     :type scroll_id: str
     """
+
     _service = "events"
     _action = "debug_images"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'images': {
-                'description': 'Images list',
-                'items': {'type': 'object'},
-                'type': ['array', 'null'],
+        "definitions": {},
+        "properties": {
+            "images": {
+                "description": "Images list",
+                "items": {"type": "object"},
+                "type": ["array", "null"],
             },
-            'returned': {
-                'description': 'Number of results returned',
-                'type': ['integer', 'null'],
+            "returned": {
+                "description": "Number of results returned",
+                "type": ["integer", "null"],
             },
-            'scroll_id': {
-                'description': 'Scroll ID for getting more results',
-                'type': ['string', 'null'],
+            "scroll_id": {
+                "description": "Scroll ID for getting more results",
+                "type": ["string", "null"],
             },
-            'task': {'description': 'Task ID', 'type': ['string', 'null']},
-            'total': {
-                'description': 'Total number of results available for this query',
-                'type': ['number', 'null'],
+            "task": {"description": "Task ID", "type": ["string", "null"]},
+            "total": {
+                "description": "Total number of results available for this query",
+                "type": ["number", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
+
     def __init__(
-            self, task=None, images=None, returned=None, total=None, scroll_id=None, **kwargs):
+        self,
+        task=None,
+        images=None,
+        returned=None,
+        total=None,
+        scroll_id=None,
+        **kwargs
+    ):
         super(DebugImagesResponse, self).__init__(**kwargs)
         self.task = task
         self.images = images
@@ -1133,7 +1195,7 @@ class DebugImagesResponse(Response):
         self.total = total
         self.scroll_id = scroll_id
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -1146,7 +1208,7 @@ class DebugImagesResponse(Response):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('images')
+    @schema_property("images")
     def images(self):
         return self._property_images
 
@@ -1161,7 +1223,7 @@ class DebugImagesResponse(Response):
         self.assert_isinstance(value, "images", (dict,), is_array=True)
         self._property_images = value
 
-    @schema_property('returned')
+    @schema_property("returned")
     def returned(self):
         return self._property_returned
 
@@ -1176,7 +1238,7 @@ class DebugImagesResponse(Response):
         self.assert_isinstance(value, "returned", six.integer_types)
         self._property_returned = value
 
-    @schema_property('total')
+    @schema_property("total")
     def total(self):
         return self._property_total
 
@@ -1189,7 +1251,7 @@ class DebugImagesResponse(Response):
         self.assert_isinstance(value, "total", six.integer_types + (float,))
         self._property_total = value
 
-    @schema_property('scroll_id')
+    @schema_property("scroll_id")
     def scroll_id(self):
         return self._property_scroll_id
 
@@ -1215,17 +1277,17 @@ class DeleteForTaskRequest(Request):
     _action = "delete_for_task"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {'task': {'description': 'Task ID', 'type': 'string'}},
-        'required': ['task'],
-        'type': 'object',
+        "definitions": {},
+        "properties": {"task": {"description": "Task ID", "type": "string"}},
+        "required": ["task"],
+        "type": "object",
     }
-    def __init__(
-            self, task, **kwargs):
+
+    def __init__(self, task, **kwargs):
         super(DeleteForTaskRequest, self).__init__(**kwargs)
         self.task = task
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -1246,26 +1308,27 @@ class DeleteForTaskResponse(Response):
     :param deleted: Number of deleted events
     :type deleted: bool
     """
+
     _service = "events"
     _action = "delete_for_task"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'deleted': {
-                'description': 'Number of deleted events',
-                'type': ['boolean', 'null'],
+        "definitions": {},
+        "properties": {
+            "deleted": {
+                "description": "Number of deleted events",
+                "type": ["boolean", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, deleted=None, **kwargs):
+
+    def __init__(self, deleted=None, **kwargs):
         super(DeleteForTaskResponse, self).__init__(**kwargs)
         self.deleted = deleted
 
-    @schema_property('deleted')
+    @schema_property("deleted")
     def deleted(self):
         return self._property_deleted
 
@@ -1295,31 +1358,37 @@ class DownloadTaskLogRequest(Request):
     _action = "download_task_log"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'line_format': {
-                'default': '{asctime} {worker} {level} {msg}',
-                'description': "Line string format. Used if the line type is 'text'",
-                'type': 'string',
+        "definitions": {},
+        "properties": {
+            "line_format": {
+                "default": "{asctime} {worker} {level} {msg}",
+                "description": "Line string format. Used if the line type is 'text'",
+                "type": "string",
             },
-            'line_type': {
-                'description': 'Line format type',
-                'enum': ['json', 'text'],
-                'type': 'string',
+            "line_type": {
+                "description": "Line format type",
+                "enum": ["json", "text"],
+                "type": "string",
             },
-            'task': {'description': 'Task ID', 'type': 'string'},
+            "task": {"description": "Task ID", "type": "string"},
         },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, line_type=None, line_format="{asctime} {worker} {level} {msg}", **kwargs):
+        self,
+        task,
+        line_type=None,
+        line_format="{asctime} {worker} {level} {msg}",
+        **kwargs
+    ):
         super(DownloadTaskLogRequest, self).__init__(**kwargs)
         self.task = task
         self.line_type = line_type
         self.line_format = line_format
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -1332,7 +1401,7 @@ class DownloadTaskLogRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('line_type')
+    @schema_property("line_type")
     def line_type(self):
         return self._property_line_type
 
@@ -1345,7 +1414,7 @@ class DownloadTaskLogRequest(Request):
         self.assert_isinstance(value, "line_type", six.string_types)
         self._property_line_type = value
 
-    @schema_property('line_format')
+    @schema_property("line_format")
     def line_format(self):
         return self._property_line_format
 
@@ -1364,11 +1433,12 @@ class DownloadTaskLogResponse(Response):
     Response of events.download_task_log endpoint.
 
     """
+
     _service = "events"
     _action = "download_task_log"
     _version = "2.1"
 
-    _schema = {'definitions': {}, 'type': 'string'}
+    _schema = {"definitions": {}, "type": "string"}
 
 
 class GetMultiTaskPlotsRequest(Request):
@@ -1387,33 +1457,33 @@ class GetMultiTaskPlotsRequest(Request):
     _action = "get_multi_task_plots"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'iters': {
-                'description': 'Max number of latest iterations for which to return debug images',
-                'type': 'integer',
+        "definitions": {},
+        "properties": {
+            "iters": {
+                "description": "Max number of latest iterations for which to return debug images",
+                "type": "integer",
             },
-            'scroll_id': {
-                'description': 'Scroll ID of previous call (used for getting more results)',
-                'type': 'string',
+            "scroll_id": {
+                "description": "Scroll ID of previous call (used for getting more results)",
+                "type": "string",
             },
-            'tasks': {
-                'description': 'List of task IDs',
-                'items': {'description': 'Task ID', 'type': 'string'},
-                'type': 'array',
+            "tasks": {
+                "description": "List of task IDs",
+                "items": {"description": "Task ID", "type": "string"},
+                "type": "array",
             },
         },
-        'required': ['tasks'],
-        'type': 'object',
+        "required": ["tasks"],
+        "type": "object",
     }
-    def __init__(
-            self, tasks, iters=None, scroll_id=None, **kwargs):
+
+    def __init__(self, tasks, iters=None, scroll_id=None, **kwargs):
         super(GetMultiTaskPlotsRequest, self).__init__(**kwargs)
         self.tasks = tasks
         self.iters = iters
         self.scroll_id = scroll_id
 
-    @schema_property('tasks')
+    @schema_property("tasks")
     def tasks(self):
         return self._property_tasks
 
@@ -1428,7 +1498,7 @@ class GetMultiTaskPlotsRequest(Request):
         self.assert_isinstance(value, "tasks", six.string_types, is_array=True)
         self._property_tasks = value
 
-    @schema_property('iters')
+    @schema_property("iters")
     def iters(self):
         return self._property_iters
 
@@ -1443,7 +1513,7 @@ class GetMultiTaskPlotsRequest(Request):
         self.assert_isinstance(value, "iters", six.integer_types)
         self._property_iters = value
 
-    @schema_property('scroll_id')
+    @schema_property("scroll_id")
     def scroll_id(self):
         return self._property_scroll_id
 
@@ -1470,41 +1540,42 @@ class GetMultiTaskPlotsResponse(Response):
     :param scroll_id: Scroll ID for getting more results
     :type scroll_id: str
     """
+
     _service = "events"
     _action = "get_multi_task_plots"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'plots': {
-                'description': 'Plots mapping (keyed by task name)',
-                'type': ['object', 'null'],
+        "definitions": {},
+        "properties": {
+            "plots": {
+                "description": "Plots mapping (keyed by task name)",
+                "type": ["object", "null"],
             },
-            'returned': {
-                'description': 'Number of results returned',
-                'type': ['integer', 'null'],
+            "returned": {
+                "description": "Number of results returned",
+                "type": ["integer", "null"],
             },
-            'scroll_id': {
-                'description': 'Scroll ID for getting more results',
-                'type': ['string', 'null'],
+            "scroll_id": {
+                "description": "Scroll ID for getting more results",
+                "type": ["string", "null"],
             },
-            'total': {
-                'description': 'Total number of results available for this query',
-                'type': ['number', 'null'],
+            "total": {
+                "description": "Total number of results available for this query",
+                "type": ["number", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, plots=None, returned=None, total=None, scroll_id=None, **kwargs):
+
+    def __init__(self, plots=None, returned=None, total=None, scroll_id=None, **kwargs):
         super(GetMultiTaskPlotsResponse, self).__init__(**kwargs)
         self.plots = plots
         self.returned = returned
         self.total = total
         self.scroll_id = scroll_id
 
-    @schema_property('plots')
+    @schema_property("plots")
     def plots(self):
         return self._property_plots
 
@@ -1517,7 +1588,7 @@ class GetMultiTaskPlotsResponse(Response):
         self.assert_isinstance(value, "plots", (dict,))
         self._property_plots = value
 
-    @schema_property('returned')
+    @schema_property("returned")
     def returned(self):
         return self._property_returned
 
@@ -1532,7 +1603,7 @@ class GetMultiTaskPlotsResponse(Response):
         self.assert_isinstance(value, "returned", six.integer_types)
         self._property_returned = value
 
-    @schema_property('total')
+    @schema_property("total")
     def total(self):
         return self._property_total
 
@@ -1545,7 +1616,7 @@ class GetMultiTaskPlotsResponse(Response):
         self.assert_isinstance(value, "total", six.integer_types + (float,))
         self._property_total = value
 
-    @schema_property('scroll_id')
+    @schema_property("scroll_id")
     def scroll_id(self):
         return self._property_scroll_id
 
@@ -1573,20 +1644,20 @@ class GetScalarMetricDataRequest(Request):
     _action = "get_scalar_metric_data"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'metric': {'description': 'type of metric', 'type': ['string', 'null']},
-            'task': {'description': 'task ID', 'type': ['string', 'null']},
+        "definitions": {},
+        "properties": {
+            "metric": {"description": "type of metric", "type": ["string", "null"]},
+            "task": {"description": "task ID", "type": ["string", "null"]},
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, task=None, metric=None, **kwargs):
+
+    def __init__(self, task=None, metric=None, **kwargs):
         super(GetScalarMetricDataRequest, self).__init__(**kwargs)
         self.task = task
         self.metric = metric
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -1599,7 +1670,7 @@ class GetScalarMetricDataRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('metric')
+    @schema_property("metric")
     def metric(self):
         return self._property_metric
 
@@ -1626,42 +1697,45 @@ class GetScalarMetricDataResponse(Response):
     :param scroll_id: Scroll ID of previous call (used for getting more results)
     :type scroll_id: str
     """
+
     _service = "events"
     _action = "get_scalar_metric_data"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'events': {
-                'description': 'task scalar metric events',
-                'items': {'type': 'object'},
-                'type': ['array', 'null'],
+        "definitions": {},
+        "properties": {
+            "events": {
+                "description": "task scalar metric events",
+                "items": {"type": "object"},
+                "type": ["array", "null"],
             },
-            'returned': {
-                'description': 'amount of events returned',
-                'type': ['integer', 'null'],
+            "returned": {
+                "description": "amount of events returned",
+                "type": ["integer", "null"],
             },
-            'scroll_id': {
-                'description': 'Scroll ID of previous call (used for getting more results)',
-                'type': ['string', 'null'],
+            "scroll_id": {
+                "description": "Scroll ID of previous call (used for getting more results)",
+                "type": ["string", "null"],
             },
-            'total': {
-                'description': 'amount of events in task',
-                'type': ['integer', 'null'],
+            "total": {
+                "description": "amount of events in task",
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
+
     def __init__(
-            self, events=None, returned=None, total=None, scroll_id=None, **kwargs):
+        self, events=None, returned=None, total=None, scroll_id=None, **kwargs
+    ):
         super(GetScalarMetricDataResponse, self).__init__(**kwargs)
         self.events = events
         self.returned = returned
         self.total = total
         self.scroll_id = scroll_id
 
-    @schema_property('events')
+    @schema_property("events")
     def events(self):
         return self._property_events
 
@@ -1676,7 +1750,7 @@ class GetScalarMetricDataResponse(Response):
         self.assert_isinstance(value, "events", (dict,), is_array=True)
         self._property_events = value
 
-    @schema_property('returned')
+    @schema_property("returned")
     def returned(self):
         return self._property_returned
 
@@ -1691,7 +1765,7 @@ class GetScalarMetricDataResponse(Response):
         self.assert_isinstance(value, "returned", six.integer_types)
         self._property_returned = value
 
-    @schema_property('total')
+    @schema_property("total")
     def total(self):
         return self._property_total
 
@@ -1706,7 +1780,7 @@ class GetScalarMetricDataResponse(Response):
         self.assert_isinstance(value, "total", six.integer_types)
         self._property_total = value
 
-    @schema_property('scroll_id')
+    @schema_property("scroll_id")
     def scroll_id(self):
         return self._property_scroll_id
 
@@ -1732,17 +1806,17 @@ class GetScalarMetricsAndVariantsRequest(Request):
     _action = "get_scalar_metrics_and_variants"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {'task': {'description': 'task ID', 'type': 'string'}},
-        'required': ['task'],
-        'type': 'object',
+        "definitions": {},
+        "properties": {"task": {"description": "task ID", "type": "string"}},
+        "required": ["task"],
+        "type": "object",
     }
-    def __init__(
-            self, task, **kwargs):
+
+    def __init__(self, task, **kwargs):
         super(GetScalarMetricsAndVariantsRequest, self).__init__(**kwargs)
         self.task = task
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -1763,23 +1837,24 @@ class GetScalarMetricsAndVariantsResponse(Response):
     :param metrics:
     :type metrics: dict
     """
+
     _service = "events"
     _action = "get_scalar_metrics_and_variants"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'metrics': {'additionalProperties': True, 'type': ['object', 'null']},
+        "definitions": {},
+        "properties": {
+            "metrics": {"additionalProperties": True, "type": ["object", "null"]},
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, metrics=None, **kwargs):
+
+    def __init__(self, metrics=None, **kwargs):
         super(GetScalarMetricsAndVariantsResponse, self).__init__(**kwargs)
         self.metrics = metrics
 
-    @schema_property('metrics')
+    @schema_property("metrics")
     def metrics(self):
         return self._property_metrics
 
@@ -1813,32 +1888,40 @@ class GetTaskEventsRequest(Request):
     _action = "get_task_events"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'batch_size': {
-                'description': 'Number of events to return each time',
-                'type': 'integer',
+        "definitions": {},
+        "properties": {
+            "batch_size": {
+                "description": "Number of events to return each time",
+                "type": "integer",
             },
-            'event_type': {
-                'description': 'Return only events of this type',
-                'type': 'string',
+            "event_type": {
+                "description": "Return only events of this type",
+                "type": "string",
             },
-            'order': {
-                'description': "'asc' (default) or 'desc'.",
-                'enum': ['asc', 'desc'],
-                'type': 'string',
+            "order": {
+                "description": "'asc' (default) or 'desc'.",
+                "enum": ["asc", "desc"],
+                "type": "string",
             },
-            'scroll_id': {
-                'description': 'Pass this value on next call to get next page',
-                'type': 'string',
+            "scroll_id": {
+                "description": "Pass this value on next call to get next page",
+                "type": "string",
             },
-            'task': {'description': 'Task ID', 'type': 'string'},
+            "task": {"description": "Task ID", "type": "string"},
         },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, order=None, scroll_id=None, batch_size=None, event_type=None, **kwargs):
+        self,
+        task,
+        order=None,
+        scroll_id=None,
+        batch_size=None,
+        event_type=None,
+        **kwargs
+    ):
         super(GetTaskEventsRequest, self).__init__(**kwargs)
         self.task = task
         self.order = order
@@ -1846,7 +1929,7 @@ class GetTaskEventsRequest(Request):
         self.batch_size = batch_size
         self.event_type = event_type
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -1859,7 +1942,7 @@ class GetTaskEventsRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('order')
+    @schema_property("order")
     def order(self):
         return self._property_order
 
@@ -1872,7 +1955,7 @@ class GetTaskEventsRequest(Request):
         self.assert_isinstance(value, "order", six.string_types)
         self._property_order = value
 
-    @schema_property('scroll_id')
+    @schema_property("scroll_id")
     def scroll_id(self):
         return self._property_scroll_id
 
@@ -1885,7 +1968,7 @@ class GetTaskEventsRequest(Request):
         self.assert_isinstance(value, "scroll_id", six.string_types)
         self._property_scroll_id = value
 
-    @schema_property('batch_size')
+    @schema_property("batch_size")
     def batch_size(self):
         return self._property_batch_size
 
@@ -1899,7 +1982,8 @@ class GetTaskEventsRequest(Request):
 
         self.assert_isinstance(value, "batch_size", six.integer_types)
         self._property_batch_size = value
-    @schema_property('event_type')
+
+    @schema_property("event_type")
     def event_type(self):
         return self._property_event_type
 
@@ -1908,7 +1992,7 @@ class GetTaskEventsRequest(Request):
         if value is None:
             self._property_event_type = None
             return
-        
+
         self.assert_isinstance(value, "event_type", six.string_types)
         self._property_event_type = value
 
@@ -1926,42 +2010,45 @@ class GetTaskEventsResponse(Response):
     :param scroll_id: Scroll ID for getting more results
     :type scroll_id: str
     """
+
     _service = "events"
     _action = "get_task_events"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'events': {
-                'description': 'Events list',
-                'items': {'type': 'object'},
-                'type': ['array', 'null'],
+        "definitions": {},
+        "properties": {
+            "events": {
+                "description": "Events list",
+                "items": {"type": "object"},
+                "type": ["array", "null"],
             },
-            'returned': {
-                'description': 'Number of results returned',
-                'type': ['integer', 'null'],
+            "returned": {
+                "description": "Number of results returned",
+                "type": ["integer", "null"],
             },
-            'scroll_id': {
-                'description': 'Scroll ID for getting more results',
-                'type': ['string', 'null'],
+            "scroll_id": {
+                "description": "Scroll ID for getting more results",
+                "type": ["string", "null"],
             },
-            'total': {
-                'description': 'Total number of results available for this query',
-                'type': ['number', 'null'],
+            "total": {
+                "description": "Total number of results available for this query",
+                "type": ["number", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
+
     def __init__(
-            self, events=None, returned=None, total=None, scroll_id=None, **kwargs):
+        self, events=None, returned=None, total=None, scroll_id=None, **kwargs
+    ):
         super(GetTaskEventsResponse, self).__init__(**kwargs)
         self.events = events
         self.returned = returned
         self.total = total
         self.scroll_id = scroll_id
 
-    @schema_property('events')
+    @schema_property("events")
     def events(self):
         return self._property_events
 
@@ -1976,7 +2063,7 @@ class GetTaskEventsResponse(Response):
         self.assert_isinstance(value, "events", (dict,), is_array=True)
         self._property_events = value
 
-    @schema_property('returned')
+    @schema_property("returned")
     def returned(self):
         return self._property_returned
 
@@ -1991,7 +2078,7 @@ class GetTaskEventsResponse(Response):
         self.assert_isinstance(value, "returned", six.integer_types)
         self._property_returned = value
 
-    @schema_property('total')
+    @schema_property("total")
     def total(self):
         return self._property_total
 
@@ -2004,7 +2091,7 @@ class GetTaskEventsResponse(Response):
         self.assert_isinstance(value, "total", six.integer_types + (float,))
         self._property_total = value
 
-    @schema_property('scroll_id')
+    @schema_property("scroll_id")
     def scroll_id(self):
         return self._property_scroll_id
 
@@ -2030,17 +2117,17 @@ class GetTaskLatestScalarValuesRequest(Request):
     _action = "get_task_latest_scalar_values"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {'task': {'description': 'Task ID', 'type': 'string'}},
-        'required': ['task'],
-        'type': 'object',
+        "definitions": {},
+        "properties": {"task": {"description": "Task ID", "type": "string"}},
+        "required": ["task"],
+        "type": "object",
     }
-    def __init__(
-            self, task, **kwargs):
+
+    def __init__(self, task, **kwargs):
         super(GetTaskLatestScalarValuesRequest, self).__init__(**kwargs)
         self.task = task
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -2061,51 +2148,52 @@ class GetTaskLatestScalarValuesResponse(Response):
     :param metrics:
     :type metrics: Sequence[dict]
     """
+
     _service = "events"
     _action = "get_task_latest_scalar_values"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'metrics': {
-                'items': {
-                    'properties': {
-                        'name': {'description': 'Metric name', 'type': 'string'},
-                        'variants': {
-                            'items': {
-                                'properties': {
-                                    'last_100_value': {
-                                        'description': 'Average of 100 last reported values',
-                                        'type': 'number',
+        "definitions": {},
+        "properties": {
+            "metrics": {
+                "items": {
+                    "properties": {
+                        "name": {"description": "Metric name", "type": "string"},
+                        "variants": {
+                            "items": {
+                                "properties": {
+                                    "last_100_value": {
+                                        "description": "Average of 100 last reported values",
+                                        "type": "number",
                                     },
-                                    'last_value': {
-                                        'description': 'Last reported value',
-                                        'type': 'number',
+                                    "last_value": {
+                                        "description": "Last reported value",
+                                        "type": "number",
                                     },
-                                    'name': {
-                                        'description': 'Variant name',
-                                        'type': 'string',
+                                    "name": {
+                                        "description": "Variant name",
+                                        "type": "string",
                                     },
                                 },
-                                'type': 'object',
+                                "type": "object",
                             },
-                            'type': 'array',
+                            "type": "array",
                         },
                     },
-                    'type': 'object',
+                    "type": "object",
                 },
-                'type': ['array', 'null'],
+                "type": ["array", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, metrics=None, **kwargs):
+
+    def __init__(self, metrics=None, **kwargs):
         super(GetTaskLatestScalarValuesResponse, self).__init__(**kwargs)
         self.metrics = metrics
 
-    @schema_property('metrics')
+    @schema_property("metrics")
     def metrics(self):
         return self._property_metrics
 
@@ -2143,27 +2231,29 @@ class GetTaskLogRequest(Request):
     _action = "get_task_log"
     _version = "1.7"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'batch_size': {'description': '', 'type': 'integer'},
-            'from': {
-                'description': 'Where will the log entries be taken from (default to the head of the log)',
-                'enum': ['head', 'tail'],
-                'type': 'string',
+        "definitions": {},
+        "properties": {
+            "batch_size": {"description": "", "type": "integer"},
+            "from": {
+                "description": "Where will the log entries be taken from (default to the head of the log)",
+                "enum": ["head", "tail"],
+                "type": "string",
             },
-            'order': {
-                'description': 'Timestamp order in which log events will be returned (defaults to ascending)',
-                'enum': ['asc', 'desc'],
-                'type': 'string',
+            "order": {
+                "description": "Timestamp order in which log events will be returned (defaults to ascending)",
+                "enum": ["asc", "desc"],
+                "type": "string",
             },
-            'scroll_id': {'description': '', 'type': 'string'},
-            'task': {'description': 'Task ID', 'type': 'string'},
+            "scroll_id": {"description": "", "type": "string"},
+            "task": {"description": "Task ID", "type": "string"},
         },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, order=None, from_=None, scroll_id=None, batch_size=None, **kwargs):
+        self, task, order=None, from_=None, scroll_id=None, batch_size=None, **kwargs
+    ):
         super(GetTaskLogRequest, self).__init__(**kwargs)
         self.task = task
         self.order = order
@@ -2171,7 +2261,7 @@ class GetTaskLogRequest(Request):
         self.scroll_id = scroll_id
         self.batch_size = batch_size
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -2184,7 +2274,7 @@ class GetTaskLogRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('order')
+    @schema_property("order")
     def order(self):
         return self._property_order
 
@@ -2197,7 +2287,7 @@ class GetTaskLogRequest(Request):
         self.assert_isinstance(value, "order", six.string_types)
         self._property_order = value
 
-    @schema_property('from')
+    @schema_property("from")
     def from_(self):
         return self._property_from_
 
@@ -2210,7 +2300,7 @@ class GetTaskLogRequest(Request):
         self.assert_isinstance(value, "from_", six.string_types)
         self._property_from_ = value
 
-    @schema_property('scroll_id')
+    @schema_property("scroll_id")
     def scroll_id(self):
         return self._property_scroll_id
 
@@ -2223,7 +2313,7 @@ class GetTaskLogRequest(Request):
         self.assert_isinstance(value, "scroll_id", six.string_types)
         self._property_scroll_id = value
 
-    @schema_property('batch_size')
+    @schema_property("batch_size")
     def batch_size(self):
         return self._property_batch_size
 
@@ -2252,42 +2342,45 @@ class GetTaskLogResponse(Response):
     :param scroll_id: Scroll ID for getting more results
     :type scroll_id: str
     """
+
     _service = "events"
     _action = "get_task_log"
     _version = "1.7"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'events': {
-                'description': 'Log items list',
-                'items': {'type': 'object'},
-                'type': ['array', 'null'],
+        "definitions": {},
+        "properties": {
+            "events": {
+                "description": "Log items list",
+                "items": {"type": "object"},
+                "type": ["array", "null"],
             },
-            'returned': {
-                'description': 'Number of results returned',
-                'type': ['integer', 'null'],
+            "returned": {
+                "description": "Number of results returned",
+                "type": ["integer", "null"],
             },
-            'scroll_id': {
-                'description': 'Scroll ID for getting more results',
-                'type': ['string', 'null'],
+            "scroll_id": {
+                "description": "Scroll ID for getting more results",
+                "type": ["string", "null"],
             },
-            'total': {
-                'description': 'Total number of results available for this query',
-                'type': ['number', 'null'],
+            "total": {
+                "description": "Total number of results available for this query",
+                "type": ["number", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
+
     def __init__(
-            self, events=None, returned=None, total=None, scroll_id=None, **kwargs):
+        self, events=None, returned=None, total=None, scroll_id=None, **kwargs
+    ):
         super(GetTaskLogResponse, self).__init__(**kwargs)
         self.events = events
         self.returned = returned
         self.total = total
         self.scroll_id = scroll_id
 
-    @schema_property('events')
+    @schema_property("events")
     def events(self):
         return self._property_events
 
@@ -2302,7 +2395,7 @@ class GetTaskLogResponse(Response):
         self.assert_isinstance(value, "events", (dict,), is_array=True)
         self._property_events = value
 
-    @schema_property('returned')
+    @schema_property("returned")
     def returned(self):
         return self._property_returned
 
@@ -2317,7 +2410,7 @@ class GetTaskLogResponse(Response):
         self.assert_isinstance(value, "returned", six.integer_types)
         self._property_returned = value
 
-    @schema_property('total')
+    @schema_property("total")
     def total(self):
         return self._property_total
 
@@ -2330,7 +2423,7 @@ class GetTaskLogResponse(Response):
         self.assert_isinstance(value, "total", six.integer_types + (float,))
         self._property_total = value
 
-    @schema_property('scroll_id')
+    @schema_property("scroll_id")
     def scroll_id(self):
         return self._property_scroll_id
 
@@ -2360,29 +2453,29 @@ class GetTaskPlotsRequest(Request):
     _action = "get_task_plots"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'iters': {
-                'description': 'Max number of latest iterations for which to return debug images',
-                'type': 'integer',
+        "definitions": {},
+        "properties": {
+            "iters": {
+                "description": "Max number of latest iterations for which to return debug images",
+                "type": "integer",
             },
-            'scroll_id': {
-                'description': 'Scroll ID of previous call (used for getting more results)',
-                'type': 'string',
+            "scroll_id": {
+                "description": "Scroll ID of previous call (used for getting more results)",
+                "type": "string",
             },
-            'task': {'description': 'Task ID', 'type': 'string'},
+            "task": {"description": "Task ID", "type": "string"},
         },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
-    def __init__(
-            self, task, iters=None, scroll_id=None, **kwargs):
+
+    def __init__(self, task, iters=None, scroll_id=None, **kwargs):
         super(GetTaskPlotsRequest, self).__init__(**kwargs)
         self.task = task
         self.iters = iters
         self.scroll_id = scroll_id
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -2395,7 +2488,7 @@ class GetTaskPlotsRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('iters')
+    @schema_property("iters")
     def iters(self):
         return self._property_iters
 
@@ -2410,7 +2503,7 @@ class GetTaskPlotsRequest(Request):
         self.assert_isinstance(value, "iters", six.integer_types)
         self._property_iters = value
 
-    @schema_property('scroll_id')
+    @schema_property("scroll_id")
     def scroll_id(self):
         return self._property_scroll_id
 
@@ -2437,42 +2530,43 @@ class GetTaskPlotsResponse(Response):
     :param scroll_id: Scroll ID for getting more results
     :type scroll_id: str
     """
+
     _service = "events"
     _action = "get_task_plots"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'plots': {
-                'description': 'Plots list',
-                'items': {'type': 'object'},
-                'type': ['array', 'null'],
+        "definitions": {},
+        "properties": {
+            "plots": {
+                "description": "Plots list",
+                "items": {"type": "object"},
+                "type": ["array", "null"],
             },
-            'returned': {
-                'description': 'Number of results returned',
-                'type': ['integer', 'null'],
+            "returned": {
+                "description": "Number of results returned",
+                "type": ["integer", "null"],
             },
-            'scroll_id': {
-                'description': 'Scroll ID for getting more results',
-                'type': ['string', 'null'],
+            "scroll_id": {
+                "description": "Scroll ID for getting more results",
+                "type": ["string", "null"],
             },
-            'total': {
-                'description': 'Total number of results available for this query',
-                'type': ['number', 'null'],
+            "total": {
+                "description": "Total number of results available for this query",
+                "type": ["number", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, plots=None, returned=None, total=None, scroll_id=None, **kwargs):
+
+    def __init__(self, plots=None, returned=None, total=None, scroll_id=None, **kwargs):
         super(GetTaskPlotsResponse, self).__init__(**kwargs)
         self.plots = plots
         self.returned = returned
         self.total = total
         self.scroll_id = scroll_id
 
-    @schema_property('plots')
+    @schema_property("plots")
     def plots(self):
         return self._property_plots
 
@@ -2487,7 +2581,7 @@ class GetTaskPlotsResponse(Response):
         self.assert_isinstance(value, "plots", (dict,), is_array=True)
         self._property_plots = value
 
-    @schema_property('returned')
+    @schema_property("returned")
     def returned(self):
         return self._property_returned
 
@@ -2502,7 +2596,7 @@ class GetTaskPlotsResponse(Response):
         self.assert_isinstance(value, "returned", six.integer_types)
         self._property_returned = value
 
-    @schema_property('total')
+    @schema_property("total")
     def total(self):
         return self._property_total
 
@@ -2515,7 +2609,7 @@ class GetTaskPlotsResponse(Response):
         self.assert_isinstance(value, "total", six.integer_types + (float,))
         self._property_total = value
 
-    @schema_property('scroll_id')
+    @schema_property("scroll_id")
     def scroll_id(self):
         return self._property_scroll_id
 
@@ -2539,17 +2633,17 @@ class GetVectorMetricsAndVariantsRequest(Request):
     _action = "get_vector_metrics_and_variants"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {'task': {'description': 'Task ID', 'type': 'string'}},
-        'required': ['task'],
-        'type': 'object',
+        "definitions": {},
+        "properties": {"task": {"description": "Task ID", "type": "string"}},
+        "required": ["task"],
+        "type": "object",
     }
-    def __init__(
-            self, task, **kwargs):
+
+    def __init__(self, task, **kwargs):
         super(GetVectorMetricsAndVariantsRequest, self).__init__(**kwargs)
         self.task = task
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -2570,27 +2664,28 @@ class GetVectorMetricsAndVariantsResponse(Response):
     :param metrics:
     :type metrics: Sequence[dict]
     """
+
     _service = "events"
     _action = "get_vector_metrics_and_variants"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'metrics': {
-                'description': '',
-                'items': {'type': 'object'},
-                'type': ['array', 'null'],
+        "definitions": {},
+        "properties": {
+            "metrics": {
+                "description": "",
+                "items": {"type": "object"},
+                "type": ["array", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, metrics=None, **kwargs):
+
+    def __init__(self, metrics=None, **kwargs):
         super(GetVectorMetricsAndVariantsResponse, self).__init__(**kwargs)
         self.metrics = metrics
 
-    @schema_property('metrics')
+    @schema_property("metrics")
     def metrics(self):
         return self._property_metrics
 
@@ -2625,38 +2720,38 @@ class MultiTaskScalarMetricsIterHistogramRequest(Request):
     _action = "multi_task_scalar_metrics_iter_histogram"
     _version = "2.1"
     _schema = {
-        'definitions': {
-            'scalar_key_enum': {'enum': ['iter', 'timestamp', 'iso_time'], 'type': 'string'},
-        },
-        'properties': {
-            'key': {
-                '$ref': '#/definitions/scalar_key_enum',
-                'description': '\n                        Histogram x axis to use:\n                        iter - iteration number\n                        iso_time - event time as ISO formatted string\n                        timestamp - event timestamp as milliseconds since epoch\n                        ',
-            },
-            'samples': {
-                'description': 'The amount of histogram points to return (0 to return all the points). Optional, the default value is 10000.',
-                'type': 'integer',
-            },
-            'tasks': {
-                'description': 'List of task Task IDs',
-                'items': {
-                    'description': 'List of task Task IDs',
-                    'type': 'string',
-                },
-                'type': 'array',
+        "definitions": {
+            "scalar_key_enum": {
+                "enum": ["iter", "timestamp", "iso_time"],
+                "type": "string",
             },
         },
-        'required': ['tasks'],
-        'type': 'object',
+        "properties": {
+            "key": {
+                "$ref": "#/definitions/scalar_key_enum",
+                "description": "\n                        Histogram x axis to use:\n                        iter - iteration number\n                        iso_time - event time as ISO formatted string\n                        timestamp - event timestamp as milliseconds since epoch\n                        ",
+            },
+            "samples": {
+                "description": "The amount of histogram points to return (0 to return all the points). Optional, the default value is 10000.",
+                "type": "integer",
+            },
+            "tasks": {
+                "description": "List of task Task IDs",
+                "items": {"description": "List of task Task IDs", "type": "string",},
+                "type": "array",
+            },
+        },
+        "required": ["tasks"],
+        "type": "object",
     }
-    def __init__(
-            self, tasks, samples=None, key=None, **kwargs):
+
+    def __init__(self, tasks, samples=None, key=None, **kwargs):
         super(MultiTaskScalarMetricsIterHistogramRequest, self).__init__(**kwargs)
         self.tasks = tasks
         self.samples = samples
         self.key = key
 
-    @schema_property('tasks')
+    @schema_property("tasks")
     def tasks(self):
         return self._property_tasks
 
@@ -2671,7 +2766,7 @@ class MultiTaskScalarMetricsIterHistogramRequest(Request):
         self.assert_isinstance(value, "tasks", six.string_types, is_array=True)
         self._property_tasks = value
 
-    @schema_property('samples')
+    @schema_property("samples")
     def samples(self):
         return self._property_samples
 
@@ -2686,7 +2781,7 @@ class MultiTaskScalarMetricsIterHistogramRequest(Request):
         self.assert_isinstance(value, "samples", six.integer_types)
         self._property_samples = value
 
-    @schema_property('key')
+    @schema_property("key")
     def key(self):
         return self._property_key
 
@@ -2710,11 +2805,12 @@ class MultiTaskScalarMetricsIterHistogramResponse(Response):
     Response of events.multi_task_scalar_metrics_iter_histogram endpoint.
 
     """
+
     _service = "events"
     _action = "multi_task_scalar_metrics_iter_histogram"
     _version = "2.1"
 
-    _schema = {'additionalProperties': True, 'definitions': {}, 'type': 'object'}
+    _schema = {"additionalProperties": True, "definitions": {}, "type": "object"}
 
 
 class ScalarMetricsIterHistogramRequest(Request):
@@ -2736,31 +2832,34 @@ class ScalarMetricsIterHistogramRequest(Request):
     _action = "scalar_metrics_iter_histogram"
     _version = "2.1"
     _schema = {
-        'definitions': {
-            'scalar_key_enum': {'enum': ['iter', 'timestamp', 'iso_time'], 'type': 'string'},
-        },
-        'properties': {
-            'key': {
-                '$ref': '#/definitions/scalar_key_enum',
-                'description': '\n                        Histogram x axis to use:\n                        iter - iteration number\n                        iso_time - event time as ISO formatted string\n                        timestamp - event timestamp as milliseconds since epoch\n                        ',
+        "definitions": {
+            "scalar_key_enum": {
+                "enum": ["iter", "timestamp", "iso_time"],
+                "type": "string",
             },
-            'samples': {
-                'description': 'The amount of histogram points to return (0 to return all the points). Optional, the default value is 10000.',
-                'type': 'integer',
-            },
-            'task': {'description': 'Task ID', 'type': 'string'},
         },
-        'required': ['task'],
-        'type': 'object',
+        "properties": {
+            "key": {
+                "$ref": "#/definitions/scalar_key_enum",
+                "description": "\n                        Histogram x axis to use:\n                        iter - iteration number\n                        iso_time - event time as ISO formatted string\n                        timestamp - event timestamp as milliseconds since epoch\n                        ",
+            },
+            "samples": {
+                "description": "The amount of histogram points to return (0 to return all the points). Optional, the default value is 10000.",
+                "type": "integer",
+            },
+            "task": {"description": "Task ID", "type": "string"},
+        },
+        "required": ["task"],
+        "type": "object",
     }
-    def __init__(
-            self, task, samples=None, key=None, **kwargs):
+
+    def __init__(self, task, samples=None, key=None, **kwargs):
         super(ScalarMetricsIterHistogramRequest, self).__init__(**kwargs)
         self.task = task
         self.samples = samples
         self.key = key
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -2773,7 +2872,7 @@ class ScalarMetricsIterHistogramRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('samples')
+    @schema_property("samples")
     def samples(self):
         return self._property_samples
 
@@ -2788,7 +2887,7 @@ class ScalarMetricsIterHistogramRequest(Request):
         self.assert_isinstance(value, "samples", six.integer_types)
         self._property_samples = value
 
-    @schema_property('key')
+    @schema_property("key")
     def key(self):
         return self._property_key
 
@@ -2814,23 +2913,24 @@ class ScalarMetricsIterHistogramResponse(Response):
     :param images:
     :type images: Sequence[dict]
     """
+
     _service = "events"
     _action = "scalar_metrics_iter_histogram"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'images': {'items': {'type': 'object'}, 'type': ['array', 'null']},
+        "definitions": {},
+        "properties": {
+            "images": {"items": {"type": "object"}, "type": ["array", "null"]},
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, images=None, **kwargs):
+
+    def __init__(self, images=None, **kwargs):
         super(ScalarMetricsIterHistogramResponse, self).__init__(**kwargs)
         self.images = images
 
-    @schema_property('images')
+    @schema_property("images")
     def images(self):
         return self._property_images
 
@@ -2862,23 +2962,23 @@ class VectorMetricsIterHistogramRequest(Request):
     _action = "vector_metrics_iter_histogram"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'metric': {'description': '', 'type': 'string'},
-            'task': {'description': 'Task ID', 'type': 'string'},
-            'variant': {'description': '', 'type': 'string'},
+        "definitions": {},
+        "properties": {
+            "metric": {"description": "", "type": "string"},
+            "task": {"description": "Task ID", "type": "string"},
+            "variant": {"description": "", "type": "string"},
         },
-        'required': ['task', 'metric', 'variant'],
-        'type': 'object',
+        "required": ["task", "metric", "variant"],
+        "type": "object",
     }
-    def __init__(
-            self, task, metric, variant, **kwargs):
+
+    def __init__(self, task, metric, variant, **kwargs):
         super(VectorMetricsIterHistogramRequest, self).__init__(**kwargs)
         self.task = task
         self.metric = metric
         self.variant = variant
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -2891,7 +2991,7 @@ class VectorMetricsIterHistogramRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('metric')
+    @schema_property("metric")
     def metric(self):
         return self._property_metric
 
@@ -2904,7 +3004,7 @@ class VectorMetricsIterHistogramRequest(Request):
         self.assert_isinstance(value, "metric", six.string_types)
         self._property_metric = value
 
-    @schema_property('variant')
+    @schema_property("variant")
     def variant(self):
         return self._property_variant
 
@@ -2925,23 +3025,24 @@ class VectorMetricsIterHistogramResponse(Response):
     :param images:
     :type images: Sequence[dict]
     """
+
     _service = "events"
     _action = "vector_metrics_iter_histogram"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'images': {'items': {'type': 'object'}, 'type': ['array', 'null']},
+        "definitions": {},
+        "properties": {
+            "images": {"items": {"type": "object"}, "type": ["array", "null"]},
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, images=None, **kwargs):
+
+    def __init__(self, images=None, **kwargs):
         super(VectorMetricsIterHistogramResponse, self).__init__(**kwargs)
         self.images = images
 
-    @schema_property('images')
+    @schema_property("images")
     def images(self):
         return self._property_images
 

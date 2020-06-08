@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function, division, absolute_import
+from __future__ import absolute_import, division, print_function
 
+import difflib
 import os
 import re
 import sys
-import difflib
-
 
 PY32 = sys.version_info[:2] == (3, 2)
 
@@ -33,22 +32,23 @@ class Dict(dict):
 
 
 def parse_reqs(fpath):
-    pkg_v_re = re.compile(r'^(?P<pkg>[^><==]+)[><==]{,2}(?P<version>.*)$')
+    pkg_v_re = re.compile(r"^(?P<pkg>[^><==]+)[><==]{,2}(?P<version>.*)$")
     """Parse requirements file."""
     reqs = dict()
-    with open(fpath, 'r') as f:
+    with open(fpath, "r") as f:
         for line in f:
-            if line.startswith('#'):
+            if line.startswith("#"):
                 continue
             m = pkg_v_re.match(line.strip())
             if m:
                 d = m.groupdict()
-                reqs[d['pkg'].strip()] = d['version'].strip()
+                reqs[d["pkg"].strip()] = d["version"].strip()
     return reqs
 
 
 def cmp_to_key(cmp_func):
     """Convert a cmp=fcuntion into a key=function."""
+
     class K(object):
         def __init__(self, obj, *args):
             self.obj = obj
@@ -69,12 +69,12 @@ def compare_version(version1, version2):
     """Compare version number, such as 1.1.1 and 1.1b2.0."""
     v1, v2 = list(), list()
 
-    for item in version1.split('.'):
+    for item in version1.split("."):
         if item.isdigit():
             v1.append(int(item))
         else:
             v1.extend([i for i in _group_alnum(item)])
-    for item in version2.split('.'):
+    for item in version2.split("."):
         if item.isdigit():
             v2.append(int(item))
         else:
@@ -100,17 +100,17 @@ def _group_alnum(s):
     for c in s:
         if c.isdigit():
             if flag == 0:
-                yield ''.join(tmp)
+                yield "".join(tmp)
                 tmp = list()
                 flag = 1
             tmp.append(c)
         elif c.isalpha():
             if flag == 1:
-                yield int(''.join(tmp))
+                yield int("".join(tmp))
                 tmp = list()
                 flag = 0
             tmp.append(c)
-    last = ''.join(tmp)
+    last = "".join(tmp)
     yield (int(last) if flag else last)
 
 
@@ -119,14 +119,14 @@ def parse_git_config(path):
     config = dict()
     section = None
 
-    with open(os.path.join(path, 'config'), 'r') as f:
+    with open(os.path.join(path, "config"), "r") as f:
         for line in f:
             line = line.strip()
-            if line.startswith('['):
-                section = line[1: -1].strip()
+            if line.startswith("["):
+                section = line[1:-1].strip()
                 config[section] = dict()
             elif section:
-                key, value = line.replace(' ', '').split('=')
+                key, value = line.replace(" ", "").split("=")
                 config[section][key] = value
     return config
 
@@ -137,7 +137,7 @@ def lines_diff(lines1, lines2):
     diffs = list()
 
     for line in difflib.ndiff(lines1, lines2):
-        if not is_diff and line[0] in ('+', '-'):
+        if not is_diff and line[0] in ("+", "-"):
             is_diff = True
         diffs.append(line)
 

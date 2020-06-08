@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function, division, absolute_import
+from __future__ import absolute_import, division, print_function
 
 import sys
 
 import greenlet
 from gevent.pool import Pool
 
-from .extractor import BaseExtractor
 from ..log import logger
+from .extractor import BaseExtractor
 
 
 class GeventExtractor(BaseExtractor):
-
     def __init__(self, names, max_workers=222):
         super(self.__class__, self).__init__(names, max_workers)
         self._pool = Pool(self._max_workers)
@@ -36,6 +35,7 @@ class GeventExtractor(BaseExtractor):
                 e = sys.exc_info()[1]
                 logger.error('Extracting "{0}", got: {1}'.format(name, e))
             return result
+
         return _job
 
     def wait_complete(self):
@@ -47,4 +47,4 @@ class GeventExtractor(BaseExtractor):
     def final(self):
         count = self._exited_greenlets
         if count != 0:
-            print('** {0} running job exited.'.format(count))
+            print("** {0} running job exited.".format(count))

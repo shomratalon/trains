@@ -11,29 +11,30 @@ from typing import Any
 
 import six
 from pathlib2 import Path
-from ..utilities.pyhocon import ConfigTree, ConfigFactory
 from pyparsing import (
-    ParseFatalException,
     ParseException,
-    RecursiveGrammarException,
+    ParseFatalException,
     ParseSyntaxException,
+    RecursiveGrammarException,
 )
 from six.moves.urllib.parse import urlparse
 
+from ..utilities.pyhocon import ConfigFactory, ConfigTree
 from .bucket_config import S3BucketConfig
 from .defs import (
-    Environment,
     DEFAULT_CONFIG_FOLDER,
-    LOCAL_CONFIG_PATHS,
-    ENV_CONFIG_PATHS,
-    LOCAL_CONFIG_FILES,
-    LOCAL_CONFIG_FILE_OVERRIDE_VAR,
     ENV_CONFIG_PATH_OVERRIDE_VAR,
+    ENV_CONFIG_PATHS,
+    LOCAL_CONFIG_FILE_OVERRIDE_VAR,
+    LOCAL_CONFIG_FILES,
+    LOCAL_CONFIG_PATHS,
+    Environment,
+    is_config_file,
 )
-from .defs import is_config_file
 from .entry import Entry, NotSet
 from .errors import ConfigurationError
-from .log import initialize as initialize_log, logger
+from .log import initialize as initialize_log
+from .log import logger
 from .utils import get_options
 
 try:
@@ -70,7 +71,8 @@ class Config(object):
     NOTE: will not watch folders that were created after initialization.
     """
 
-    # used in place of None in Config.get as default value because None is a valid value
+    # used in place of None in Config.get as default value because None is a
+    # valid value
     _MISSING = object()
 
     def __init__(
@@ -159,7 +161,9 @@ class Config(object):
         if LOCAL_CONFIG_PATHS:
             config = functools.reduce(
                 lambda cfg, path: ConfigTree.merge_configs(
-                    cfg, self._read_recursive(path, verbose=self._verbose), copy_trees=True
+                    cfg,
+                    self._read_recursive(path, verbose=self._verbose),
+                    copy_trees=True,
                 ),
                 LOCAL_CONFIG_PATHS,
                 config,
@@ -312,7 +316,8 @@ class Config(object):
             return ConfigFactory.parse_file(file_path)
         except ParseSyntaxException as ex:
             msg = "Failed parsing {0} ({1.__class__.__name__}): (at char {1.loc}, line:{1.lineno}, col:{1.column})".format(
-                file_path, ex)
+                file_path, ex
+            )
             six.reraise(
                 ConfigurationError,
                 ConfigurationError(msg, file_path=file_path),
@@ -381,7 +386,8 @@ class Config(object):
                 # try host/bucket only if path parts contain any element
                 match = find_match(host=parsed.netloc, bucket=parts[0])
             if not match:
-                # no path parts or no config found for host/bucket, try netloc as bucket
+                # no path parts or no config found for host/bucket, try netloc
+                # as bucket
                 match = find_match(bucket=parsed.netloc)
         else:
             # No netloc, so we'll simply search by bucket

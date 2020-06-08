@@ -2,6 +2,7 @@ import itertools
 import re
 
 import attr
+
 import six
 
 from ...utilities.pyhocon import ConfigTree
@@ -58,10 +59,10 @@ class Service(object):
             "_default", ConfigTree()
         ).as_plain_ordered_dict()
 
-        self._doc = '{} service'.format(self.name)
-        description = service_config.get('_description', '')
+        self._doc = "{} service".format(self.name)
+        description = service_config.get("_description", "")
         if description:
-            self._doc += '\n\n{}'.format(description)
+            self._doc += "\n\n{}".format(description)
         self._definitions = service_config.get(
             "_definitions", ConfigTree()
         ).as_plain_ordered_dict()
@@ -108,7 +109,10 @@ class Service(object):
         return {
             parsed_version: action
             for parsed_version, action in (
-                (parsed_version, self._parse_action(action_name, parsed_version, add_internal(cfg)))
+                (
+                    parsed_version,
+                    self._parse_action(action_name, parsed_version, add_internal(cfg)),
+                )
                 for parsed_version, cfg in (
                     (parse_version(version), cfg)
                     for version, cfg in action_versions.items()

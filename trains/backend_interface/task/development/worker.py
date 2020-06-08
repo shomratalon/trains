@@ -1,19 +1,23 @@
-import attr
-from threading import Thread, Event
-
+from threading import Event, Thread
 from time import time
 
-from ....config import config
-from ....backend_interface.task.development.stop_signal import TaskStopSignal
+import attr
+
 from ....backend_api.services import tasks
+from ....backend_interface.task.development.stop_signal import TaskStopSignal
+from ....config import config
 
 
 class DevWorker(object):
     prefix = attr.ib(type=str, default="MANUAL:")
 
-    report_period = float(max(config.get('development.worker.report_period_sec', 30.), 1.))
-    report_stdout = bool(config.get('development.worker.log_stdout', True))
-    ping_period = float(max(config.get('development.worker.ping_period_sec', 30.), 1.))
+    report_period = float(
+        max(config.get("development.worker.report_period_sec", 30.0), 1.0)
+    )
+    report_stdout = bool(config.get("development.worker.log_stdout", True))
+    ping_period = float(
+        max(config.get("development.worker.ping_period_sec", 30.0), 1.0)
+    )
 
     def __init__(self):
         self._dev_stop_signal = None
@@ -35,7 +39,7 @@ class DevWorker(object):
             return True
         if TaskStopSignal.enabled:
             self._dev_stop_signal = TaskStopSignal(task=task)
-        self._support_ping = hasattr(tasks, 'PingRequest')
+        self._support_ping = hasattr(tasks, "PingRequest")
         # if there is nothing to monitor, leave
         if not self._support_ping and not self._dev_stop_signal:
             return

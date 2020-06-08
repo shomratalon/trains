@@ -1,13 +1,11 @@
-import keyword
-
 import enum
 import json
+import keyword
 import warnings
 from datetime import datetime
-
-import jsonschema
 from enum import Enum
 
+import jsonschema
 import six
 
 
@@ -28,6 +26,7 @@ class SchemaProperty(property):
 def schema_property(name):
     def init(*args, **kwargs):
         return SchemaProperty(name, *args, **kwargs)
+
     return init
 
 
@@ -41,7 +40,7 @@ try:
 
     _CustomValidator = jsonschema.validators.extend(
         Draft7Validator,
-        type_checker=Draft7Validator.TYPE_CHECKER.redefine("array", _is_array)
+        type_checker=Draft7Validator.TYPE_CHECKER.redefine("array", _is_array),
     )
 except ImportError:
     pass
@@ -49,6 +48,7 @@ except ImportError:
 
 class DataModel(object):
     """ Data Model"""
+
     _schema = None
     _data_props_list = None
 
@@ -58,8 +58,13 @@ class DataModel(object):
         if props is None:
             props = {}
             for c in cls.__mro__:
-                props.update({k: getattr(v, 'name', k) for k, v in vars(c).items()
-                              if isinstance(v, property)})
+                props.update(
+                    {
+                        k: getattr(v, "name", k)
+                        for k, v in vars(c).items()
+                        if isinstance(v, property)
+                    }
+                )
             cls._data_props_list = props
         return props.copy()
 
@@ -78,7 +83,9 @@ class DataModel(object):
         return {
             k: self._to_base_type(v)
             for k, v in prop_values.items()
-            if v is not None and (not only or k in only) and (not except_ or k not in except_)
+            if v is not None
+            and (not only or k in only)
+            and (not except_ or k not in except_)
         }
 
     def validate(self, schema=None):
@@ -90,32 +97,30 @@ class DataModel(object):
             )
         else:
             jsonschema.validate(
-                self.to_dict(),
-                schema or self._schema,
-                cls=_CustomValidator,
+                self.to_dict(), schema or self._schema, cls=_CustomValidator,
             )
 
     def __repr__(self):
-        return '<{}.{}: {}>'.format(
-            self.__module__.split('.')[-1],
+        return "<{}.{}: {}>".format(
+            self.__module__.split(".")[-1],
             type(self).__name__,
-            json.dumps(
-                self.to_dict(),
-                indent=4,
-                default=format_date,
-            )
+            json.dumps(self.to_dict(), indent=4, default=format_date,),
         )
 
     @staticmethod
     def assert_isinstance(value, field_name, expected, is_array=False):
         if not is_array:
             if not isinstance(value, expected):
-                raise TypeError("Expected %s of type %s, got %s" % (field_name, expected, type(value).__name__))
+                raise TypeError(
+                    "Expected %s of type %s, got %s"
+                    % (field_name, expected, type(value).__name__)
+                )
             return
 
         if not all(isinstance(x, expected) for x in value):
             raise TypeError(
-                "Expected %s of type list[%s], got %s" % (
+                "Expected %s of type list[%s], got %s"
+                % (
                     field_name,
                     expected,
                     ", ".join(set(type(x).__name__ for x in value)),
@@ -125,8 +130,8 @@ class DataModel(object):
     @staticmethod
     def normalize_key(prop_key):
         if keyword.iskeyword(prop_key):
-            prop_key += '_'
-        return prop_key.replace('.', '__')
+            prop_key += "_"
+        return prop_key.replace(".", "__")
 
     @classmethod
     def from_dict(cls, dct, strict=False):
@@ -137,7 +142,13 @@ class DataModel(object):
         invalid_keys = set(dct).difference(allowed_keys)
         if strict and invalid_keys:
             raise ValueError("Invalid keys %s" % tuple(invalid_keys))
-        return cls(**{cls.normalize_key(key): value for key, value in dct.items() if key not in invalid_keys})
+        return cls(
+            **{
+                cls.normalize_key(key): value
+                for key, value in dct.items()
+                if key not in invalid_keys
+            }
+        )
 
 
 class UnusedKwargsWarning(UserWarning):
@@ -167,6 +178,5 @@ class NonStrictDataModel(DataModel, NonStrictDataModelMixin):
 
 
 class StringEnum(Enum):
-
     def __str__(self):
         return self.value

@@ -1,2 +1,2 @@
-from .scriptinfo import ScriptInfo
 from .freeze import pip_freeze
+from .scriptinfo import ScriptInfo

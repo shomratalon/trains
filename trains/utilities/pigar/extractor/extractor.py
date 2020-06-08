@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function, division, absolute_import
+from __future__ import absolute_import, division, print_function
 
 import multiprocessing
 
 
 class BaseExtractor(object):
-
     def __init__(self, names, max_workers=None):
         self._names = names
         self._max_workers = max_workers or (multiprocessing.cpu_count() * 4)
@@ -16,10 +15,10 @@ class BaseExtractor(object):
             self.extract(job)
             self.wait_complete()
         except KeyboardInterrupt:
-            print('** Shutting down ...')
+            print("** Shutting down ...")
             self.shutdown()
         else:
-            print('^.^ Extracting all packages done!')
+            print("^.^ Extracting all packages done!")
         finally:
             self.final()
 

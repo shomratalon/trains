@@ -3,7 +3,8 @@ from functools import partial
 
 import attr
 from attr.converters import optional as optional_converter
-from attr.validators import instance_of, optional, and_
+from attr.validators import and_, instance_of, optional
+
 from six import string_types
 
 # noinspection PyTypeChecker
@@ -32,7 +33,4 @@ class Action(object):
     batch_request = attr.ib(validator=optional(instance_of(dict)), default=None)
     response = attr.ib(validator=optional(instance_of(dict)), default=None)
     method = attr.ib(default=None)
-    description = attr.ib(
-        default=None,
-        validator=optional(instance_of(string_types)),
-    )
+    description = attr.ib(default=None, validator=optional(instance_of(string_types)),)

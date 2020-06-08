@@ -1,15 +1,20 @@
+import copy
+import re
 from collections import OrderedDict
-from pyparsing import lineno
-from pyparsing import col
+
+from pyparsing import col, lineno
+
+from .exceptions import (
+    ConfigException,
+    ConfigMissingException,
+    ConfigWrongTypeException,
+)
+
 try:
     basestring
 except NameError:  # pragma: no cover
     basestring = str
     unicode = str
-
-import re
-import copy
-from .exceptions import ConfigException, ConfigWrongTypeException, ConfigMissingException
 
 
 class UndefinedKey(object):
@@ -25,10 +30,10 @@ class NoneValue(object):
 
 
 class ConfigTree(OrderedDict):
-    KEY_SEP = '.'
+    KEY_SEP = "."
 
     def __init__(self, *args, **kwds):
-        self.root = kwds.pop('root') if 'root' in kwds else False
+        self.root = kwds.pop("root") if "root" in kwds else False
         if self.root:
             self.history = {}
         super(ConfigTree, self).__init__(*args, **kwds)
@@ -48,8 +53,13 @@ class ConfigTree(OrderedDict):
         :return: merged config a
         """
         for key, value in b.items():
-            # if key is in both a and b and both values are dictionary then merge it otherwise override it
-            if key in a and isinstance(a[key], ConfigTree) and isinstance(b[key], ConfigTree):
+            # if key is in both a and b and both values are dictionary then
+            # merge it otherwise override it
+            if (
+                key in a
+                and isinstance(a[key], ConfigTree)
+                and isinstance(b[key], ConfigTree)
+            ):
                 if copy_trees:
                     a[key] = a[key].copy()
                 ConfigTree.merge_configs(a[key], b[key], copy_trees=copy_trees)
@@ -62,7 +72,9 @@ class ConfigTree(OrderedDict):
                 a[key] = value
                 if a.root:
                     if b.root:
-                        a.history[key] = a.history.get(key, []) + b.history.get(key, [value])
+                        a.history[key] = a.history.get(key, []) + b.history.get(
+                            key, [value]
+                        )
                     else:
                         a.history[key] = a.history.get(key, []) + [value]
 
@@ -74,10 +86,18 @@ class ConfigTree(OrderedDict):
             # if value to set does not exist, override
             # if they are both configs then merge
             # if not then override
-            if key_elt in self and isinstance(self[key_elt], ConfigTree) and isinstance(value, ConfigTree):
+            if (
+                key_elt in self
+                and isinstance(self[key_elt], ConfigTree)
+                and isinstance(value, ConfigTree)
+            ):
                 if self.root:
-                    new_value = ConfigTree.merge_configs(ConfigTree(), self[key_elt], copy_trees=True)
-                    new_value = ConfigTree.merge_configs(new_value, value, copy_trees=True)
+                    new_value = ConfigTree.merge_configs(
+                        ConfigTree(), self[key_elt], copy_trees=True
+                    )
+                    new_value = ConfigTree.merge_configs(
+                        new_value, value, copy_trees=True
+                    )
                     self._push_history(key_elt, new_value)
                     self[key_elt] = new_value
                 else:
@@ -89,7 +109,9 @@ class ConfigTree(OrderedDict):
                 if isinstance(l_value, ConfigValues):
                     l_value.tokens.append(value)
                     l_value.recompute()
-                elif isinstance(l_value, ConfigTree) and isinstance(value, ConfigValues):
+                elif isinstance(l_value, ConfigTree) and isinstance(
+                    value, ConfigValues
+                ):
                     value.overriden_value = l_value
                     value.tokens.insert(0, l_value)
                     value.recompute()
@@ -113,10 +135,11 @@ class ConfigTree(OrderedDict):
                 else:
                     raise ConfigWrongTypeException(
                         u"Cannot concatenate the list {key}: {value} to {prev_value} of {type}".format(
-                            key='.'.join(key_path),
+                            key=".".join(key_path),
                             value=value,
                             prev_value=l_value,
-                            type=l_value.__class__.__name__)
+                            type=l_value.__class__.__name__,
+                        )
                     )
             else:
                 # if there was an override keep overide value
@@ -148,8 +171,11 @@ class ConfigTree(OrderedDict):
 
         if elt is UndefinedKey:
             if default is UndefinedKey:
-                raise ConfigMissingException(u"No configuration setting found for key {key}".format(
-                    key='.'.join(key_path[: key_index + 1])))
+                raise ConfigMissingException(
+                    u"No configuration setting found for key {key}".format(
+                        key=".".join(key_path[: key_index + 1])
+                    )
+                )
             else:
                 return default
 
@@ -165,8 +191,10 @@ class ConfigTree(OrderedDict):
         else:
             if default is UndefinedKey:
                 raise ConfigWrongTypeException(
-                    u"{key} has type {type} rather than dict".format(key='.'.join(key_path[:key_index + 1]),
-                                                                     type=type(elt).__name__))
+                    u"{key} has type {type} rather than dict".format(
+                        key=".".join(key_path[: key_index + 1]), type=type(elt).__name__
+                    )
+                )
             else:
                 return default
 
@@ -184,15 +212,21 @@ class ConfigTree(OrderedDict):
         if isinstance(string, (int, float)):
             return [string]
 
-        special_characters = '$}[]:=+#`^?!@*&.'
+        special_characters = "$}[]:=+#`^?!@*&."
         tokens = re.findall(
-            r'"[^"]+"|[^{special_characters}]+'.format(special_characters=re.escape(special_characters)),
-            string)
+            r'"[^"]+"|[^{special_characters}]+'.format(
+                special_characters=re.escape(special_characters)
+            ),
+            string,
+        )
 
         def contains_special_character(token):
             return any((c in special_characters) for c in token)
 
-        return [token if contains_special_character(token) else token.strip('"') for token in tokens]
+        return [
+            token if contains_special_character(token) else token.strip('"')
+            for token in tokens
+        ]
 
     def put(self, key, value, append=False):
         """Put a value in the tree (dot separated)
@@ -276,7 +310,10 @@ class ConfigTree(OrderedDict):
             return int(value) if value is not None else None
         except (TypeError, ValueError):
             raise ConfigException(
-                u"{key} has type '{type}' rather than 'int'".format(key=key, type=type(value).__name__))
+                u"{key} has type '{type}' rather than 'int'".format(
+                    key=key, type=type(value).__name__
+                )
+            )
 
     def get_float(self, key, default=UndefinedKey):
         """Return float representation of value found at key
@@ -293,7 +330,10 @@ class ConfigTree(OrderedDict):
             return float(value) if value is not None else None
         except (TypeError, ValueError):
             raise ConfigException(
-                u"{key} has type '{type}' rather than 'float'".format(key=key, type=type(value).__name__))
+                u"{key} has type '{type}' rather than 'float'".format(
+                    key=key, type=type(value).__name__
+                )
+            )
 
     def get_bool(self, key, default=UndefinedKey):
         """Return boolean representation of value found at key
@@ -310,8 +350,12 @@ class ConfigTree(OrderedDict):
         # https://github.com/typesafehub/config/blob/master/HOCON.md#automatic-type-conversions
         bool_conversions = {
             None: None,
-            'true': True, 'yes': True, 'on': True,
-            'false': False, 'no': False, 'off': False
+            "true": True,
+            "yes": True,
+            "on": True,
+            "false": False,
+            "no": False,
+            "off": False,
         }
         string_value = self.get_string(key, default)
         if string_value is not None:
@@ -320,7 +364,8 @@ class ConfigTree(OrderedDict):
             return bool_conversions[string_value]
         except KeyError:
             raise ConfigException(
-                u"{key} does not translate to a Boolean value".format(key=key))
+                u"{key} does not translate to a Boolean value".format(key=key)
+            )
 
     def get_list(self, key, default=UndefinedKey):
         """Return list representation of value found at key
@@ -338,16 +383,21 @@ class ConfigTree(OrderedDict):
         elif isinstance(value, ConfigTree):
             lst = []
             for k, v in sorted(value.items(), key=lambda kv: kv[0]):
-                if re.match('^[1-9][0-9]*$|0', k):
+                if re.match("^[1-9][0-9]*$|0", k):
                     lst.append(v)
                 else:
-                    raise ConfigException(u"{key} does not translate to a list".format(key=key))
+                    raise ConfigException(
+                        u"{key} does not translate to a list".format(key=key)
+                    )
             return lst
         elif value is None:
             return None
         else:
             raise ConfigException(
-                u"{key} has type '{type}' rather than 'list'".format(key=key, type=type(value).__name__))
+                u"{key} has type '{type}' rather than 'list'".format(
+                    key=key, type=type(value).__name__
+                )
+            )
 
     def get_config(self, key, default=UndefinedKey):
         """Return tree config representation of value found at key
@@ -366,7 +416,10 @@ class ConfigTree(OrderedDict):
             return None
         else:
             raise ConfigException(
-                u"{key} has type '{type}' rather than 'config'".format(key=key, type=type(value).__name__))
+                u"{key} has type '{type}' rather than 'config'".format(
+                    key=key, type=type(value).__name__
+                )
+            )
 
     def __getitem__(self, item):
         val = self.get(item)
@@ -379,6 +432,7 @@ class ConfigTree(OrderedDict):
     except ImportError:  # pragma: nocover
         pass
     else:
+
         def items(self):  # pragma: nocover
             return self._OrderedDictItemsView(self)
 
@@ -399,13 +453,19 @@ class ConfigTree(OrderedDict):
         :return: new config with fallback on config
         """
         if isinstance(config, ConfigTree):
-            result = ConfigTree.merge_configs(copy.deepcopy(config), copy.deepcopy(self))
+            result = ConfigTree.merge_configs(
+                copy.deepcopy(config), copy.deepcopy(self)
+            )
         else:
             from . import ConfigFactory
-            result = ConfigTree.merge_configs(ConfigFactory.parse_file(config, resolve=False), copy.deepcopy(self))
+
+            result = ConfigTree.merge_configs(
+                ConfigFactory.parse_file(config, resolve=False), copy.deepcopy(self)
+            )
 
         if resolve:
             from . import ConfigParser
+
             ConfigParser.resolve_substitutions(result)
         return result
 
@@ -420,6 +480,7 @@ class ConfigTree(OrderedDict):
         :return: this config as an OrderedDict
         :type return: OrderedDict
         """
+
         def plain_value(v):
             if isinstance(v, list):
                 return [plain_value(e) for e in v]
@@ -427,11 +488,18 @@ class ConfigTree(OrderedDict):
                 return v.as_plain_ordered_dict()
             else:
                 if isinstance(v, ConfigValues):
-                    raise ConfigException("The config tree contains unresolved elements")
+                    raise ConfigException(
+                        "The config tree contains unresolved elements"
+                    )
                 return v
 
-        return OrderedDict((key.strip('"') if isinstance(key, (unicode, basestring)) else key, plain_value(value))
-                           for key, value in self.items())
+        return OrderedDict(
+            (
+                key.strip('"') if isinstance(key, (unicode, basestring)) else key,
+                plain_value(value),
+            )
+            for key, value in self.items()
+        )
 
 
 class ConfigList(list):
@@ -467,12 +535,13 @@ class ConfigValues(object):
 
         # no value return empty string
         if len(self.tokens) == 0:
-            self.tokens = ['']
+            self.tokens = [""]
 
         # if the last token is an unquoted string then right strip it
         if isinstance(self.tokens[-1], ConfigUnquotedString):
-            # rstrip only whitespaces, not \n\r because they would have been used escaped
-            self.tokens[-1] = self.tokens[-1].rstrip(' \t')
+            # rstrip only whitespaces, not \n\r because they would have been
+            # used escaped
+            self.tokens[-1] = self.tokens[-1].rstrip(" \t")
 
     def has_substitution(self):
         return len(self.get_substitutions()) > 0
@@ -481,8 +550,10 @@ class ConfigValues(object):
         lst = []
         node = self
         while node:
-            lst = [token for token in node.tokens if isinstance(token, ConfigSubstitution)] + lst
-            if hasattr(node, 'overriden_value'):
+            lst = [
+                token for token in node.tokens if isinstance(token, ConfigSubstitution)
+            ] + lst
+            if hasattr(node, "overriden_value"):
                 node = node.overriden_value
                 if not isinstance(node, ConfigValues):
                     break
@@ -492,13 +563,19 @@ class ConfigValues(object):
 
     def transform(self):
         def determine_type(token):
-            return ConfigTree if isinstance(token, ConfigTree) else ConfigList if isinstance(token, list) else str
+            return (
+                ConfigTree
+                if isinstance(token, ConfigTree)
+                else ConfigList
+                if isinstance(token, list)
+                else str
+            )
 
         def format_str(v, last=False):
             if isinstance(v, ConfigQuotedString):
-                return v.value + ('' if last else v.ws)
+                return v.value + ("" if last else v.ws)
             else:
-                return '' if v is None else unicode(v)
+                return "" if v is None else unicode(v)
 
         if self.has_substitution():
             return self
@@ -521,11 +598,13 @@ class ConfigValues(object):
                         tok_type=tok_type.__name__,
                         req_tok_type=first_tok_type.__name__,
                         line=lineno(self._loc, self._instring),
-                        col=col(self._loc, self._instring)))
+                        col=col(self._loc, self._instring),
+                    )
+                )
 
         if first_tok_type is ConfigTree:
             child = []
-            if hasattr(self, 'overriden_value'):
+            if hasattr(self, "overriden_value"):
                 node = self.overriden_value
                 while node:
                     if isinstance(node, ConfigValues):
@@ -538,7 +617,7 @@ class ConfigValues(object):
                         child.append(node)
                     else:
                         break
-                    if hasattr(node, 'overriden_value'):
+                    if hasattr(node, "overriden_value"):
                         node = node.overriden_value
                     else:
                         break
@@ -568,13 +647,15 @@ class ConfigValues(object):
                     return tokens[0].value
                 return tokens[0]
             else:
-                return ''.join(format_str(token) for token in tokens[:-1]) + format_str(tokens[-1], True)
+                return "".join(format_str(token) for token in tokens[:-1]) + format_str(
+                    tokens[-1], True
+                )
 
     def put(self, index, value):
         self.tokens[index] = value
 
     def __repr__(self):  # pragma: no cover
-        return '[ConfigValues: ' + ','.join(str(o) for o in self.tokens) + ']'
+        return "[ConfigValues: " + ",".join(str(o) for o in self.tokens) + "]"
 
 
 class ConfigSubstitution(object):
@@ -588,7 +669,7 @@ class ConfigSubstitution(object):
         self.loc = loc
 
     def __repr__(self):  # pragma: no cover
-        return '[ConfigSubstitution: ' + self.variable + ']'
+        return "[ConfigSubstitution: " + self.variable + "]"
 
 
 class ConfigUnquotedString(unicode):
@@ -604,4 +685,4 @@ class ConfigQuotedString(object):
         self.loc = loc
 
     def __repr__(self):  # pragma: no cover
-        return '[ConfigQuotedString: ' + self.value + ']'
+        return "[ConfigQuotedString: " + self.value + "]"

@@ -4,9 +4,10 @@ from copy import copy
 from operator import itemgetter
 from os import getenv
 
+from attr import attrib, attrs
+
 import furl
 import six
-from attr import attrib, attrs
 
 
 def _none_to_empty_string(maybe_string):
@@ -99,13 +100,15 @@ class S3BucketConfigurations(BaseBucketConfigurations):
 
     @classmethod
     def from_config(cls, s3_configuration):
-        config_list = S3BucketConfig.from_list(
-            s3_configuration.get("credentials", [])
-        )
+        config_list = S3BucketConfig.from_list(s3_configuration.get("credentials", []))
 
         default_key = s3_configuration.get("key") or getenv("AWS_ACCESS_KEY_ID", "")
-        default_secret = s3_configuration.get("secret") or getenv("AWS_SECRET_ACCESS_KEY", "")
-        default_region = s3_configuration.get("region") or getenv("AWS_DEFAULT_REGION", "")
+        default_secret = s3_configuration.get("secret") or getenv(
+            "AWS_SECRET_ACCESS_KEY", ""
+        )
+        default_region = s3_configuration.get("region") or getenv(
+            "AWS_DEFAULT_REGION", ""
+        )
 
         default_key = _none_to_empty_string(default_key)
         default_secret = _none_to_empty_string(default_secret)
@@ -243,7 +246,9 @@ class GSBucketConfigurations(BaseBucketConfigurations):
         buckets_configs = [GSBucketConfig(**entry) for entry in config_list]
 
         default_project = gs_configuration.get("project") or {}
-        default_credentials = gs_configuration.get("credentials_json") or default_credentials
+        default_credentials = (
+            gs_configuration.get("credentials_json") or default_credentials
+        )
 
         return cls(buckets_configs, default_project, default_credentials)
 
@@ -314,15 +319,19 @@ class AzureContainerConfigurations(object):
 
         default_container_configs = []
         if default_account and default_key:
-            default_container_configs.append(AzureContainerConfig(
-                account_name=default_account, account_key=default_key
-            ))
+            default_container_configs.append(
+                AzureContainerConfig(
+                    account_name=default_account, account_key=default_key
+                )
+            )
 
         if configuration is None:
             return cls(default_container_configs)
 
         containers = configuration.get("containers", list())
-        container_configs = [AzureContainerConfig(**entry) for entry in containers] + default_container_configs
+        container_configs = [
+            AzureContainerConfig(**entry) for entry in containers
+        ] + default_container_configs
 
         return cls(container_configs)
 
@@ -339,9 +348,7 @@ class AzureContainerConfigurations(object):
         if not f.path.segments:
             raise ValueError(
                 "URI {} is missing a container name (expected "
-                "[https/azure]://<account-name>.../<container-name>)".format(
-                    uri
-                )
+                "[https/azure]://<account-name>.../<container-name>)".format(uri)
             )
 
         container = f.path.segments[0]
@@ -358,10 +365,8 @@ class AzureContainerConfigurations(object):
             (
                 config
                 for config in self._container_configs
-                if config.account_name == account_name and (
-                    not config.container_name
-                    or config.container_name == container
-                )
+                if config.account_name == account_name
+                and (not config.container_name or config.container_name == container)
             ),
-            None
+            None,
         )

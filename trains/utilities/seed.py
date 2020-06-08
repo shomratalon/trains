@@ -1,5 +1,5 @@
-import sys
 import random
+import sys
 
 try:
     import numpy as np
@@ -48,6 +48,7 @@ def make_deterministic(seed=1337, cudnn_deterministic=False):
         try:
             import tensorflow
             from tensorflow.python.eager.context import _context
+
             eager_mode_bypass = _context is None
         except Exception:
             eager_mode_bypass = False

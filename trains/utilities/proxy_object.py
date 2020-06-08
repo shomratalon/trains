@@ -12,7 +12,9 @@ class ProxyDictPostWrite(dict):
         self._update_func = None
         for k, i in self.items():
             if isinstance(i, dict):
-                super(ProxyDictPostWrite, self).update({k: ProxyDictPostWrite(update_obj, self._set_callback, i)})
+                super(ProxyDictPostWrite, self).update(
+                    {k: ProxyDictPostWrite(update_obj, self._set_callback, i)}
+                )
         self._update_func = update_func
 
     def __setitem__(self, key, value):
@@ -37,8 +39,10 @@ class ProxyDictPostWrite(dict):
 
     def update(self, E=None, **F):
         return super(ProxyDictPostWrite, self).update(
-            ProxyDictPostWrite(self._update_obj, self._set_callback, E) if E is not None else
-            ProxyDictPostWrite(self._update_obj, self._set_callback, **F))
+            ProxyDictPostWrite(self._update_obj, self._set_callback, E)
+            if E is not None
+            else ProxyDictPostWrite(self._update_obj, self._set_callback, **F)
+        )
 
 
 class ProxyDictPreWrite(dict):
@@ -74,18 +78,25 @@ class ProxyDictPreWrite(dict):
         return key_value
 
     def _nested_callback(self, prefix, key_value):
-        return self._set_callback((prefix + '.' + key_value[0], key_value[1],))
+        return self._set_callback((prefix + "." + key_value[0], key_value[1],))
 
 
-def flatten_dictionary(a_dict, prefix=''):
+def flatten_dictionary(a_dict, prefix=""):
     flat_dict = {}
-    sep = '/'
-    basic_types = (float, int, bool, six.string_types, )
+    sep = "/"
+    basic_types = (
+        float,
+        int,
+        bool,
+        six.string_types,
+    )
     for k, v in a_dict.items():
         k = str(k)
         if isinstance(v, (float, int, bool, six.string_types)):
             flat_dict[prefix + k] = v
-        elif isinstance(v, (list, tuple)) and all([isinstance(i, basic_types) for i in v]):
+        elif isinstance(v, (list, tuple)) and all(
+            [isinstance(i, basic_types) for i in v]
+        ):
             flat_dict[prefix + k] = v
         elif isinstance(v, dict):
             flat_dict.update(flatten_dictionary(v, prefix=prefix + k + sep))
@@ -96,17 +107,26 @@ def flatten_dictionary(a_dict, prefix=''):
     return flat_dict
 
 
-def nested_from_flat_dictionary(a_dict, flat_dict, prefix=''):
-    basic_types = (float, int, bool, six.string_types, )
-    sep = '/'
+def nested_from_flat_dictionary(a_dict, flat_dict, prefix=""):
+    basic_types = (
+        float,
+        int,
+        bool,
+        six.string_types,
+    )
+    sep = "/"
     for k, v in a_dict.items():
         k = str(k)
         if isinstance(v, (float, int, bool, six.string_types)):
             a_dict[k] = flat_dict.get(prefix + k, v)
-        elif isinstance(v, (list, tuple)) and all([isinstance(i, basic_types) for i in v]):
+        elif isinstance(v, (list, tuple)) and all(
+            [isinstance(i, basic_types) for i in v]
+        ):
             a_dict[k] = flat_dict.get(prefix + k, v)
         elif isinstance(v, dict):
-            a_dict[k] = nested_from_flat_dictionary(v, flat_dict, prefix=prefix + k + sep) or v
+            a_dict[k] = (
+                nested_from_flat_dictionary(v, flat_dict, prefix=prefix + k + sep) or v
+            )
         else:
             # this is a mixture of list and dict, or any other object,
             # leave it as is, we have nothing to do with it.
@@ -114,16 +134,17 @@ def nested_from_flat_dictionary(a_dict, flat_dict, prefix=''):
     return a_dict
 
 
-def naive_nested_from_flat_dictionary(flat_dict, sep='/'):
+def naive_nested_from_flat_dictionary(flat_dict, sep="/"):
     """ A naive conversion of a flat dictionary with '/'-separated keys signifying nesting
     into a nested dictionary.
     """
     return {
         sub_prefix: (
-            bucket[0][1] if (len(bucket) == 1 and sub_prefix == bucket[0][0])
+            bucket[0][1]
+            if (len(bucket) == 1 and sub_prefix == bucket[0][0])
             else naive_nested_from_flat_dictionary(
                 {
-                    k[len(sub_prefix) + 1:]: v
+                    k[len(sub_prefix) + 1 :]: v
                     for k, v in bucket
                     if len(k) > len(sub_prefix)
                 }
@@ -132,8 +153,7 @@ def naive_nested_from_flat_dictionary(flat_dict, sep='/'):
         for sub_prefix, bucket in (
             (key, list(group))
             for key, group in itertools.groupby(
-                sorted(flat_dict.items()),
-                key=lambda item: item[0].partition(sep)[0]
+                sorted(flat_dict.items()), key=lambda item: item[0].partition(sep)[0]
             )
         )
     }

@@ -22,6 +22,7 @@ class PatchAbsl(object):
         # noinspection PyBroadException
         try:
             from absl.flags import _defines
+
             if six.PY2:
                 cls._original_DEFINE_flag = staticmethod(_defines.DEFINE_flag)
             else:
@@ -33,6 +34,7 @@ class PatchAbsl(object):
 
         try:
             from absl.flags._flagvalues import FlagValues
+
             if six.PY2:
                 cls._original_FLAGS_parse_call = staticmethod(FlagValues.__call__)
             else:
@@ -46,6 +48,7 @@ class PatchAbsl(object):
             try:
                 # if absl was already set, let's update our task params
                 from absl import flags
+
                 cls._update_current_flags(flags.FLAGS)
             except Exception:
                 # there is no absl
@@ -64,7 +67,9 @@ class PatchAbsl(object):
             module_name = args[2] if len(args) >= 3 else None
             param_name = None
             if flag:
-                param_name = ((module_name + _Arguments._prefix_sep) if module_name else '') + flag.name
+                param_name = (
+                    (module_name + _Arguments._prefix_sep) if module_name else ""
+                ) + flag.name
         except Exception:
             flag = None
             param_name = None
@@ -73,8 +78,9 @@ class PatchAbsl(object):
             # noinspection PyBroadException
             try:
                 if param_name and flag:
-                    param_dict = PatchAbsl._task._arguments.copy_to_dict({param_name: flag.value},
-                                                                         prefix=_Arguments._prefix_tf_defines)
+                    param_dict = PatchAbsl._task._arguments.copy_to_dict(
+                        {param_name: flag.value}, prefix=_Arguments._prefix_tf_defines
+                    )
                     flag.value = param_dict.get(param_name, flag.value)
             except Exception:
                 pass
@@ -82,7 +88,9 @@ class PatchAbsl(object):
         else:
             if flag and param_name:
                 value = flag.value
-                PatchAbsl._task.update_parameters({_Arguments._prefix_tf_defines + param_name: value})
+                PatchAbsl._task.update_parameters(
+                    {_Arguments._prefix_tf_defines + param_name: value}
+                )
             ret = PatchAbsl._original_DEFINE_flag(*args, **kwargs)
         return ret
 
@@ -104,7 +112,9 @@ class PatchAbsl(object):
         try:
             if running_remotely():
                 param_dict = dict((k, FLAGS[k].value) for k in FLAGS)
-                param_dict = cls._task._arguments.copy_to_dict(param_dict, prefix=_Arguments._prefix_tf_defines)
+                param_dict = cls._task._arguments.copy_to_dict(
+                    param_dict, prefix=_Arguments._prefix_tf_defines
+                )
                 for k, v in param_dict.items():
                     # noinspection PyBroadException
                     try:
@@ -117,6 +127,8 @@ class PatchAbsl(object):
             else:
                 # clear previous parameters
                 parameters = dict([(k, FLAGS[k].value) for k in FLAGS])
-                cls._task._arguments.copy_from_dict(parameters, prefix=_Arguments._prefix_tf_defines)
+                cls._task._arguments.copy_from_dict(
+                    parameters, prefix=_Arguments._prefix_tf_defines
+                )
         except Exception:
             pass

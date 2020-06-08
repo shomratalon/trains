@@ -21,15 +21,18 @@ class EnvironmentBind(object):
     def _bind_environment(cls):
         if not cls._task:
             return
-        environ_log = str(TASK_LOG_ENVIRONMENT.get() or '').strip()
+        environ_log = str(TASK_LOG_ENVIRONMENT.get() or "").strip()
         if not environ_log:
             return
 
-        if environ_log == '*':
-            env_param = {k: os.environ.get(k) for k in os.environ
-                         if not k.startswith('TRAINS_') and not k.startswith('ALG_')}
+        if environ_log == "*":
+            env_param = {
+                k: os.environ.get(k)
+                for k in os.environ
+                if not k.startswith("TRAINS_") and not k.startswith("ALG_")
+            }
         else:
-            environ_log = [e.strip() for e in environ_log.split(',')]
+            environ_log = [e.strip() for e in environ_log.split(",")]
             env_param = {k: os.environ.get(k) for k in os.environ if k in environ_log}
 
         env_param = cls._task.connect(env_param)
@@ -61,6 +64,7 @@ class PatchOsFork(object):
         # Make sure the new process stdout is logged
         if not ret:
             from ..task import Task
+
             if Task.current_task() is not None:
                 # bind sub-process logger
                 task = Task.init(project_name=None, task_name=None, task_type=None)
@@ -78,7 +82,7 @@ class PatchOsFork(object):
                     # noinspection PyProtectedMember
                     return os._org_exit(*args, **kwargs)
 
-                if not hasattr(os, '_org_exit'):
+                if not hasattr(os, "_org_exit"):
                     os._org_exit = os._exit
                 os._exit = _at_exit_callback
 

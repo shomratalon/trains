@@ -3,42 +3,53 @@ import itertools
 import logging
 import os
 import re
+from collections import OrderedDict
 from enum import Enum
-from tempfile import gettempdir
 from multiprocessing import RLock
+from tempfile import gettempdir
 from threading import Thread
+
+import six
+from pathlib2 import Path
+from six.moves.urllib.parse import quote
+
+from ...backend_api import Session
+from ...backend_api.services import events, models, projects, tasks
+from ...backend_interface.task.development.worker import DevWorker
+from ...config import (
+    DOCKER_IMAGE_ENV_VAR,
+    PROC_MASTER_ID_ENV_VAR,
+    TASK_ID_ENV_VAR,
+    config,
+    get_cache_dir,
+    get_config_for_bucket,
+    get_log_to_backend,
+    get_remote_task_id,
+    running_remotely,
+)
+from ...debugging import get_logger
+from ...debugging.log import LoggerRoot
+from ...storage.helper import StorageError, StorageHelper
+from ...utilities.locks import RLock as FileRLock
+from ...utilities.pyhocon import ConfigFactory, ConfigTree
+from ..base import IdObjectBase
+from ..metrics import Metrics, Reporter
+from ..model import Model
+from ..setupuploadmixin import SetupUploadMixin
+from ..util import (
+    exact_match_regex,
+    get_or_create_project,
+    get_single_result,
+    make_message,
+)
+from .access import AccessMixin
+from .log import TaskHandler
+from .repo import ScriptInfo
 
 try:
     from collections.abc import Iterable
 except ImportError:
     from collections import Iterable
-
-import six
-from collections import OrderedDict
-from six.moves.urllib.parse import quote
-
-from ...utilities.locks import RLock as FileRLock
-from ...backend_interface.task.development.worker import DevWorker
-from ...backend_api import Session
-from ...backend_api.services import tasks, models, events, projects
-from pathlib2 import Path
-from ...utilities.pyhocon import ConfigTree, ConfigFactory
-
-from ..base import IdObjectBase
-from ..metrics import Metrics, Reporter
-from ..model import Model
-from ..setupuploadmixin import SetupUploadMixin
-from ..util import make_message, get_or_create_project, get_single_result, \
-    exact_match_regex
-from ...config import get_config_for_bucket, get_remote_task_id, TASK_ID_ENV_VAR, get_log_to_backend, \
-    running_remotely, get_cache_dir, DOCKER_IMAGE_ENV_VAR
-from ...debugging import get_logger
-from ...debugging.log import LoggerRoot
-from ...storage.helper import StorageHelper, StorageError
-from .access import AccessMixin
-from .log import TaskHandler
-from .repo import ScriptInfo
-from ...config import config, PROC_MASTER_ID_ENV_VAR
 
 
 class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
@@ -46,11 +57,11 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
         frames and models.
     """
 
-    _anonymous_dataview_id = '__anonymous__'
-    _development_tag = 'development'
+    _anonymous_dataview_id = "__anonymous__"
+    _development_tag = "development"
     _force_requirements = {}
 
-    _store_diff = config.get('development.store_uncommitted_code_diff', False)
+    _store_diff = config.get("development.store_uncommitted_code_diff", False)
 
     class TaskTypes(Enum):
         def __str__(self):
@@ -59,8 +70,8 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
         def __eq__(self, other):
             return str(self) == str(other)
 
-        training = 'training'
-        testing = 'testing'
+        training = "training"
+        testing = "testing"
 
     class TaskStatusEnum(Enum):
         def __str__(self):
@@ -80,9 +91,18 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
         completed = "completed"
         unknown = "unknown"
 
-    def __init__(self, session=None, task_id=None, log=None, project_name=None,
-                 task_name=None, task_type=TaskTypes.training, log_to_backend=True,
-                 raise_on_validation_errors=True, force_create=False):
+    def __init__(
+        self,
+        session=None,
+        task_id=None,
+        log=None,
+        project_name=None,
+        task_name=None,
+        task_type=TaskTypes.training,
+        log_to_backend=True,
+        raise_on_validation_errors=True,
+        force_create=False,
+    ):
         """
         Create a new task instance.
         :param session: Optional API Session instance. If not provided, a default session based on the system's
@@ -119,7 +139,9 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
         self._curr_label_stats = {}
         self._raise_on_validation_errors = raise_on_validation_errors
         self._parameters_allowed_types = (
-            six.string_types + six.integer_types + (six.text_type, float, list, tuple, dict, type(None))
+            six.string_types
+            + six.integer_types
+            + (six.text_type, float, list, tuple, dict, type(None))
         )
         self._app_server = None
         self._files_server = None
@@ -128,13 +150,15 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
 
         if not task_id:
             # generate a new task
-            self.id = self._auto_generate(project_name=project_name, task_name=task_name, task_type=task_type)
+            self.id = self._auto_generate(
+                project_name=project_name, task_name=task_name, task_type=task_type
+            )
         else:
             # this is an existing task, let's try to verify stuff
             self._validate()
 
         if self.data is None:
-            raise ValueError("Task ID \"{}\" could not be found".format(self.id))
+            raise ValueError('Task ID "{}" could not be found'.format(self.id))
 
         self._project_name = (self.project, project_name)
 
@@ -154,11 +178,15 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
         a handler for this task.
         """
         # Make sure urllib is never in debug/info,
-        disable_urllib3_info = config.get('log.disable_urllib3_info', True)
-        if disable_urllib3_info and logging.getLogger('urllib3').isEnabledFor(logging.INFO):
-            logging.getLogger('urllib3').setLevel(logging.WARNING)
+        disable_urllib3_info = config.get("log.disable_urllib3_info", True)
+        if disable_urllib3_info and logging.getLogger("urllib3").isEnabledFor(
+            logging.INFO
+        ):
+            logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-        log_to_backend = get_log_to_backend(default=default_log_to_backend) or self._log_to_backend
+        log_to_backend = (
+            get_log_to_backend(default=default_log_to_backend) or self._log_to_backend
+        )
         if not log_to_backend:
             return
 
@@ -167,7 +195,12 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
         loggers = {logging.getLogger(), LoggerRoot.get_base_logger()}
 
         # Find all TaskHandler handlers for these loggers
-        handlers = {logger: h for logger in loggers for h in logger.handlers if isinstance(h, TaskHandler)}
+        handlers = {
+            logger: h
+            for logger in loggers
+            for h in logger.handlers
+            if isinstance(h, TaskHandler)
+        }
 
         if handlers and not replace_existing:
             # Handlers exist and we shouldn't replace them
@@ -192,30 +225,37 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
 
     def _validate(self, check_output_dest_credentials=True):
         raise_errors = self._raise_on_validation_errors
-        output_dest = self.get_output_destination(raise_on_error=False, log_on_error=False)
+        output_dest = self.get_output_destination(
+            raise_on_error=False, log_on_error=False
+        )
         if output_dest and check_output_dest_credentials:
             try:
-                self.log.info('Validating output destination')
+                self.log.info("Validating output destination")
                 conf = get_config_for_bucket(base_url=output_dest)
                 if not conf:
-                    msg = 'Failed resolving output destination (no credentials found for %s)' % output_dest
+                    msg = (
+                        "Failed resolving output destination (no credentials found for %s)"
+                        % output_dest
+                    )
                     self.log.warning(msg)
                     if raise_errors:
                         raise Exception(msg)
                 else:
-                    StorageHelper._test_bucket_config(conf=conf, log=self.log, raise_on_error=raise_errors)
+                    StorageHelper._test_bucket_config(
+                        conf=conf, log=self.log, raise_on_error=raise_errors
+                    )
             except StorageError:
                 raise
             except Exception as ex:
-                self.log.error('Failed trying to verify output destination: %s' % ex)
+                self.log.error("Failed trying to verify output destination: %s" % ex)
 
     @classmethod
     def _resolve_task_id(cls, task_id, log=None):
         if not task_id:
             task_id = cls.normalize_id(get_remote_task_id())
             if task_id:
-                log = log or get_logger('task')
-                log.info('Using task ID from env %s=%s' % (TASK_ID_ENV_VAR[0], task_id))
+                log = log or get_logger("task")
+                log.info("Using task ID from env %s=%s" % (TASK_ID_ENV_VAR[0], task_id))
         return task_id
 
     def _update_repository(self):
@@ -223,18 +263,25 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
             try:
                 # check latest version
                 from ...utilities.check_updates import CheckPackageUpdates
-                latest_version = CheckPackageUpdates.check_new_package_available(only_once=True)
+
+                latest_version = CheckPackageUpdates.check_new_package_available(
+                    only_once=True
+                )
                 if latest_version:
                     if not latest_version[1]:
                         sep = os.linesep
                         self.get_logger().report_text(
-                            '{} new package available: UPGRADE to v{} is recommended!\nRelease Notes:\n{}'.format(
-                                Session._client[0][0].upper(), latest_version[0], sep.join(latest_version[2])),
+                            "{} new package available: UPGRADE to v{} is recommended!\nRelease Notes:\n{}".format(
+                                Session._client[0][0].upper(),
+                                latest_version[0],
+                                sep.join(latest_version[2]),
+                            ),
                         )
                     else:
                         self.get_logger().report_text(
-                            'TRAINS new version available: upgrade to v{} is recommended!'.format(
-                                latest_version[0]),
+                            "TRAINS new version available: upgrade to v{} is recommended!".format(
+                                latest_version[0]
+                            ),
                         )
             except Exception:
                 pass
@@ -244,9 +291,12 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
             check_package_update_thread = Thread(target=check_package_update)
             check_package_update_thread.daemon = True
             check_package_update_thread.start()
-            # do not request requirements, because it might be a long process, and we first want to update the git repo
+            # do not request requirements, because it might be a long process,
+            # and we first want to update the git repo
             result, script_requirements = ScriptInfo.get(
-                log=self.log, create_requirements=False, check_uncommitted=self._store_diff
+                log=self.log,
+                create_requirements=False,
+                check_uncommitted=self._store_diff,
             )
             for msg in result.warning_messages:
                 self.get_logger().report_text(msg)
@@ -256,44 +306,59 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
             # overwrite it before we have a chance to call edit)
             self._edit(script=result.script)
             self.reload()
-            # if jupyter is present, requirements will be created in the background, when saving a snapshot
+            # if jupyter is present, requirements will be created in the
+            # background, when saving a snapshot
             if result.script and script_requirements:
-                entry_point_filename = None if config.get('development.force_analyze_entire_repo', False) else \
-                    os.path.join(result.script['working_dir'], result.script['entry_point'])
+                entry_point_filename = (
+                    None
+                    if config.get("development.force_analyze_entire_repo", False)
+                    else os.path.join(
+                        result.script["working_dir"], result.script["entry_point"]
+                    )
+                )
                 requirements, conda_requirements = script_requirements.get_requirements(
-                    entry_point_filename=entry_point_filename)
+                    entry_point_filename=entry_point_filename
+                )
 
                 if requirements:
-                    if not result.script['requirements']:
-                        result.script['requirements'] = {}
-                    result.script['requirements']['pip'] = requirements
-                    result.script['requirements']['conda'] = conda_requirements
+                    if not result.script["requirements"]:
+                        result.script["requirements"] = {}
+                    result.script["requirements"]["pip"] = requirements
+                    result.script["requirements"]["conda"] = conda_requirements
 
-                self._update_requirements(result.script.get('requirements') or '')
+                self._update_requirements(result.script.get("requirements") or "")
                 self.reload()
 
             # we do not want to wait for the check version thread,
-            # because someone might wait for us to finish the repo detection update
+            # because someone might wait for us to finish the repo detection
+            # update
         except SystemExit:
             pass
         except Exception as e:
-            get_logger('task').debug(str(e))
+            get_logger("task").debug(str(e))
 
-    def _auto_generate(self, project_name=None, task_name=None, task_type=TaskTypes.training):
-        created_msg = make_message('Auto-generated at %(time)s by %(user)s@%(host)s')
+    def _auto_generate(
+        self, project_name=None, task_name=None, task_type=TaskTypes.training
+    ):
+        created_msg = make_message("Auto-generated at %(time)s by %(user)s@%(host)s")
 
         project_id = None
         if project_name:
             project_id = get_or_create_project(self, project_name, created_msg)
 
         tags = [self._development_tag] if not running_remotely() else []
-        extra_properties = {'system_tags': tags} if Session.check_min_api_version('2.3') else {'tags': tags}
+        extra_properties = (
+            {"system_tags": tags}
+            if Session.check_min_api_version("2.3")
+            else {"tags": tags}
+        )
         req = tasks.CreateRequest(
-            name=task_name or make_message('Anonymous task (%(user)s@%(host)s %(time)s)'),
+            name=task_name
+            or make_message("Anonymous task (%(user)s@%(host)s %(time)s)"),
             type=tasks.TaskTypeEnum(task_type.value),
             comment=created_msg,
             project=project_id,
-            input={'view': {}},
+            input={"view": {}},
             **extra_properties
         )
         res = self.send(req)
@@ -301,10 +366,13 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
         return res.response.id
 
     def _set_storage_uri(self, value):
-        value = value.rstrip('/') if value else None
+        value = value.rstrip("/") if value else None
         self._storage_uri = StorageHelper.conform_url(value)
         self.data.output.destination = self._storage_uri
-        self._edit(output_dest=self._storage_uri or ('' if Session.check_min_api_version('2.3') else None))
+        self._edit(
+            output_dest=self._storage_uri
+            or ("" if Session.check_min_api_version("2.3") else None)
+        )
         if self._storage_uri or self._output_model:
             self.output_model.upload_storage_uri = self._storage_uri
 
@@ -327,7 +395,7 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
 
     @property
     def name(self):
-        return self.data.name or ''
+        return self.data.name or ""
 
     @name.setter
     def name(self, value):
@@ -355,7 +423,7 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
 
     @property
     def comment(self):
-        return self.data.comment or ''
+        return self.data.comment or ""
 
     @comment.setter
     def comment(self, value):
@@ -384,7 +452,7 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
     @property
     def input_model(self):
         """ A model manager used to handle the input model object """
-        model_id = self._get_task_property('execution.model', raise_on_error=False)
+        model_id = self._get_task_property("execution.model", raise_on_error=False)
         if not model_id:
             return None
         if self._input_model is None:
@@ -393,7 +461,8 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
                 model_id=model_id,
                 cache_dir=self.cache_dir,
                 log=self.log,
-                upload_storage_uri=None)
+                upload_storage_uri=None,
+            )
         return self._input_model
 
     @property
@@ -409,13 +478,19 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
     def _get_output_model(self, upload_required=True, force=False):
         return Model(
             session=self.session,
-            model_id=None if force else self._get_task_property(
-                'output.model', raise_on_error=False, log_on_error=False),
+            model_id=None
+            if force
+            else self._get_task_property(
+                "output.model", raise_on_error=False, log_on_error=False
+            ),
             cache_dir=self.cache_dir,
-            upload_storage_uri=self.storage_uri or self.get_output_destination(
-                raise_on_error=upload_required, log_on_error=upload_required),
-            upload_storage_suffix=self._get_output_destination_suffix('models'),
-            log=self.log)
+            upload_storage_uri=self.storage_uri
+            or self.get_output_destination(
+                raise_on_error=upload_required, log_on_error=upload_required
+            ),
+            upload_storage_suffix=self._get_output_destination_suffix("models"),
+            log=self.log,
+        )
 
     @property
     def metrics_manager(self):
@@ -437,8 +512,8 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
                 session=self.session,
                 task_id=self.id,
                 storage_uri=storage_uri,
-                storage_uri_suffix=self._get_output_destination_suffix('metrics'),
-                iteration_offset=self.get_initial_iteration()
+                storage_uri_suffix=self._get_output_destination_suffix("metrics"),
+                iteration_offset=self.get_initial_iteration(),
             )
         return self._metrics_manager
 
@@ -451,8 +526,15 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
         return self._reporter
 
     def _get_output_destination_suffix(self, extra_path=None):
-        return '/'.join(quote(x, safe="'[]{}()$^,.; -_+-=") for x in
-                        (self.get_project_name(), '%s.%s' % (self.name, self.data.id), extra_path) if x)
+        return "/".join(
+            quote(x, safe="'[]{}()$^,.; -_+-=")
+            for x in (
+                self.get_project_name(),
+                "%s.%s" % (self.name, self.data.id),
+                extra_path,
+            )
+            if x
+        )
 
     def _reload(self):
         """ Reload the task object from the backend """
@@ -483,14 +565,24 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
 
     def completed(self, ignore_errors=True):
         """ The signal indicating that this Task completed. """
-        if hasattr(tasks, 'CompletedRequest'):
-            return self.send(tasks.CompletedRequest(self.id, status_reason='completed'), ignore_errors=ignore_errors)
-        return self.send(tasks.StoppedRequest(self.id, status_reason='completed'), ignore_errors=ignore_errors)
+        if hasattr(tasks, "CompletedRequest"):
+            return self.send(
+                tasks.CompletedRequest(self.id, status_reason="completed"),
+                ignore_errors=ignore_errors,
+            )
+        return self.send(
+            tasks.StoppedRequest(self.id, status_reason="completed"),
+            ignore_errors=ignore_errors,
+        )
 
     def mark_failed(self, ignore_errors=True, status_reason=None, status_message=None):
         """ The signal that this Task stopped. """
-        return self.send(tasks.FailedRequest(self.id, status_reason=status_reason, status_message=status_message),
-                         ignore_errors=ignore_errors)
+        return self.send(
+            tasks.FailedRequest(
+                self.id, status_reason=status_reason, status_message=status_message
+            ),
+            ignore_errors=ignore_errors,
+        )
 
     def publish(self, ignore_errors=True):
         """ The signal that this Task will be published """
@@ -504,12 +596,16 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
         """ Change the Task's model description. """
         with self._edit_lock:
             self.reload()
-            execution = self._get_task_property('execution')
+            execution = self._get_task_property("execution")
             p = Path(new_model_desc_file)
             if not p.is_file():
-                raise IOError('mode_desc file %s cannot be found' % new_model_desc_file)
+                raise IOError("mode_desc file %s cannot be found" % new_model_desc_file)
             new_model_desc = p.read_text()
-            model_desc_key = list(execution.model_desc.keys())[0] if execution.model_desc else 'design'
+            model_desc_key = (
+                list(execution.model_desc.keys())[0]
+                if execution.model_desc
+                else "design"
+            )
             execution.model_desc[model_desc_key] = new_model_desc
 
             res = self._edit(execution=execution)
@@ -533,10 +629,20 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
         :type tags: [str]
         """
         self._conditionally_start_task()
-        self._get_output_model(upload_required=False).update_for_task(model_uri, self.id, name, comment, tags)
+        self._get_output_model(upload_required=False).update_for_task(
+            model_uri, self.id, name, comment, tags
+        )
 
     def update_output_model_and_upload(
-            self, model_file, name=None, comment=None, tags=None, async_enable=False, cb=None, iteration=None):
+        self,
+        model_file,
+        name=None,
+        comment=None,
+        tags=None,
+        async_enable=False,
+        cb=None,
+        iteration=None,
+    ):
         """
         Update the Task's output model weights file. First, Trains uploads the file to the preconfigured output
         destination (see the Task's ``output.destination`` property or call the ``setup_upload()`` method),
@@ -566,8 +672,14 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
         """
         self._conditionally_start_task()
         uri = self.output_model.update_for_task_and_upload(
-            model_file, self.id, name=name, comment=comment, tags=tags, async_enable=async_enable, cb=cb,
-            iteration=iteration
+            model_file,
+            self.id,
+            name=name,
+            comment=comment,
+            tags=tags,
+            async_enable=async_enable,
+            cb=cb,
+            iteration=iteration,
         )
         return uri
 
@@ -589,7 +701,13 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
             else:
                 self._curr_label_stats[label] = roi_stats[label]
 
-    def set_input_model(self, model_id=None, model_name=None, update_task_design=True, update_task_labels=True):
+    def set_input_model(
+        self,
+        model_id=None,
+        model_name=None,
+        update_task_design=True,
+        update_task_labels=True,
+    ):
         """
         Set a new input model for the Task. The model must be "ready" (status is ``Published``) to be used as the
         Task's input model.
@@ -609,7 +727,7 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
             - ``False`` - Trains does not copy the Task's label enumeration from the input model.
         """
         if model_id is None and not model_name:
-            raise ValueError('Expected one of [model_id, model_name]')
+            raise ValueError("Expected one of [model_id, model_name]")
 
         if model_name:
             # Try getting the model by name. Limit to 10 results.
@@ -619,11 +737,16 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
                     ready=True,
                     page=0,
                     page_size=10,
-                    order_by=['-created'],
-                    only_fields=['id', 'created']
+                    order_by=["-created"],
+                    only_fields=["id", "created"],
                 )
             )
-            model = get_single_result(entity='model', query=model_name, results=res.response.models, log=self.log)
+            model = get_single_result(
+                entity="model",
+                query=model_name,
+                results=res.response.models,
+                log=self.log,
+            )
             model_id = model.id
 
         if model_id:
@@ -631,11 +754,14 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
             model = res.response.model
             if not model.ready:
                 # raise ValueError('Model %s is not published (not ready)' % model_id)
-                self.log.debug('Model %s [%s] is not published yet (not ready)' % (model_id, model.uri))
+                self.log.debug(
+                    "Model %s [%s] is not published yet (not ready)"
+                    % (model_id, model.uri)
+                )
         else:
             # clear the input model
             model = None
-            model_id = ''
+            model_id = ""
 
         with self._edit_lock:
             self.reload()
@@ -644,7 +770,7 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
 
             # Auto populate input field from model, if they are empty
             if update_task_design and not self.data.execution.model_desc:
-                self.data.execution.model_desc = model.design if model else ''
+                self.data.execution.model_desc = model.design if model else ""
             if update_task_labels and not self.data.execution.model_labels:
                 self.data.execution.model_labels = model.labels if model else {}
 
@@ -660,9 +786,11 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
         :param kwargs: Key-value pairs, merged into the parameters dictionary created from ``args``.
         """
         if not all(isinstance(x, (dict, Iterable)) for x in args):
-            raise ValueError('only dict or iterable are supported as positional arguments')
+            raise ValueError(
+                "only dict or iterable are supported as positional arguments"
+            )
 
-        update = kwargs.pop('__update', False)
+        update = kwargs.pop("__update", False)
 
         with self._edit_lock:
             self.reload()
@@ -670,7 +798,11 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
                 parameters = self.get_parameters()
             else:
                 parameters = dict()
-            parameters.update(itertools.chain.from_iterable(x.items() if isinstance(x, dict) else x for x in args))
+            parameters.update(
+                itertools.chain.from_iterable(
+                    x.items() if isinstance(x, dict) else x for x in args
+                )
+            )
             parameters.update(kwargs)
 
             not_allowed = {
@@ -681,12 +813,16 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
             if not_allowed:
                 raise ValueError(
                     "Only builtin types ({}) are allowed for values (got {})".format(
-                        ', '.join(t.__name__ for t in self._parameters_allowed_types),
-                        ', '.join('%s=>%s' % p for p in not_allowed.items())),
+                        ", ".join(t.__name__ for t in self._parameters_allowed_types),
+                        ", ".join("%s=>%s" % p for p in not_allowed.items()),
+                    ),
                 )
 
-            # force cast all variables to strings (so that we can later edit them in UI)
-            parameters = {k: str(v) if v is not None else "" for k, v in parameters.items()}
+            # force cast all variables to strings (so that we can later edit
+            # them in UI)
+            parameters = {
+                k: str(v) if v is not None else "" for k, v in parameters.items()
+            }
 
             execution = self.data.execution
             if execution is None:
@@ -742,9 +878,14 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
             execution = self.data.execution
             if enumeration is None:
                 return
-            if not (isinstance(enumeration, dict)
-                    and all(isinstance(k, six.string_types) and isinstance(v, int) for k, v in enumeration.items())):
-                raise ValueError('Expected label to be a dict[str => int]')
+            if not (
+                isinstance(enumeration, dict)
+                and all(
+                    isinstance(k, six.string_types) and isinstance(v, int)
+                    for k, v in enumeration.items()
+                )
+            ):
+                raise ValueError("Expected label to be a dict[str => int]")
             execution.model_labels = enumeration
             self._edit(execution=execution)
 
@@ -767,7 +908,9 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
 
     def get_base_docker(self):
         """Get the base Docker command (image) that is set for this experiment."""
-        return self._get_task_property('execution.docker_cmd', raise_on_error=False, log_on_error=False)
+        return self._get_task_property(
+            "execution.docker_cmd", raise_on_error=False, log_on_error=False
+        )
 
     def set_artifacts(self, artifacts_list=None):
         """
@@ -775,16 +918,20 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
 
         :param list artifacts_list: list of artifacts (type tasks.Artifact)
         """
-        if not Session.check_min_api_version('2.3'):
+        if not Session.check_min_api_version("2.3"):
             return False
-        if not (isinstance(artifacts_list, (list, tuple))
-                and all(isinstance(a, tasks.Artifact) for a in artifacts_list)):
-            raise ValueError('Expected artifacts to [tasks.Artifacts]')
+        if not (
+            isinstance(artifacts_list, (list, tuple))
+            and all(isinstance(a, tasks.Artifact) for a in artifacts_list)
+        ):
+            raise ValueError("Expected artifacts to [tasks.Artifacts]")
         with self._edit_lock:
             self.reload()
             execution = self.data.execution
             keys = [a.key for a in artifacts_list]
-            execution.artifacts = [a for a in execution.artifacts or [] if a.key not in keys] + artifacts_list
+            execution.artifacts = [
+                a for a in execution.artifacts or [] if a.key not in keys
+            ] + artifacts_list
             self._edit(execution=execution)
 
     def _set_model_design(self, design=None):
@@ -812,7 +959,9 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
 
         :return:
         """
-        design = self._get_task_property("execution.model_desc", default={}, raise_on_error=False, log_on_error=False)
+        design = self._get_task_property(
+            "execution.model_desc", default={}, raise_on_error=False, log_on_error=False
+        )
         return Model._unwrap_design(design)
 
     def set_output_model_id(self, model_id):
@@ -836,10 +985,16 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
         if self.project is None:
             return None
 
-        if self._project_name and self._project_name[1] is not None and self._project_name[0] == self.project:
+        if (
+            self._project_name
+            and self._project_name[1] is not None
+            and self._project_name[0] == self.project
+        ):
             return self._project_name[1]
 
-        res = self.send(projects.GetByIdRequest(project=self.project), raise_on_errors=False)
+        res = self.send(
+            projects.GetByIdRequest(project=self.project), raise_on_errors=False
+        )
         if not res or not res.response or not res.response.project:
             return None
         self._project_name = (self.project, res.response.project.name)
@@ -850,7 +1005,7 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
 
     def set_system_tags(self, tags):
         assert isinstance(tags, (list, tuple))
-        if Session.check_min_api_version('2.3'):
+        if Session.check_min_api_version("2.3"):
             self._set_task_property("system_tags", tags)
             self._edit(system_tags=self.data.system_tags)
         else:
@@ -858,11 +1013,13 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
             self._edit(tags=self.data.tags)
 
     def get_system_tags(self):
-        return self._get_task_property("system_tags" if Session.check_min_api_version('2.3') else "tags")
+        return self._get_task_property(
+            "system_tags" if Session.check_min_api_version("2.3") else "tags"
+        )
 
     def set_tags(self, tags):
         assert isinstance(tags, (list, tuple))
-        if not Session.check_min_api_version('2.3'):
+        if not Session.check_min_api_version("2.3"):
             # not supported
             return
         self._set_task_property("tags", tags)
@@ -937,7 +1094,7 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
             self._data.status = status
         return str(status)
 
-    def get_reported_scalars(self, max_samples=0, x_axis='iter'):
+    def get_reported_scalars(self, max_samples=0, x_axis="iter"):
         """
         Return a nested dictionary for the scalar graphs,
         where the first key is the graph title and the second is the series name.
@@ -957,12 +1114,16 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
             'iter': iteration (default), 'timestamp': seconds from start, 'iso_time': absolute time
         :return dict: Nested scalar graphs: dict[title(str), dict[series(str), dict[axis(str), list(float)]]]
         """
-        if x_axis not in ('iter', 'timestamp', 'iso_time'):
-            raise ValueError("Scalar x-axis supported values are: 'iter', 'timestamp', 'iso_time'")
+        if x_axis not in ("iter", "timestamp", "iso_time"):
+            raise ValueError(
+                "Scalar x-axis supported values are: 'iter', 'timestamp', 'iso_time'"
+            )
 
         # send request
         res = self.send(
-            events.ScalarMetricsIterHistogramRequest(task=self.id, key=x_axis, samples=max(0, max_samples))
+            events.ScalarMetricsIterHistogramRequest(
+                task=self.id, key=x_axis, samples=max(0, max_samples)
+            )
         )
         response = res.wait()
         if not response.ok() or not response.response_data:
@@ -980,16 +1141,14 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
         """
         res = self.send(
             events.GetTaskLogRequest(
-                task=self.id,
-                order='asc',
-                from_='tail',
-                batch_size=number_of_reports,)
+                task=self.id, order="asc", from_="tail", batch_size=number_of_reports,
+            )
         )
         response = res.wait()
-        if not response.ok() or not response.response_data.get('events'):
+        if not response.ok() or not response.response_data.get("events"):
             return []
 
-        lines = [r.get('msg', '') for r in response.response_data['events']]
+        lines = [r.get("msg", "") for r in response.response_data["events"]]
         return lines
 
     @classmethod
@@ -1001,18 +1160,20 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
         """
         cls._force_requirements[package_name] = package_version
 
-    def _get_models(self, model_type='output'):
+    def _get_models(self, model_type="output"):
         model_type = model_type.lower().strip()
-        assert model_type == 'output' or model_type == 'input'
+        assert model_type == "output" or model_type == "input"
 
-        if model_type == 'input':
-            regex = '((?i)(Using model id: )(\w+)?)'
+        if model_type == "input":
+            regex = r"((?i)(Using model id: )(\w+)?)"
             compiled = re.compile(regex)
             ids = [i[-1] for i in re.findall(compiled, self.comment)] + (
-                [self.input_model_id] if self.input_model_id else [])
+                [self.input_model_id] if self.input_model_id else []
+            )
             # remove duplicates and preserve order
             ids = list(OrderedDict.fromkeys(ids))
             from ...model import Model as TrainsModel
+
             in_model = []
             for i in ids:
                 m = TrainsModel(model_id=i)
@@ -1020,23 +1181,24 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
                     # make sure the model is is valid
                     m._get_model_data()
                     in_model.append(m)
-                except:
+                except BaseException:
                     pass
             return in_model
         else:
             res = self.send(
                 models.GetAllRequest(
-                    task=[self.id],
-                    order_by=['created'],
-                    only_fields=['id']
+                    task=[self.id], order_by=["created"], only_fields=["id"]
                 )
             )
             if not res.response.models:
                 return []
-            ids = [m.id for m in res.response.models] + ([self.output_model_id] if self.output_model_id else [])
+            ids = [m.id for m in res.response.models] + (
+                [self.output_model_id] if self.output_model_id else []
+            )
             # remove duplicates and preserve order
             ids = list(OrderedDict.fromkeys(ids))
             from ...model import Model as TrainsModel
+
             return [TrainsModel(model_id=i) for i in ids]
 
     def _get_default_report_storage_uri(self):
@@ -1047,7 +1209,9 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
     def _get_status(self):
         try:
             all_tasks = self.send(
-                tasks.GetAllRequest(id=[self.id], only_fields=['status', 'status_message']),
+                tasks.GetAllRequest(
+                    id=[self.id], only_fields=["status", "status_message"]
+                ),
             ).response.tasks
             return all_tasks[0].status, all_tasks[0].status_message
         except Exception:
@@ -1056,7 +1220,7 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
     def _reload_last_iteration(self):
         try:
             all_tasks = self.send(
-                tasks.GetAllRequest(id=[self.id], only_fields=['last_iteration']),
+                tasks.GetAllRequest(id=[self.id], only_fields=["last_iteration"]),
             ).response.tasks
             self.data.last_iteration = all_tasks[0].last_iteration
         except Exception:
@@ -1064,26 +1228,50 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
 
     def _clear_task(self, system_tags=None, comment=None):
         self._data.script = tasks.Script(
-            binary='', repository='', tag='', branch='', version_num='', entry_point='',
-            working_dir='', requirements={}, diff='',
+            binary="",
+            repository="",
+            tag="",
+            branch="",
+            version_num="",
+            entry_point="",
+            working_dir="",
+            requirements={},
+            diff="",
         )
         self._data.execution = tasks.Execution(
-            artifacts=[], dataviews=[], model='', model_desc={}, model_labels={}, parameters={}, docker_cmd='')
+            artifacts=[],
+            dataviews=[],
+            model="",
+            model_desc={},
+            model_labels={},
+            parameters={},
+            docker_cmd="",
+        )
         self._data.comment = str(comment)
 
         self._storage_uri = None
         self._data.output.destination = self._storage_uri
 
-        self._update_requirements('')
+        self._update_requirements("")
 
-        if Session.check_min_api_version('2.3'):
+        if Session.check_min_api_version("2.3"):
             self._set_task_property("system_tags", system_tags)
-            self._edit(system_tags=self._data.system_tags, comment=self._data.comment,
-                       script=self._data.script, execution=self._data.execution, output_dest='')
+            self._edit(
+                system_tags=self._data.system_tags,
+                comment=self._data.comment,
+                script=self._data.script,
+                execution=self._data.execution,
+                output_dest="",
+            )
         else:
             self._set_task_property("tags", system_tags)
-            self._edit(tags=self._data.tags, comment=self._data.comment,
-                       script=self._data.script, execution=self._data.execution, output_dest=None)
+            self._edit(
+                tags=self._data.tags,
+                comment=self._data.comment,
+                script=self._data.script,
+                execution=self._data.execution,
+                output_dest=None,
+            )
 
     @classmethod
     def _get_api_server(cls):
@@ -1096,25 +1284,40 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
 
     def _edit(self, **kwargs):
         with self._edit_lock:
-            # Since we ae using forced update, make sure he task status is valid
-            status = self._data.status if self._data and self._reload_skip_flag else self.data.status
-            if status not in (tasks.TaskStatusEnum.created, tasks.TaskStatusEnum.in_progress):
+            # Since we ae using forced update, make sure he task status is
+            # valid
+            status = (
+                self._data.status
+                if self._data and self._reload_skip_flag
+                else self.data.status
+            )
+            if status not in (
+                tasks.TaskStatusEnum.created,
+                tasks.TaskStatusEnum.in_progress,
+            ):
                 # the exception being name/comment that we can always change.
-                if kwargs and all(k in ('name', 'comment') for k in kwargs.keys()):
+                if kwargs and all(k in ("name", "comment") for k in kwargs.keys()):
                     pass
                 else:
-                    raise ValueError('Task object can only be updated if created or in_progress')
+                    raise ValueError(
+                        "Task object can only be updated if created or in_progress"
+                    )
 
-            res = self.send(tasks.EditRequest(task=self.id, force=True, **kwargs), raise_on_errors=False)
+            res = self.send(
+                tasks.EditRequest(task=self.id, force=True, **kwargs),
+                raise_on_errors=False,
+            )
             return res
 
     def _update_requirements(self, requirements):
         if not isinstance(requirements, dict):
-            requirements = {'pip': requirements}
+            requirements = {"pip": requirements}
         # protection, Old API might not support it
         try:
             self.data.script.requirements = requirements
-            self.send(tasks.SetRequirementsRequest(task=self.id, requirements=requirements))
+            self.send(
+                tasks.SetRequirementsRequest(task=self.id, requirements=requirements)
+            )
         except Exception:
             pass
 
@@ -1123,8 +1326,18 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
         self._edit(script=script)
 
     @classmethod
-    def _clone_task(cls, cloned_task_id, name=None, comment=None, execution_overrides=None,
-                    tags=None, parent=None, project=None, log=None, session=None):
+    def _clone_task(
+        cls,
+        cloned_task_id,
+        name=None,
+        comment=None,
+        execution_overrides=None,
+        tags=None,
+        parent=None,
+        project=None,
+        log=None,
+        session=None,
+    ):
         """
         Clone a task
 
@@ -1153,38 +1366,49 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
 
         session = session if session else cls._get_default_session()
 
-        res = cls._send(session=session, log=log, req=tasks.GetByIdRequest(task=cloned_task_id))
+        res = cls._send(
+            session=session, log=log, req=tasks.GetByIdRequest(task=cloned_task_id)
+        )
         task = res.response.task
         output_dest = None
         if task.output:
             output_dest = task.output.destination
         execution = task.execution.to_dict() if task.execution else {}
-        execution = ConfigTree.merge_configs(ConfigFactory.from_dict(execution),
-                                             ConfigFactory.from_dict(execution_overrides or {}))
+        execution = ConfigTree.merge_configs(
+            ConfigFactory.from_dict(execution),
+            ConfigFactory.from_dict(execution_overrides or {}),
+        )
         # clear all artifacts
-        execution['artifacts'] = [e for e in execution['artifacts'] if e.get('mode') == 'input']
+        execution["artifacts"] = [
+            e for e in execution["artifacts"] if e.get("mode") == "input"
+        ]
 
-        if not hasattr(task, 'system_tags') and not tags and task.tags:
+        if not hasattr(task, "system_tags") and not tags and task.tags:
             tags = [t for t in task.tags if t != cls._development_tag]
 
         req = tasks.CreateRequest(
             name=name or task.name,
             type=task.type,
-            input=task.input if hasattr(task, 'input') else {'view': {}},
+            input=task.input if hasattr(task, "input") else {"view": {}},
             tags=tags,
             comment=comment if comment is not None else task.comment,
             parent=parent,
             project=project if project else task.project,
             output_dest=output_dest,
             execution=execution.as_plain_ordered_dict(),
-            script=task.script
+            script=task.script,
         )
         res = cls._send(session=session, log=log, req=req)
         cloned_task_id = res.response.id
 
         if task.script and task.script.requirements:
-            cls._send(session=session, log=log, req=tasks.SetRequirementsRequest(
-                task=cloned_task_id, requirements=task.script.requirements))
+            cls._send(
+                session=session,
+                log=log,
+                req=tasks.SetRequirementsRequest(
+                    task=cloned_task_id, requirements=task.script.requirements
+                ),
+            )
         return cloned_task_id
 
     @classmethod
@@ -1215,9 +1439,14 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
 
     @classmethod
     def get_by_name(cls, task_name):
-        res = cls._send(cls._get_default_session(), tasks.GetAllRequest(name=exact_match_regex(task_name)))
+        res = cls._send(
+            cls._get_default_session(),
+            tasks.GetAllRequest(name=exact_match_regex(task_name)),
+        )
 
-        task = get_single_result(entity='task', query=task_name, results=res.response.tasks)
+        task = get_single_result(
+            entity="task", query=task_name, results=res.response.tasks
+        )
         return cls(task_id=task.id)
 
     def _get_all_events(self, max_events=100):
@@ -1231,23 +1460,24 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
         :return: A list of events from the task.
         """
 
-        log_events = self.send(events.GetTaskEventsRequest(
-            task=self.id,
-            order='asc',
-            batch_size=max_events,
-        ))
+        log_events = self.send(
+            events.GetTaskEventsRequest(
+                task=self.id, order="asc", batch_size=max_events,
+            )
+        )
 
         events_list = log_events.response.events
         total_events = log_events.response.total
         scroll = log_events.response.scroll_id
 
-        while len(events_list) < total_events and (max_events is None or len(events_list) < max_events):
-            log_events = self.send(events.GetTaskEventsRequest(
-                task=self.id,
-                order='asc',
-                batch_size=max_events,
-                scroll_id=scroll,
-            ))
+        while len(events_list) < total_events and (
+            max_events is None or len(events_list) < max_events
+        ):
+            log_events = self.send(
+                events.GetTaskEventsRequest(
+                    task=self.id, order="asc", batch_size=max_events, scroll_id=scroll,
+                )
+            )
             events_list.extend(log_events.response.events)
             scroll = log_events.response.scroll_id
 
@@ -1257,11 +1487,14 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
     def _edit_lock(self):
         if self.__edit_lock:
             return self.__edit_lock
-        if not PROC_MASTER_ID_ENV_VAR.get() or len(PROC_MASTER_ID_ENV_VAR.get().split(':')) < 2:
+        if (
+            not PROC_MASTER_ID_ENV_VAR.get()
+            or len(PROC_MASTER_ID_ENV_VAR.get().split(":")) < 2
+        ):
             self.__edit_lock = RLock()
-        elif PROC_MASTER_ID_ENV_VAR.get().split(':')[1] == str(self.id):
+        elif PROC_MASTER_ID_ENV_VAR.get().split(":")[1] == str(self.id):
             # remove previous file lock instance, just in case.
-            filename = os.path.join(gettempdir(), 'trains_{}.lock'.format(self.id))
+            filename = os.path.join(gettempdir(), "trains_{}.lock".format(self.id))
             try:
                 os.unlink(filename)
             except Exception:
@@ -1280,17 +1513,17 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
     def __update_master_pid_task(cls, pid=None, task=None):
         pid = pid or os.getpid()
         if not task:
-            PROC_MASTER_ID_ENV_VAR.set(str(pid) + ':')
+            PROC_MASTER_ID_ENV_VAR.set(str(pid) + ":")
         elif isinstance(task, str):
-            PROC_MASTER_ID_ENV_VAR.set(str(pid) + ':' + task)
+            PROC_MASTER_ID_ENV_VAR.set(str(pid) + ":" + task)
         else:
-            PROC_MASTER_ID_ENV_VAR.set(str(pid) + ':' + str(task.id))
+            PROC_MASTER_ID_ENV_VAR.set(str(pid) + ":" + str(task.id))
             # make sure we refresh the edit lock next time we need it,
             task._edit_lock = None
 
     @classmethod
     def __get_master_id_task_id(cls):
-        master_task_id = PROC_MASTER_ID_ENV_VAR.get().split(':')
+        master_task_id = PROC_MASTER_ID_ENV_VAR.get().split(":")
         # we could not find a task ID, revert to old stub behaviour
         if len(master_task_id) < 2 or not master_task_id[1]:
             return None
@@ -1298,7 +1531,13 @@ class Task(IdObjectBase, AccessMixin, SetupUploadMixin):
 
     @classmethod
     def __is_subprocess(cls):
-        # notice this class function is called from Task.ExitHooks, do not rename/move it.
-        is_subprocess = PROC_MASTER_ID_ENV_VAR.get() and \
-            PROC_MASTER_ID_ENV_VAR.get().split(':')[0] != str(os.getpid())
+        # notice this class function is called from Task.ExitHooks, do not
+        # rename/move it.
+        is_subprocess = PROC_MASTER_ID_ENV_VAR.get() and PROC_MASTER_ID_ENV_VAR.get().split(
+            ":"
+        )[
+            0
+        ] != str(
+            os.getpid()
+        )
         return is_subprocess

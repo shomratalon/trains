@@ -8,7 +8,13 @@ from datetime import datetime
 import six
 from dateutil.parser import parse as parse_datetime
 
-from ....backend_api.session import Request, Response, NonStrictDataModel, schema_property, StringEnum
+from ....backend_api.session import (
+    NonStrictDataModel,
+    Request,
+    Response,
+    StringEnum,
+    schema_property,
+)
 
 
 class MultiFieldPatternData(NonStrictDataModel):
@@ -18,27 +24,28 @@ class MultiFieldPatternData(NonStrictDataModel):
     :param fields: List of field names
     :type fields: Sequence[str]
     """
+
     _schema = {
-        'properties': {
-            'fields': {
-                'description': 'List of field names',
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+        "properties": {
+            "fields": {
+                "description": "List of field names",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'pattern': {
-                'description': 'Pattern string (regex)',
-                'type': ['string', 'null'],
+            "pattern": {
+                "description": "Pattern string (regex)",
+                "type": ["string", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, pattern=None, fields=None, **kwargs):
+
+    def __init__(self, pattern=None, fields=None, **kwargs):
         super(MultiFieldPatternData, self).__init__(**kwargs)
         self.pattern = pattern
         self.fields = fields
 
-    @schema_property('pattern')
+    @schema_property("pattern")
     def pattern(self):
         return self._property_pattern
 
@@ -51,7 +58,7 @@ class MultiFieldPatternData(NonStrictDataModel):
         self.assert_isinstance(value, "pattern", six.string_types)
         self._property_pattern = value
 
-    @schema_property('fields')
+    @schema_property("fields")
     def fields(self):
         return self._property_fields
 
@@ -93,48 +100,59 @@ class Project(NonStrictDataModel):
         project metadata was changed or a task in this project has changed status
     :type last_update: datetime.datetime
     """
+
     _schema = {
-        'properties': {
-            'company': {'description': 'Company id', 'type': ['string', 'null']},
-            'created': {
-                'description': 'Creation time',
-                'format': 'date-time',
-                'type': ['string', 'null'],
+        "properties": {
+            "company": {"description": "Company id", "type": ["string", "null"]},
+            "created": {
+                "description": "Creation time",
+                "format": "date-time",
+                "type": ["string", "null"],
             },
-            'default_output_destination': {
-                'description': 'The default output destination URL for new tasks under this project',
-                'type': ['string', 'null'],
+            "default_output_destination": {
+                "description": "The default output destination URL for new tasks under this project",
+                "type": ["string", "null"],
             },
-            'description': {
-                'description': 'Project description',
-                'type': ['string', 'null'],
+            "description": {
+                "description": "Project description",
+                "type": ["string", "null"],
             },
-            'id': {'description': 'Project id', 'type': ['string', 'null']},
-            'last_update': {
-                'description': 'Last project update time. Reflects the last time the project metadata was changed or a task in this project has changed status',
-                'format': 'date-time',
-                'type': ['string', 'null'],
+            "id": {"description": "Project id", "type": ["string", "null"]},
+            "last_update": {
+                "description": "Last project update time. Reflects the last time the project metadata was changed or a task in this project has changed status",
+                "format": "date-time",
+                "type": ["string", "null"],
             },
-            'name': {'description': 'Project name', 'type': ['string', 'null']},
-            'system_tags': {
-                'description': "System tags. This field is reserved for system use, please don't use it.",
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "name": {"description": "Project name", "type": ["string", "null"]},
+            "system_tags": {
+                "description": "System tags. This field is reserved for system use, please don't use it.",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'tags': {
-                'description': 'User-defined tags',
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "tags": {
+                "description": "User-defined tags",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'user': {
-                'description': 'Associated user id',
-                'type': ['string', 'null'],
-            },
+            "user": {"description": "Associated user id", "type": ["string", "null"],},
         },
-        'type': 'object',
+        "type": "object",
     }
+
     def __init__(
-            self, id=None, name=None, description=None, user=None, company=None, created=None, tags=None, system_tags=None, default_output_destination=None, last_update=None, **kwargs):
+        self,
+        id=None,
+        name=None,
+        description=None,
+        user=None,
+        company=None,
+        created=None,
+        tags=None,
+        system_tags=None,
+        default_output_destination=None,
+        last_update=None,
+        **kwargs
+    ):
         super(Project, self).__init__(**kwargs)
         self.id = id
         self.name = name
@@ -147,7 +165,7 @@ class Project(NonStrictDataModel):
         self.default_output_destination = default_output_destination
         self.last_update = last_update
 
-    @schema_property('id')
+    @schema_property("id")
     def id(self):
         return self._property_id
 
@@ -160,7 +178,7 @@ class Project(NonStrictDataModel):
         self.assert_isinstance(value, "id", six.string_types)
         self._property_id = value
 
-    @schema_property('name')
+    @schema_property("name")
     def name(self):
         return self._property_name
 
@@ -173,7 +191,7 @@ class Project(NonStrictDataModel):
         self.assert_isinstance(value, "name", six.string_types)
         self._property_name = value
 
-    @schema_property('description')
+    @schema_property("description")
     def description(self):
         return self._property_description
 
@@ -186,7 +204,7 @@ class Project(NonStrictDataModel):
         self.assert_isinstance(value, "description", six.string_types)
         self._property_description = value
 
-    @schema_property('user')
+    @schema_property("user")
     def user(self):
         return self._property_user
 
@@ -199,7 +217,7 @@ class Project(NonStrictDataModel):
         self.assert_isinstance(value, "user", six.string_types)
         self._property_user = value
 
-    @schema_property('company')
+    @schema_property("company")
     def company(self):
         return self._property_company
 
@@ -212,7 +230,7 @@ class Project(NonStrictDataModel):
         self.assert_isinstance(value, "company", six.string_types)
         self._property_company = value
 
-    @schema_property('created')
+    @schema_property("created")
     def created(self):
         return self._property_created
 
@@ -227,7 +245,7 @@ class Project(NonStrictDataModel):
             value = parse_datetime(value)
         self._property_created = value
 
-    @schema_property('tags')
+    @schema_property("tags")
     def tags(self):
         return self._property_tags
 
@@ -242,7 +260,7 @@ class Project(NonStrictDataModel):
         self.assert_isinstance(value, "tags", six.string_types, is_array=True)
         self._property_tags = value
 
-    @schema_property('system_tags')
+    @schema_property("system_tags")
     def system_tags(self):
         return self._property_system_tags
 
@@ -257,7 +275,7 @@ class Project(NonStrictDataModel):
         self.assert_isinstance(value, "system_tags", six.string_types, is_array=True)
         self._property_system_tags = value
 
-    @schema_property('default_output_destination')
+    @schema_property("default_output_destination")
     def default_output_destination(self):
         return self._property_default_output_destination
 
@@ -270,7 +288,7 @@ class Project(NonStrictDataModel):
         self.assert_isinstance(value, "default_output_destination", six.string_types)
         self._property_default_output_destination = value
 
-    @schema_property('last_update')
+    @schema_property("last_update")
     def last_update(self):
         return self._property_last_update
 
@@ -293,60 +311,61 @@ class StatsStatusCount(NonStrictDataModel):
     :param status_count: Status counts
     :type status_count: dict
     """
+
     _schema = {
-        'properties': {
-            'status_count': {
-                'description': 'Status counts',
-                'properties': {
-                    'closed': {
-                        'description': "Number of 'closed' tasks in project",
-                        'type': 'integer',
+        "properties": {
+            "status_count": {
+                "description": "Status counts",
+                "properties": {
+                    "closed": {
+                        "description": "Number of 'closed' tasks in project",
+                        "type": "integer",
                     },
-                    'created': {
-                        'description': "Number of 'created' tasks in project",
-                        'type': 'integer',
+                    "created": {
+                        "description": "Number of 'created' tasks in project",
+                        "type": "integer",
                     },
-                    'failed': {
-                        'description': "Number of 'failed' tasks in project",
-                        'type': 'integer',
+                    "failed": {
+                        "description": "Number of 'failed' tasks in project",
+                        "type": "integer",
                     },
-                    'in_progress': {
-                        'description': "Number of 'in_progress' tasks in project",
-                        'type': 'integer',
+                    "in_progress": {
+                        "description": "Number of 'in_progress' tasks in project",
+                        "type": "integer",
                     },
-                    'published': {
-                        'description': "Number of 'published' tasks in project",
-                        'type': 'integer',
+                    "published": {
+                        "description": "Number of 'published' tasks in project",
+                        "type": "integer",
                     },
-                    'queued': {
-                        'description': "Number of 'queued' tasks in project",
-                        'type': 'integer',
+                    "queued": {
+                        "description": "Number of 'queued' tasks in project",
+                        "type": "integer",
                     },
-                    'stopped': {
-                        'description': "Number of 'stopped' tasks in project",
-                        'type': 'integer',
+                    "stopped": {
+                        "description": "Number of 'stopped' tasks in project",
+                        "type": "integer",
                     },
-                    'unknown': {
-                        'description': "Number of 'unknown' tasks in project",
-                        'type': 'integer',
+                    "unknown": {
+                        "description": "Number of 'unknown' tasks in project",
+                        "type": "integer",
                     },
                 },
-                'type': ['object', 'null'],
+                "type": ["object", "null"],
             },
-            'total_runtime': {
-                'description': 'Total run time of all tasks in project (in seconds)',
-                'type': ['integer', 'null'],
+            "total_runtime": {
+                "description": "Total run time of all tasks in project (in seconds)",
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, total_runtime=None, status_count=None, **kwargs):
+
+    def __init__(self, total_runtime=None, status_count=None, **kwargs):
         super(StatsStatusCount, self).__init__(**kwargs)
         self.total_runtime = total_runtime
         self.status_count = status_count
 
-    @schema_property('total_runtime')
+    @schema_property("total_runtime")
     def total_runtime(self):
         return self._property_total_runtime
 
@@ -361,7 +380,7 @@ class StatsStatusCount(NonStrictDataModel):
         self.assert_isinstance(value, "total_runtime", six.integer_types)
         self._property_total_runtime = value
 
-    @schema_property('status_count')
+    @schema_property("status_count")
     def status_count(self):
         return self._property_status_count
 
@@ -382,32 +401,33 @@ class Stats(NonStrictDataModel):
     :param archived: Stats for archived tasks
     :type archived: StatsStatusCount
     """
+
     _schema = {
-        'properties': {
-            'active': {
-                'description': 'Stats for active tasks',
-                'oneOf': [
-                    {'$ref': '#/definitions/stats_status_count'},
-                    {'type': 'null'},
+        "properties": {
+            "active": {
+                "description": "Stats for active tasks",
+                "oneOf": [
+                    {"$ref": "#/definitions/stats_status_count"},
+                    {"type": "null"},
                 ],
             },
-            'archived': {
-                'description': 'Stats for archived tasks',
-                'oneOf': [
-                    {'$ref': '#/definitions/stats_status_count'},
-                    {'type': 'null'},
+            "archived": {
+                "description": "Stats for archived tasks",
+                "oneOf": [
+                    {"$ref": "#/definitions/stats_status_count"},
+                    {"type": "null"},
                 ],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, active=None, archived=None, **kwargs):
+
+    def __init__(self, active=None, archived=None, **kwargs):
         super(Stats, self).__init__(**kwargs)
         self.active = active
         self.archived = archived
 
-    @schema_property('active')
+    @schema_property("active")
     def active(self):
         return self._property_active
 
@@ -422,7 +442,7 @@ class Stats(NonStrictDataModel):
             self.assert_isinstance(value, "active", StatsStatusCount)
         self._property_active = value
 
-    @schema_property('archived')
+    @schema_property("archived")
     def archived(self):
         return self._property_archived
 
@@ -463,47 +483,58 @@ class ProjectsGetAllResponseSingle(NonStrictDataModel):
     :param stats: Additional project stats
     :type stats: Stats
     """
+
     _schema = {
-        'properties': {
-            'company': {'description': 'Company id', 'type': ['string', 'null']},
-            'created': {
-                'description': 'Creation time',
-                'format': 'date-time',
-                'type': ['string', 'null'],
+        "properties": {
+            "company": {"description": "Company id", "type": ["string", "null"]},
+            "created": {
+                "description": "Creation time",
+                "format": "date-time",
+                "type": ["string", "null"],
             },
-            'default_output_destination': {
-                'description': 'The default output destination URL for new tasks under this project',
-                'type': ['string', 'null'],
+            "default_output_destination": {
+                "description": "The default output destination URL for new tasks under this project",
+                "type": ["string", "null"],
             },
-            'description': {
-                'description': 'Project description',
-                'type': ['string', 'null'],
+            "description": {
+                "description": "Project description",
+                "type": ["string", "null"],
             },
-            'id': {'description': 'Project id', 'type': ['string', 'null']},
-            'name': {'description': 'Project name', 'type': ['string', 'null']},
-            'stats': {
-                'description': 'Additional project stats',
-                'oneOf': [{'$ref': '#/definitions/stats'}, {'type': 'null'}],
+            "id": {"description": "Project id", "type": ["string", "null"]},
+            "name": {"description": "Project name", "type": ["string", "null"]},
+            "stats": {
+                "description": "Additional project stats",
+                "oneOf": [{"$ref": "#/definitions/stats"}, {"type": "null"}],
             },
-            'system_tags': {
-                'description': "System tags. This field is reserved for system use, please don't use it.",
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "system_tags": {
+                "description": "System tags. This field is reserved for system use, please don't use it.",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'tags': {
-                'description': 'User-defined tags',
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "tags": {
+                "description": "User-defined tags",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'user': {
-                'description': 'Associated user id',
-                'type': ['string', 'null'],
-            },
+            "user": {"description": "Associated user id", "type": ["string", "null"],},
         },
-        'type': 'object',
+        "type": "object",
     }
+
     def __init__(
-            self, id=None, name=None, description=None, user=None, company=None, created=None, tags=None, system_tags=None, default_output_destination=None, stats=None, **kwargs):
+        self,
+        id=None,
+        name=None,
+        description=None,
+        user=None,
+        company=None,
+        created=None,
+        tags=None,
+        system_tags=None,
+        default_output_destination=None,
+        stats=None,
+        **kwargs
+    ):
         super(ProjectsGetAllResponseSingle, self).__init__(**kwargs)
         self.id = id
         self.name = name
@@ -516,7 +547,7 @@ class ProjectsGetAllResponseSingle(NonStrictDataModel):
         self.default_output_destination = default_output_destination
         self.stats = stats
 
-    @schema_property('id')
+    @schema_property("id")
     def id(self):
         return self._property_id
 
@@ -529,7 +560,7 @@ class ProjectsGetAllResponseSingle(NonStrictDataModel):
         self.assert_isinstance(value, "id", six.string_types)
         self._property_id = value
 
-    @schema_property('name')
+    @schema_property("name")
     def name(self):
         return self._property_name
 
@@ -542,7 +573,7 @@ class ProjectsGetAllResponseSingle(NonStrictDataModel):
         self.assert_isinstance(value, "name", six.string_types)
         self._property_name = value
 
-    @schema_property('description')
+    @schema_property("description")
     def description(self):
         return self._property_description
 
@@ -555,7 +586,7 @@ class ProjectsGetAllResponseSingle(NonStrictDataModel):
         self.assert_isinstance(value, "description", six.string_types)
         self._property_description = value
 
-    @schema_property('user')
+    @schema_property("user")
     def user(self):
         return self._property_user
 
@@ -568,7 +599,7 @@ class ProjectsGetAllResponseSingle(NonStrictDataModel):
         self.assert_isinstance(value, "user", six.string_types)
         self._property_user = value
 
-    @schema_property('company')
+    @schema_property("company")
     def company(self):
         return self._property_company
 
@@ -581,7 +612,7 @@ class ProjectsGetAllResponseSingle(NonStrictDataModel):
         self.assert_isinstance(value, "company", six.string_types)
         self._property_company = value
 
-    @schema_property('created')
+    @schema_property("created")
     def created(self):
         return self._property_created
 
@@ -596,7 +627,7 @@ class ProjectsGetAllResponseSingle(NonStrictDataModel):
             value = parse_datetime(value)
         self._property_created = value
 
-    @schema_property('tags')
+    @schema_property("tags")
     def tags(self):
         return self._property_tags
 
@@ -611,7 +642,7 @@ class ProjectsGetAllResponseSingle(NonStrictDataModel):
         self.assert_isinstance(value, "tags", six.string_types, is_array=True)
         self._property_tags = value
 
-    @schema_property('system_tags')
+    @schema_property("system_tags")
     def system_tags(self):
         return self._property_system_tags
 
@@ -626,7 +657,7 @@ class ProjectsGetAllResponseSingle(NonStrictDataModel):
         self.assert_isinstance(value, "system_tags", six.string_types, is_array=True)
         self._property_system_tags = value
 
-    @schema_property('default_output_destination')
+    @schema_property("default_output_destination")
     def default_output_destination(self):
         return self._property_default_output_destination
 
@@ -639,7 +670,7 @@ class ProjectsGetAllResponseSingle(NonStrictDataModel):
         self.assert_isinstance(value, "default_output_destination", six.string_types)
         self._property_default_output_destination = value
 
-    @schema_property('stats')
+    @schema_property("stats")
     def stats(self):
         return self._property_stats
 
@@ -668,30 +699,33 @@ class MetricVariantResult(NonStrictDataModel):
         categorizing last metrics events in task objects.
     :type variant_hash: str
     """
+
     _schema = {
-        'properties': {
-            'metric': {'description': 'Metric name', 'type': ['string', 'null']},
-            'metric_hash': {
-                'description': 'Metric name hash. Used instead of the metric name when categorizing\n                last metrics events in task objects.',
-                'type': ['string', 'null'],
+        "properties": {
+            "metric": {"description": "Metric name", "type": ["string", "null"]},
+            "metric_hash": {
+                "description": "Metric name hash. Used instead of the metric name when categorizing\n                last metrics events in task objects.",
+                "type": ["string", "null"],
             },
-            'variant': {'description': 'Variant name', 'type': ['string', 'null']},
-            'variant_hash': {
-                'description': 'Variant name hash. Used instead of the variant name when categorizing\n                last metrics events in task objects.',
-                'type': ['string', 'null'],
+            "variant": {"description": "Variant name", "type": ["string", "null"]},
+            "variant_hash": {
+                "description": "Variant name hash. Used instead of the variant name when categorizing\n                last metrics events in task objects.",
+                "type": ["string", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
+
     def __init__(
-            self, metric=None, metric_hash=None, variant=None, variant_hash=None, **kwargs):
+        self, metric=None, metric_hash=None, variant=None, variant_hash=None, **kwargs
+    ):
         super(MetricVariantResult, self).__init__(**kwargs)
         self.metric = metric
         self.metric_hash = metric_hash
         self.variant = variant
         self.variant_hash = variant_hash
 
-    @schema_property('metric')
+    @schema_property("metric")
     def metric(self):
         return self._property_metric
 
@@ -704,7 +738,7 @@ class MetricVariantResult(NonStrictDataModel):
         self.assert_isinstance(value, "metric", six.string_types)
         self._property_metric = value
 
-    @schema_property('metric_hash')
+    @schema_property("metric_hash")
     def metric_hash(self):
         return self._property_metric_hash
 
@@ -717,7 +751,7 @@ class MetricVariantResult(NonStrictDataModel):
         self.assert_isinstance(value, "metric_hash", six.string_types)
         self._property_metric_hash = value
 
-    @schema_property('variant')
+    @schema_property("variant")
     def variant(self):
         return self._property_variant
 
@@ -730,7 +764,7 @@ class MetricVariantResult(NonStrictDataModel):
         self.assert_isinstance(value, "variant", six.string_types)
         self._property_variant = value
 
-    @schema_property('variant_hash')
+    @schema_property("variant_hash")
     def variant_hash(self):
         return self._property_variant_hash
 
@@ -766,36 +800,41 @@ class CreateRequest(Request):
     _action = "create"
     _version = "1.5"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'default_output_destination': {
-                'description': 'The default output destination URL for new tasks under this project',
-                'type': 'string',
+        "definitions": {},
+        "properties": {
+            "default_output_destination": {
+                "description": "The default output destination URL for new tasks under this project",
+                "type": "string",
             },
-            'description': {
-                'description': 'Project description. ',
-                'type': 'string',
+            "description": {"description": "Project description. ", "type": "string",},
+            "name": {
+                "description": "Project name Unique within the company.",
+                "type": "string",
             },
-            'name': {
-                'description': 'Project name Unique within the company.',
-                'type': 'string',
+            "system_tags": {
+                "description": "System tags. This field is reserved for system use, please don't use it.",
+                "items": {"type": "string"},
+                "type": "array",
             },
-            'system_tags': {
-                'description': "System tags. This field is reserved for system use, please don't use it.",
-                'items': {'type': 'string'},
-                'type': 'array',
-            },
-            'tags': {
-                'description': 'User-defined tags',
-                'items': {'type': 'string'},
-                'type': 'array',
+            "tags": {
+                "description": "User-defined tags",
+                "items": {"type": "string"},
+                "type": "array",
             },
         },
-        'required': ['name', 'description'],
-        'type': 'object',
+        "required": ["name", "description"],
+        "type": "object",
     }
+
     def __init__(
-            self, name, description, tags=None, system_tags=None, default_output_destination=None, **kwargs):
+        self,
+        name,
+        description,
+        tags=None,
+        system_tags=None,
+        default_output_destination=None,
+        **kwargs
+    ):
         super(CreateRequest, self).__init__(**kwargs)
         self.name = name
         self.description = description
@@ -803,7 +842,7 @@ class CreateRequest(Request):
         self.system_tags = system_tags
         self.default_output_destination = default_output_destination
 
-    @schema_property('name')
+    @schema_property("name")
     def name(self):
         return self._property_name
 
@@ -816,7 +855,7 @@ class CreateRequest(Request):
         self.assert_isinstance(value, "name", six.string_types)
         self._property_name = value
 
-    @schema_property('description')
+    @schema_property("description")
     def description(self):
         return self._property_description
 
@@ -829,7 +868,7 @@ class CreateRequest(Request):
         self.assert_isinstance(value, "description", six.string_types)
         self._property_description = value
 
-    @schema_property('tags')
+    @schema_property("tags")
     def tags(self):
         return self._property_tags
 
@@ -844,7 +883,7 @@ class CreateRequest(Request):
         self.assert_isinstance(value, "tags", six.string_types, is_array=True)
         self._property_tags = value
 
-    @schema_property('system_tags')
+    @schema_property("system_tags")
     def system_tags(self):
         return self._property_system_tags
 
@@ -859,7 +898,7 @@ class CreateRequest(Request):
         self.assert_isinstance(value, "system_tags", six.string_types, is_array=True)
         self._property_system_tags = value
 
-    @schema_property('default_output_destination')
+    @schema_property("default_output_destination")
     def default_output_destination(self):
         return self._property_default_output_destination
 
@@ -880,23 +919,24 @@ class CreateResponse(Response):
     :param id: Project id
     :type id: str
     """
+
     _service = "projects"
     _action = "create"
     _version = "1.5"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'id': {'description': 'Project id', 'type': ['string', 'null']},
+        "definitions": {},
+        "properties": {
+            "id": {"description": "Project id", "type": ["string", "null"]},
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, id=None, **kwargs):
+
+    def __init__(self, id=None, **kwargs):
         super(CreateResponse, self).__init__(**kwargs)
         self.id = id
 
-    @schema_property('id')
+    @schema_property("id")
     def id(self):
         return self._property_id
 
@@ -925,25 +965,25 @@ class DeleteRequest(Request):
     _action = "delete"
     _version = "1.5"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'force': {
-                'default': False,
-                'description': 'If not true, fails if project has tasks.\n                    If true, and project has tasks, they will be unassigned',
-                'type': 'boolean',
+        "definitions": {},
+        "properties": {
+            "force": {
+                "default": False,
+                "description": "If not true, fails if project has tasks.\n                    If true, and project has tasks, they will be unassigned",
+                "type": "boolean",
             },
-            'project': {'description': 'Project id', 'type': 'string'},
+            "project": {"description": "Project id", "type": "string"},
         },
-        'required': ['project'],
-        'type': 'object',
+        "required": ["project"],
+        "type": "object",
     }
-    def __init__(
-            self, project, force=False, **kwargs):
+
+    def __init__(self, project, force=False, **kwargs):
         super(DeleteRequest, self).__init__(**kwargs)
         self.project = project
         self.force = force
 
-    @schema_property('project')
+    @schema_property("project")
     def project(self):
         return self._property_project
 
@@ -956,7 +996,7 @@ class DeleteRequest(Request):
         self.assert_isinstance(value, "project", six.string_types)
         self._property_project = value
 
-    @schema_property('force')
+    @schema_property("force")
     def force(self):
         return self._property_force
 
@@ -980,31 +1020,32 @@ class DeleteResponse(Response):
         project
     :type disassociated_tasks: int
     """
+
     _service = "projects"
     _action = "delete"
     _version = "1.5"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'deleted': {
-                'description': 'Number of projects deleted (0 or 1)',
-                'type': ['integer', 'null'],
+        "definitions": {},
+        "properties": {
+            "deleted": {
+                "description": "Number of projects deleted (0 or 1)",
+                "type": ["integer", "null"],
             },
-            'disassociated_tasks': {
-                'description': 'Number of tasks disassociated from the deleted project',
-                'type': ['integer', 'null'],
+            "disassociated_tasks": {
+                "description": "Number of tasks disassociated from the deleted project",
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, deleted=None, disassociated_tasks=None, **kwargs):
+
+    def __init__(self, deleted=None, disassociated_tasks=None, **kwargs):
         super(DeleteResponse, self).__init__(**kwargs)
         self.deleted = deleted
         self.disassociated_tasks = disassociated_tasks
 
-    @schema_property('deleted')
+    @schema_property("deleted")
     def deleted(self):
         return self._property_deleted
 
@@ -1019,7 +1060,7 @@ class DeleteResponse(Response):
         self.assert_isinstance(value, "deleted", six.integer_types)
         self._property_deleted = value
 
-    @schema_property('disassociated_tasks')
+    @schema_property("disassociated_tasks")
     def disassociated_tasks(self):
         return self._property_disassociated_tasks
 
@@ -1080,89 +1121,104 @@ class GetAllRequest(Request):
     _action = "get_all"
     _version = "1.5"
     _schema = {
-        'definitions': {
-            'multi_field_pattern_data': {
-                'properties': {
-                    'fields': {
-                        'description': 'List of field names',
-                        'items': {'type': 'string'},
-                        'type': ['array', 'null'],
+        "definitions": {
+            "multi_field_pattern_data": {
+                "properties": {
+                    "fields": {
+                        "description": "List of field names",
+                        "items": {"type": "string"},
+                        "type": ["array", "null"],
                     },
-                    'pattern': {
-                        'description': 'Pattern string (regex)',
-                        'type': ['string', 'null'],
+                    "pattern": {
+                        "description": "Pattern string (regex)",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
         },
-        'properties': {
-            '_all_': {
-                'description': 'Multi-field pattern condition (all fields match pattern)',
-                'oneOf': [
-                    {'$ref': '#/definitions/multi_field_pattern_data'},
-                    {'type': 'null'},
+        "properties": {
+            "_all_": {
+                "description": "Multi-field pattern condition (all fields match pattern)",
+                "oneOf": [
+                    {"$ref": "#/definitions/multi_field_pattern_data"},
+                    {"type": "null"},
                 ],
             },
-            '_any_': {
-                'description': 'Multi-field pattern condition (any field matches pattern)',
-                'oneOf': [
-                    {'$ref': '#/definitions/multi_field_pattern_data'},
-                    {'type': 'null'},
+            "_any_": {
+                "description": "Multi-field pattern condition (any field matches pattern)",
+                "oneOf": [
+                    {"$ref": "#/definitions/multi_field_pattern_data"},
+                    {"type": "null"},
                 ],
             },
-            'description': {
-                'description': 'Get only projects whose description matches this pattern (python regular expression syntax)',
-                'type': ['string', 'null'],
+            "description": {
+                "description": "Get only projects whose description matches this pattern (python regular expression syntax)",
+                "type": ["string", "null"],
             },
-            'id': {
-                'description': 'List of IDs to filter by',
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "id": {
+                "description": "List of IDs to filter by",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'name': {
-                'description': 'Get only projects whose name matches this pattern (python regular expression syntax)',
-                'type': ['string', 'null'],
+            "name": {
+                "description": "Get only projects whose name matches this pattern (python regular expression syntax)",
+                "type": ["string", "null"],
             },
-            'only_fields': {
-                'description': "List of document's field names (nesting is supported using '.', e.g. execution.model_labels). If provided, this list defines the query's projection (only these fields will be returned for each result entry)",
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "only_fields": {
+                "description": "List of document's field names (nesting is supported using '.', e.g. execution.model_labels). If provided, this list defines the query's projection (only these fields will be returned for each result entry)",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'order_by': {
-                'description': "List of field names to order by. When search_text is used, '@text_score' can be used as a field representing the text score of returned documents. Use '-' prefix to specify descending order. Optional, recommended when using page",
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "order_by": {
+                "description": "List of field names to order by. When search_text is used, '@text_score' can be used as a field representing the text score of returned documents. Use '-' prefix to specify descending order. Optional, recommended when using page",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'page': {
-                'description': 'Page number, returns a specific page out of the resulting list of dataviews',
-                'minimum': 0,
-                'type': ['integer', 'null'],
+            "page": {
+                "description": "Page number, returns a specific page out of the resulting list of dataviews",
+                "minimum": 0,
+                "type": ["integer", "null"],
             },
-            'page_size': {
-                'description': 'Page size, specifies the number of results returned in each page (last page may contain fewer results)',
-                'minimum': 1,
-                'type': ['integer', 'null'],
+            "page_size": {
+                "description": "Page size, specifies the number of results returned in each page (last page may contain fewer results)",
+                "minimum": 1,
+                "type": ["integer", "null"],
             },
-            'search_text': {
-                'description': 'Free text search query',
-                'type': ['string', 'null'],
+            "search_text": {
+                "description": "Free text search query",
+                "type": ["string", "null"],
             },
-            'system_tags': {
-                'description': "System tags list used to filter results. Prepend '-' to system tag name to indicate exclusion",
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "system_tags": {
+                "description": "System tags list used to filter results. Prepend '-' to system tag name to indicate exclusion",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'tags': {
-                'description': "User-defined tags list used to filter results. Prepend '-' to tag name to indicate exclusion",
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "tags": {
+                "description": "User-defined tags list used to filter results. Prepend '-' to tag name to indicate exclusion",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
+
     def __init__(
-            self, id=None, name=None, description=None, tags=None, system_tags=None, order_by=None, page=None, page_size=None, search_text=None, only_fields=None, _all_=None, _any_=None, **kwargs):
+        self,
+        id=None,
+        name=None,
+        description=None,
+        tags=None,
+        system_tags=None,
+        order_by=None,
+        page=None,
+        page_size=None,
+        search_text=None,
+        only_fields=None,
+        _all_=None,
+        _any_=None,
+        **kwargs
+    ):
         super(GetAllRequest, self).__init__(**kwargs)
         self.id = id
         self.name = name
@@ -1177,7 +1233,7 @@ class GetAllRequest(Request):
         self._all_ = _all_
         self._any_ = _any_
 
-    @schema_property('id')
+    @schema_property("id")
     def id(self):
         return self._property_id
 
@@ -1192,7 +1248,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "id", six.string_types, is_array=True)
         self._property_id = value
 
-    @schema_property('name')
+    @schema_property("name")
     def name(self):
         return self._property_name
 
@@ -1205,7 +1261,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "name", six.string_types)
         self._property_name = value
 
-    @schema_property('description')
+    @schema_property("description")
     def description(self):
         return self._property_description
 
@@ -1218,7 +1274,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "description", six.string_types)
         self._property_description = value
 
-    @schema_property('tags')
+    @schema_property("tags")
     def tags(self):
         return self._property_tags
 
@@ -1233,7 +1289,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "tags", six.string_types, is_array=True)
         self._property_tags = value
 
-    @schema_property('system_tags')
+    @schema_property("system_tags")
     def system_tags(self):
         return self._property_system_tags
 
@@ -1248,7 +1304,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "system_tags", six.string_types, is_array=True)
         self._property_system_tags = value
 
-    @schema_property('order_by')
+    @schema_property("order_by")
     def order_by(self):
         return self._property_order_by
 
@@ -1263,7 +1319,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "order_by", six.string_types, is_array=True)
         self._property_order_by = value
 
-    @schema_property('page')
+    @schema_property("page")
     def page(self):
         return self._property_page
 
@@ -1278,7 +1334,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "page", six.integer_types)
         self._property_page = value
 
-    @schema_property('page_size')
+    @schema_property("page_size")
     def page_size(self):
         return self._property_page_size
 
@@ -1293,7 +1349,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "page_size", six.integer_types)
         self._property_page_size = value
 
-    @schema_property('search_text')
+    @schema_property("search_text")
     def search_text(self):
         return self._property_search_text
 
@@ -1306,7 +1362,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "search_text", six.string_types)
         self._property_search_text = value
 
-    @schema_property('only_fields')
+    @schema_property("only_fields")
     def only_fields(self):
         return self._property_only_fields
 
@@ -1321,7 +1377,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "only_fields", six.string_types, is_array=True)
         self._property_only_fields = value
 
-    @schema_property('_all_')
+    @schema_property("_all_")
     def _all_(self):
         return self._property__all_
 
@@ -1336,7 +1392,7 @@ class GetAllRequest(Request):
             self.assert_isinstance(value, "_all_", MultiFieldPatternData)
         self._property__all_ = value
 
-    @schema_property('_any_')
+    @schema_property("_any_")
     def _any_(self):
         return self._property__any_
 
@@ -1359,144 +1415,140 @@ class GetAllResponse(Response):
     :param projects: Projects list
     :type projects: Sequence[ProjectsGetAllResponseSingle]
     """
+
     _service = "projects"
     _action = "get_all"
     _version = "1.5"
 
     _schema = {
-        'definitions': {
-            'projects_get_all_response_single': {
-                'properties': {
-                    'company': {
-                        'description': 'Company id',
-                        'type': ['string', 'null'],
+        "definitions": {
+            "projects_get_all_response_single": {
+                "properties": {
+                    "company": {
+                        "description": "Company id",
+                        "type": ["string", "null"],
                     },
-                    'created': {
-                        'description': 'Creation time',
-                        'format': 'date-time',
-                        'type': ['string', 'null'],
+                    "created": {
+                        "description": "Creation time",
+                        "format": "date-time",
+                        "type": ["string", "null"],
                     },
-                    'default_output_destination': {
-                        'description': 'The default output destination URL for new tasks under this project',
-                        'type': ['string', 'null'],
+                    "default_output_destination": {
+                        "description": "The default output destination URL for new tasks under this project",
+                        "type": ["string", "null"],
                     },
-                    'description': {
-                        'description': 'Project description',
-                        'type': ['string', 'null'],
+                    "description": {
+                        "description": "Project description",
+                        "type": ["string", "null"],
                     },
-                    'id': {'description': 'Project id', 'type': ['string', 'null']},
-                    'name': {
-                        'description': 'Project name',
-                        'type': ['string', 'null'],
+                    "id": {"description": "Project id", "type": ["string", "null"]},
+                    "name": {
+                        "description": "Project name",
+                        "type": ["string", "null"],
                     },
-                    'stats': {
-                        'description': 'Additional project stats',
-                        'oneOf': [
-                            {'$ref': '#/definitions/stats'},
-                            {'type': 'null'},
-                        ],
+                    "stats": {
+                        "description": "Additional project stats",
+                        "oneOf": [{"$ref": "#/definitions/stats"}, {"type": "null"},],
                     },
-                    'system_tags': {
-                        'description': "System tags. This field is reserved for system use, please don't use it.",
-                        'items': {'type': 'string'},
-                        'type': ['array', 'null'],
+                    "system_tags": {
+                        "description": "System tags. This field is reserved for system use, please don't use it.",
+                        "items": {"type": "string"},
+                        "type": ["array", "null"],
                     },
-                    'tags': {
-                        'description': 'User-defined tags',
-                        'items': {'type': 'string'},
-                        'type': ['array', 'null'],
+                    "tags": {
+                        "description": "User-defined tags",
+                        "items": {"type": "string"},
+                        "type": ["array", "null"],
                     },
-                    'user': {
-                        'description': 'Associated user id',
-                        'type': ['string', 'null'],
+                    "user": {
+                        "description": "Associated user id",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'stats': {
-                'properties': {
-                    'active': {
-                        'description': 'Stats for active tasks',
-                        'oneOf': [
-                            {'$ref': '#/definitions/stats_status_count'},
-                            {'type': 'null'},
+            "stats": {
+                "properties": {
+                    "active": {
+                        "description": "Stats for active tasks",
+                        "oneOf": [
+                            {"$ref": "#/definitions/stats_status_count"},
+                            {"type": "null"},
                         ],
                     },
-                    'archived': {
-                        'description': 'Stats for archived tasks',
-                        'oneOf': [
-                            {'$ref': '#/definitions/stats_status_count'},
-                            {'type': 'null'},
+                    "archived": {
+                        "description": "Stats for archived tasks",
+                        "oneOf": [
+                            {"$ref": "#/definitions/stats_status_count"},
+                            {"type": "null"},
                         ],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'stats_status_count': {
-                'properties': {
-                    'status_count': {
-                        'description': 'Status counts',
-                        'properties': {
-                            'closed': {
-                                'description': "Number of 'closed' tasks in project",
-                                'type': 'integer',
+            "stats_status_count": {
+                "properties": {
+                    "status_count": {
+                        "description": "Status counts",
+                        "properties": {
+                            "closed": {
+                                "description": "Number of 'closed' tasks in project",
+                                "type": "integer",
                             },
-                            'created': {
-                                'description': "Number of 'created' tasks in project",
-                                'type': 'integer',
+                            "created": {
+                                "description": "Number of 'created' tasks in project",
+                                "type": "integer",
                             },
-                            'failed': {
-                                'description': "Number of 'failed' tasks in project",
-                                'type': 'integer',
+                            "failed": {
+                                "description": "Number of 'failed' tasks in project",
+                                "type": "integer",
                             },
-                            'in_progress': {
-                                'description': "Number of 'in_progress' tasks in project",
-                                'type': 'integer',
+                            "in_progress": {
+                                "description": "Number of 'in_progress' tasks in project",
+                                "type": "integer",
                             },
-                            'published': {
-                                'description': "Number of 'published' tasks in project",
-                                'type': 'integer',
+                            "published": {
+                                "description": "Number of 'published' tasks in project",
+                                "type": "integer",
                             },
-                            'queued': {
-                                'description': "Number of 'queued' tasks in project",
-                                'type': 'integer',
+                            "queued": {
+                                "description": "Number of 'queued' tasks in project",
+                                "type": "integer",
                             },
-                            'stopped': {
-                                'description': "Number of 'stopped' tasks in project",
-                                'type': 'integer',
+                            "stopped": {
+                                "description": "Number of 'stopped' tasks in project",
+                                "type": "integer",
                             },
-                            'unknown': {
-                                'description': "Number of 'unknown' tasks in project",
-                                'type': 'integer',
+                            "unknown": {
+                                "description": "Number of 'unknown' tasks in project",
+                                "type": "integer",
                             },
                         },
-                        'type': ['object', 'null'],
+                        "type": ["object", "null"],
                     },
-                    'total_runtime': {
-                        'description': 'Total run time of all tasks in project (in seconds)',
-                        'type': ['integer', 'null'],
+                    "total_runtime": {
+                        "description": "Total run time of all tasks in project (in seconds)",
+                        "type": ["integer", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
         },
-        'properties': {
-            'projects': {
-                'description': 'Projects list',
-                'items': {
-                    '$ref': '#/definitions/projects_get_all_response_single',
-                },
-                'type': ['array', 'null'],
+        "properties": {
+            "projects": {
+                "description": "Projects list",
+                "items": {"$ref": "#/definitions/projects_get_all_response_single",},
+                "type": ["array", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, projects=None, **kwargs):
+
+    def __init__(self, projects=None, **kwargs):
         super(GetAllResponse, self).__init__(**kwargs)
         self.projects = projects
 
-    @schema_property('projects')
+    @schema_property("projects")
     def projects(self):
         return self._property_projects
 
@@ -1508,9 +1560,14 @@ class GetAllResponse(Response):
 
         self.assert_isinstance(value, "projects", (list, tuple))
         if any(isinstance(v, dict) for v in value):
-            value = [ProjectsGetAllResponseSingle.from_dict(v) if isinstance(v, dict) else v for v in value]
+            value = [
+                ProjectsGetAllResponseSingle.from_dict(v) if isinstance(v, dict) else v
+                for v in value
+            ]
         else:
-            self.assert_isinstance(value, "projects", ProjectsGetAllResponseSingle, is_array=True)
+            self.assert_isinstance(
+                value, "projects", ProjectsGetAllResponseSingle, is_array=True
+            )
         self._property_projects = value
 
 
@@ -1524,17 +1581,17 @@ class GetByIdRequest(Request):
     _action = "get_by_id"
     _version = "1.5"
     _schema = {
-        'definitions': {},
-        'properties': {'project': {'description': 'Project id', 'type': 'string'}},
-        'required': ['project'],
-        'type': 'object',
+        "definitions": {},
+        "properties": {"project": {"description": "Project id", "type": "string"}},
+        "required": ["project"],
+        "type": "object",
     }
-    def __init__(
-            self, project, **kwargs):
+
+    def __init__(self, project, **kwargs):
         super(GetByIdRequest, self).__init__(**kwargs)
         self.project = project
 
-    @schema_property('project')
+    @schema_property("project")
     def project(self):
         return self._property_project
 
@@ -1555,73 +1612,74 @@ class GetByIdResponse(Response):
     :param project: Project info
     :type project: Project
     """
+
     _service = "projects"
     _action = "get_by_id"
     _version = "1.5"
 
     _schema = {
-        'definitions': {
-            'project': {
-                'properties': {
-                    'company': {
-                        'description': 'Company id',
-                        'type': ['string', 'null'],
+        "definitions": {
+            "project": {
+                "properties": {
+                    "company": {
+                        "description": "Company id",
+                        "type": ["string", "null"],
                     },
-                    'created': {
-                        'description': 'Creation time',
-                        'format': 'date-time',
-                        'type': ['string', 'null'],
+                    "created": {
+                        "description": "Creation time",
+                        "format": "date-time",
+                        "type": ["string", "null"],
                     },
-                    'default_output_destination': {
-                        'description': 'The default output destination URL for new tasks under this project',
-                        'type': ['string', 'null'],
+                    "default_output_destination": {
+                        "description": "The default output destination URL for new tasks under this project",
+                        "type": ["string", "null"],
                     },
-                    'description': {
-                        'description': 'Project description',
-                        'type': ['string', 'null'],
+                    "description": {
+                        "description": "Project description",
+                        "type": ["string", "null"],
                     },
-                    'id': {'description': 'Project id', 'type': ['string', 'null']},
-                    'last_update': {
-                        'description': 'Last project update time. Reflects the last time the project metadata was changed or a task in this project has changed status',
-                        'format': 'date-time',
-                        'type': ['string', 'null'],
+                    "id": {"description": "Project id", "type": ["string", "null"]},
+                    "last_update": {
+                        "description": "Last project update time. Reflects the last time the project metadata was changed or a task in this project has changed status",
+                        "format": "date-time",
+                        "type": ["string", "null"],
                     },
-                    'name': {
-                        'description': 'Project name',
-                        'type': ['string', 'null'],
+                    "name": {
+                        "description": "Project name",
+                        "type": ["string", "null"],
                     },
-                    'system_tags': {
-                        'description': "System tags. This field is reserved for system use, please don't use it.",
-                        'items': {'type': 'string'},
-                        'type': ['array', 'null'],
+                    "system_tags": {
+                        "description": "System tags. This field is reserved for system use, please don't use it.",
+                        "items": {"type": "string"},
+                        "type": ["array", "null"],
                     },
-                    'tags': {
-                        'description': 'User-defined tags',
-                        'items': {'type': 'string'},
-                        'type': ['array', 'null'],
+                    "tags": {
+                        "description": "User-defined tags",
+                        "items": {"type": "string"},
+                        "type": ["array", "null"],
                     },
-                    'user': {
-                        'description': 'Associated user id',
-                        'type': ['string', 'null'],
+                    "user": {
+                        "description": "Associated user id",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
         },
-        'properties': {
-            'project': {
-                'description': 'Project info',
-                'oneOf': [{'$ref': '#/definitions/project'}, {'type': 'null'}],
+        "properties": {
+            "project": {
+                "description": "Project info",
+                "oneOf": [{"$ref": "#/definitions/project"}, {"type": "null"}],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, project=None, **kwargs):
+
+    def __init__(self, project=None, **kwargs):
         super(GetByIdResponse, self).__init__(**kwargs)
         self.project = project
 
-    @schema_property('project')
+    @schema_property("project")
     def project(self):
         return self._property_project
 
@@ -1653,31 +1711,27 @@ class GetHyperParametersRequest(Request):
     _action = "get_hyper_parameters"
     _version = "2.2"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'page': {
-                'default': 0,
-                'description': 'Page number',
-                'type': 'integer',
+        "definitions": {},
+        "properties": {
+            "page": {"default": 0, "description": "Page number", "type": "integer",},
+            "page_size": {
+                "default": 500,
+                "description": "Page size",
+                "type": "integer",
             },
-            'page_size': {
-                'default': 500,
-                'description': 'Page size',
-                'type': 'integer',
-            },
-            'project': {'description': 'Project ID', 'type': 'string'},
+            "project": {"description": "Project ID", "type": "string"},
         },
-        'required': ['project'],
-        'type': 'object',
+        "required": ["project"],
+        "type": "object",
     }
-    def __init__(
-            self, project, page=0, page_size=500, **kwargs):
+
+    def __init__(self, project, page=0, page_size=500, **kwargs):
         super(GetHyperParametersRequest, self).__init__(**kwargs)
         self.project = project
         self.page = page
         self.page_size = page_size
 
-    @schema_property('project')
+    @schema_property("project")
     def project(self):
         return self._property_project
 
@@ -1690,7 +1744,7 @@ class GetHyperParametersRequest(Request):
         self.assert_isinstance(value, "project", six.string_types)
         self._property_project = value
 
-    @schema_property('page')
+    @schema_property("page")
     def page(self):
         return self._property_page
 
@@ -1705,7 +1759,7 @@ class GetHyperParametersRequest(Request):
         self.assert_isinstance(value, "page", six.integer_types)
         self._property_page = value
 
-    @schema_property('page_size')
+    @schema_property("page_size")
     def page_size(self):
         return self._property_page_size
 
@@ -1732,37 +1786,38 @@ class GetHyperParametersResponse(Response):
     :param total: Total number of results
     :type total: int
     """
+
     _service = "projects"
     _action = "get_hyper_parameters"
     _version = "2.2"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'parameters': {
-                'description': 'A list of hyper parameter names',
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+        "definitions": {},
+        "properties": {
+            "parameters": {
+                "description": "A list of hyper parameter names",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'remaining': {
-                'description': 'Remaining results',
-                'type': ['integer', 'null'],
+            "remaining": {
+                "description": "Remaining results",
+                "type": ["integer", "null"],
             },
-            'total': {
-                'description': 'Total number of results',
-                'type': ['integer', 'null'],
+            "total": {
+                "description": "Total number of results",
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, parameters=None, remaining=None, total=None, **kwargs):
+
+    def __init__(self, parameters=None, remaining=None, total=None, **kwargs):
         super(GetHyperParametersResponse, self).__init__(**kwargs)
         self.parameters = parameters
         self.remaining = remaining
         self.total = total
 
-    @schema_property('parameters')
+    @schema_property("parameters")
     def parameters(self):
         return self._property_parameters
 
@@ -1777,7 +1832,7 @@ class GetHyperParametersResponse(Response):
         self.assert_isinstance(value, "parameters", six.string_types, is_array=True)
         self._property_parameters = value
 
-    @schema_property('remaining')
+    @schema_property("remaining")
     def remaining(self):
         return self._property_remaining
 
@@ -1792,7 +1847,7 @@ class GetHyperParametersResponse(Response):
         self.assert_isinstance(value, "remaining", six.integer_types)
         self._property_remaining = value
 
-    @schema_property('total')
+    @schema_property("total")
     def total(self):
         return self._property_total
 
@@ -1822,18 +1877,18 @@ class GetUniqueMetricVariantsRequest(Request):
     _action = "get_unique_metric_variants"
     _version = "1.6"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'project': {'description': 'Project ID', 'type': ['string', 'null']},
+        "definitions": {},
+        "properties": {
+            "project": {"description": "Project ID", "type": ["string", "null"]},
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, project=None, **kwargs):
+
+    def __init__(self, project=None, **kwargs):
         super(GetUniqueMetricVariantsRequest, self).__init__(**kwargs)
         self.project = project
 
-    @schema_property('project')
+    @schema_property("project")
     def project(self):
         return self._property_project
 
@@ -1854,49 +1909,50 @@ class GetUniqueMetricVariantsResponse(Response):
     :param metrics: A list of metric variants reported for tasks in this project
     :type metrics: Sequence[MetricVariantResult]
     """
+
     _service = "projects"
     _action = "get_unique_metric_variants"
     _version = "1.6"
 
     _schema = {
-        'definitions': {
-            'metric_variant_result': {
-                'properties': {
-                    'metric': {
-                        'description': 'Metric name',
-                        'type': ['string', 'null'],
+        "definitions": {
+            "metric_variant_result": {
+                "properties": {
+                    "metric": {
+                        "description": "Metric name",
+                        "type": ["string", "null"],
                     },
-                    'metric_hash': {
-                        'description': 'Metric name hash. Used instead of the metric name when categorizing\n                last metrics events in task objects.',
-                        'type': ['string', 'null'],
+                    "metric_hash": {
+                        "description": "Metric name hash. Used instead of the metric name when categorizing\n                last metrics events in task objects.",
+                        "type": ["string", "null"],
                     },
-                    'variant': {
-                        'description': 'Variant name',
-                        'type': ['string', 'null'],
+                    "variant": {
+                        "description": "Variant name",
+                        "type": ["string", "null"],
                     },
-                    'variant_hash': {
-                        'description': 'Variant name hash. Used instead of the variant name when categorizing\n                last metrics events in task objects.',
-                        'type': ['string', 'null'],
+                    "variant_hash": {
+                        "description": "Variant name hash. Used instead of the variant name when categorizing\n                last metrics events in task objects.",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
         },
-        'properties': {
-            'metrics': {
-                'description': 'A list of metric variants reported for tasks in this project',
-                'items': {'$ref': '#/definitions/metric_variant_result'},
-                'type': ['array', 'null'],
+        "properties": {
+            "metrics": {
+                "description": "A list of metric variants reported for tasks in this project",
+                "items": {"$ref": "#/definitions/metric_variant_result"},
+                "type": ["array", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, metrics=None, **kwargs):
+
+    def __init__(self, metrics=None, **kwargs):
         super(GetUniqueMetricVariantsResponse, self).__init__(**kwargs)
         self.metrics = metrics
 
-    @schema_property('metrics')
+    @schema_property("metrics")
     def metrics(self):
         return self._property_metrics
 
@@ -1908,7 +1964,10 @@ class GetUniqueMetricVariantsResponse(Response):
 
         self.assert_isinstance(value, "metrics", (list, tuple))
         if any(isinstance(v, dict) for v in value):
-            value = [MetricVariantResult.from_dict(v) if isinstance(v, dict) else v for v in value]
+            value = [
+                MetricVariantResult.from_dict(v) if isinstance(v, dict) else v
+                for v in value
+            ]
         else:
             self.assert_isinstance(value, "metrics", MetricVariantResult, is_array=True)
         self._property_metrics = value
@@ -1938,37 +1997,43 @@ class UpdateRequest(Request):
     _action = "update"
     _version = "1.5"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'default_output_destination': {
-                'description': 'The default output destination URL for new tasks under this project',
-                'type': 'string',
+        "definitions": {},
+        "properties": {
+            "default_output_destination": {
+                "description": "The default output destination URL for new tasks under this project",
+                "type": "string",
             },
-            'description': {
-                'description': 'Project description',
-                'type': 'string',
+            "description": {"description": "Project description", "type": "string",},
+            "name": {
+                "description": "Project name. Unique within the company.",
+                "type": "string",
             },
-            'name': {
-                'description': 'Project name. Unique within the company.',
-                'type': 'string',
+            "project": {"description": "Project id", "type": "string"},
+            "system_tags": {
+                "description": "System tags list. This field is reserved for system use, please don't use it.",
+                "items": {"type": "string"},
+                "type": "array",
             },
-            'project': {'description': 'Project id', 'type': 'string'},
-            'system_tags': {
-                'description': "System tags list. This field is reserved for system use, please don't use it.",
-                'items': {'type': 'string'},
-                'type': 'array',
-            },
-            'tags': {
-                'description': 'User-defined tags list',
-                'items': {'type': 'string'},
-                'type': 'array',
+            "tags": {
+                "description": "User-defined tags list",
+                "items": {"type": "string"},
+                "type": "array",
             },
         },
-        'required': ['project'],
-        'type': 'object',
+        "required": ["project"],
+        "type": "object",
     }
+
     def __init__(
-            self, project, name=None, description=None, tags=None, system_tags=None, default_output_destination=None, **kwargs):
+        self,
+        project,
+        name=None,
+        description=None,
+        tags=None,
+        system_tags=None,
+        default_output_destination=None,
+        **kwargs
+    ):
         super(UpdateRequest, self).__init__(**kwargs)
         self.project = project
         self.name = name
@@ -1977,7 +2042,7 @@ class UpdateRequest(Request):
         self.system_tags = system_tags
         self.default_output_destination = default_output_destination
 
-    @schema_property('project')
+    @schema_property("project")
     def project(self):
         return self._property_project
 
@@ -1990,7 +2055,7 @@ class UpdateRequest(Request):
         self.assert_isinstance(value, "project", six.string_types)
         self._property_project = value
 
-    @schema_property('name')
+    @schema_property("name")
     def name(self):
         return self._property_name
 
@@ -2003,7 +2068,7 @@ class UpdateRequest(Request):
         self.assert_isinstance(value, "name", six.string_types)
         self._property_name = value
 
-    @schema_property('description')
+    @schema_property("description")
     def description(self):
         return self._property_description
 
@@ -2016,7 +2081,7 @@ class UpdateRequest(Request):
         self.assert_isinstance(value, "description", six.string_types)
         self._property_description = value
 
-    @schema_property('tags')
+    @schema_property("tags")
     def tags(self):
         return self._property_tags
 
@@ -2031,7 +2096,7 @@ class UpdateRequest(Request):
         self.assert_isinstance(value, "tags", six.string_types, is_array=True)
         self._property_tags = value
 
-    @schema_property('system_tags')
+    @schema_property("system_tags")
     def system_tags(self):
         return self._property_system_tags
 
@@ -2046,7 +2111,7 @@ class UpdateRequest(Request):
         self.assert_isinstance(value, "system_tags", six.string_types, is_array=True)
         self._property_system_tags = value
 
-    @schema_property('default_output_destination')
+    @schema_property("default_output_destination")
     def default_output_destination(self):
         return self._property_default_output_destination
 
@@ -2069,33 +2134,34 @@ class UpdateResponse(Response):
     :param fields: Updated fields names and values
     :type fields: dict
     """
+
     _service = "projects"
     _action = "update"
     _version = "1.5"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'fields': {
-                'additionalProperties': True,
-                'description': 'Updated fields names and values',
-                'type': ['object', 'null'],
+        "definitions": {},
+        "properties": {
+            "fields": {
+                "additionalProperties": True,
+                "description": "Updated fields names and values",
+                "type": ["object", "null"],
             },
-            'updated': {
-                'description': 'Number of projects updated (0 or 1)',
-                'enum': [0, 1],
-                'type': ['integer', 'null'],
+            "updated": {
+                "description": "Number of projects updated (0 or 1)",
+                "enum": [0, 1],
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, updated=None, fields=None, **kwargs):
+
+    def __init__(self, updated=None, fields=None, **kwargs):
         super(UpdateResponse, self).__init__(**kwargs)
         self.updated = updated
         self.fields = fields
 
-    @schema_property('updated')
+    @schema_property("updated")
     def updated(self):
         return self._property_updated
 
@@ -2110,7 +2176,7 @@ class UpdateResponse(Response):
         self.assert_isinstance(value, "updated", six.integer_types)
         self._property_updated = value
 
-    @schema_property('fields')
+    @schema_property("fields")
     def fields(self):
         return self._property_fields
 
