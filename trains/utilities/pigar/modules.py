@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function, division, absolute_import
+from __future__ import absolute_import, division, print_function
 
 import collections
-
 
 # FIXME: Just a workaround, not a radical cure..
 _special_cases = {
@@ -22,7 +21,6 @@ class Modules(dict):
 
 
 class ImportedModules(Modules):
-
     def __init__(self):
         super(ImportedModules, self).__init__()
 
@@ -31,17 +29,17 @@ class ImportedModules(Modules):
             return
 
         names = list()
-        special_name = '.'.join(name.split('.')[:2])
+        special_name = ".".join(name.split(".")[:2])
         # Flask extension.
-        if name.startswith('flask.ext.'):
-            names.append('flask')
-            names.append('flask_' + name.split('.')[2])
+        if name.startswith("flask.ext."):
+            names.append("flask")
+            names.append("flask_" + name.split(".")[2])
         # Special cases..
         elif special_name in _special_cases:
             names.append(_special_cases[special_name])
         # Other.
-        elif '.' in name and not name.startswith('.'):
-            names.append(name.split('.')[0])
+        elif "." in name and not name.startswith("."):
+            names.append(name.split(".")[0])
         else:
             names.append(name)
 
@@ -60,7 +58,7 @@ class ImportedModules(Modules):
 
 class ReqsModules(Modules):
 
-    _Detail = collections.namedtuple('Detail', ['version', 'comments'])
+    _Detail = collections.namedtuple("Detail", ["version", "comments"])
 
     def __init__(self):
         super(ReqsModules, self).__init__()
@@ -105,7 +103,7 @@ class _Locations(dict):
     def sorted_items(self):
         if self._sorted is None:
             self._sorted = [
-                '{0}: {1}'.format(f, ','.join([str(n) for n in sorted(ls)]))
+                "{0}: {1}".format(f, ",".join([str(n) for n in sorted(ls)]))
                 for f, ls in sorted(self.items())
             ]
         return self._sorted

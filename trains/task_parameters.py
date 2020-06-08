@@ -1,9 +1,9 @@
-import six
 import attr
 from attr import validators
 
+import six
 
-__all__ = ['range_validator', 'param', 'percent_param', 'TaskParameters']
+__all__ = ["range_validator", "param", "percent_param", "TaskParameters"]
 
 
 def _canonize_validator(current_validator):
@@ -35,22 +35,22 @@ def range_validator(min_value, max_value):
     :param max_value: The maximum limit of the range, inclusive. None for no maximum limit.
     :return: A new range validator
     """
+
     def _range_validator(instance, attribute, value):
-        if ((min_value is not None) and (value < min_value)) or \
-                ((max_value is not None) and (value > max_value)):
-            raise ValueError("{} must be in range [{}, {}]".format(attribute.name, min_value, max_value))
+        if ((min_value is not None) and (value < min_value)) or (
+            (max_value is not None) and (value > max_value)
+        ):
+            raise ValueError(
+                "{} must be in range [{}, {}]".format(
+                    attribute.name, min_value, max_value
+                )
+            )
 
     return _range_validator
 
 
 def param(
-        validator=None,
-        range=None,
-        type=None,
-        desc=None,
-        metadata=None,
-        *args,
-        **kwargs
+    validator=None, range=None, type=None, desc=None, metadata=None, *args, **kwargs
 ):
     """
     A parameter inside a TaskParameters class.
@@ -142,7 +142,9 @@ class TaskParameters(object):
         """
         for key, value in source_dict.items():
             if not hasattr(self, key):
-                raise ValueError("Unknown key {} in {} object".format(key, type(self).__name__))
+                raise ValueError(
+                    "Unknown key {} in {} object".format(key, type(self).__name__)
+                )
 
             setattr(self, key, value)
 

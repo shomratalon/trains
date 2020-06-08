@@ -1,5 +1,5 @@
 import abc
-from typing import Optional, Any, Tuple, Callable, Dict
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import six
 

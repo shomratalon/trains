@@ -8,7 +8,7 @@ import six
 if six.PY3:
     from math import inf
 else:
-    inf = float('inf')
+    inf = float("inf")
 
 
 class InvalidVersion(ValueError):
@@ -100,10 +100,13 @@ class Version(_BaseVersion):
             release=tuple(int(i) for i in match.group("release").split(".")),
             pre=self._parse_letter_version(match.group("pre_l"), match.group("pre_n")),
             post=self._parse_letter_version(
-                match.group("post_l") or '', match.group("post_n1") or match.group("post_n2") or ''
+                match.group("post_l") or "",
+                match.group("post_n1") or match.group("post_n2") or "",
             ),
-            dev=self._parse_letter_version(match.group("dev_l") or '', match.group("dev_n") or ''),
-            local=self._parse_local_version(match.group("local") or ''),
+            dev=self._parse_letter_version(
+                match.group("dev_l") or "", match.group("dev_n") or ""
+            ),
+            local=self._parse_local_version(match.group("local") or ""),
         )
 
         # Generate a key which will be used for sorting
@@ -277,14 +280,16 @@ class Version(_BaseVersion):
         else:
             post = post[1]
 
-        # Versions without a development segment should sort after those with one.
+        # Versions without a development segment should sort after those with
+        # one.
         if not dev:
             dev = inf
         else:
             dev = dev[1]
 
         if not local:
-            # Versions without a local segment should sort before those with one.
+            # Versions without a local segment should sort before those with
+            # one.
             local = inf
         else:
             # Versions with a local segment need that segment parsed to implement

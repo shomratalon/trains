@@ -1,11 +1,10 @@
 """ Configuration module. Uses backend_config to load system configuration. """
 import logging
 import os
-from os.path import expandvars, expanduser
+from os.path import expanduser, expandvars
 
 from ..backend_api import load_config
 from ..backend_config.bucket_config import S3BucketConfigurations
-
 from .defs import *
 from .remote import running_remotely_task_id as _running_remotely_task_id
 
@@ -19,7 +18,9 @@ def get_cache_dir():
     cache_base_dir = Path(
         expandvars(
             expanduser(
-                TRAINS_CACHE_DIR.get() or config.get("storage.cache.default_base_dir") or DEFAULT_CACHE_DIR
+                TRAINS_CACHE_DIR.get()
+                or config.get("storage.cache.default_base_dir")
+                or DEFAULT_CACHE_DIR
             )
         )
     )
@@ -51,13 +52,17 @@ def get_node_id(default=0):
     node_id = NODE_ID_ENV_VAR.get()
 
     try:
-        mpi_world_rank = int(os.environ.get('OMPI_COMM_WORLD_NODE_RANK', os.environ.get('PMI_RANK')))
-    except:
+        mpi_world_rank = int(
+            os.environ.get("OMPI_COMM_WORLD_NODE_RANK", os.environ.get("PMI_RANK"))
+        )
+    except BaseException:
         mpi_world_rank = None
 
     try:
-        mpi_rank = int(os.environ.get('OMPI_COMM_WORLD_RANK', os.environ.get('SLURM_PROCID')))
-    except:
+        mpi_rank = int(
+            os.environ.get("OMPI_COMM_WORLD_RANK", os.environ.get("SLURM_PROCID"))
+        )
+    except BaseException:
         mpi_rank = None
 
     # if we have no node_id, use the mpi rank
@@ -71,6 +76,7 @@ def get_node_id(default=0):
     # check if we have pyTorch node/worker ID
     try:
         from torch.utils.data.dataloader import get_worker_info
+
         worker_info = get_worker_info()
         if not worker_info:
             torch_rank = None
@@ -81,15 +87,17 @@ def get_node_id(default=0):
             except Exception:
                 # guess a number based on wid hopefully unique value
                 import hashlib
+
                 h = hashlib.md5()
-                h.update(str(w_id).encode('utf-8'))
+                h.update(str(w_id).encode("utf-8"))
                 torch_rank = int(h.hexdigest(), 16)
     except Exception:
         torch_rank = None
 
     # if we also have a torch rank add it to the node rank
     if torch_rank is not None:
-        # Since we dont know the world rank, we assume it is not bigger than 10k
+        # Since we dont know the world rank, we assume it is not bigger than
+        # 10k
         node_id = (10000 * node_id) + torch_rank
 
     return node_id
@@ -119,14 +127,14 @@ def dev_worker_name():
 
 def __set_is_master_node():
     try:
-        force_master_node = os.environ.pop('TRAINS_FORCE_MASTER_NODE', None)
-    except:
+        force_master_node = os.environ.pop("TRAINS_FORCE_MASTER_NODE", None)
+    except BaseException:
         force_master_node = None
 
     if force_master_node is not None:
         try:
             force_master_node = bool(int(force_master_node))
-        except:
+        except BaseException:
             force_master_node = None
 
     return force_master_node

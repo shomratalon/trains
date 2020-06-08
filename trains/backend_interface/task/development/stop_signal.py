@@ -1,5 +1,5 @@
-from ....config import config
 from ....backend_api.services import tasks
+from ....config import config
 
 
 class TaskStopReason(object):
@@ -9,7 +9,7 @@ class TaskStopReason(object):
 
 
 class TaskStopSignal(object):
-    enabled = bool(config.get('development.support_stopping', False))
+    enabled = bool(config.get("development.support_stopping", False))
 
     _number_of_consecutive_reset_tests = 4
 
@@ -23,6 +23,7 @@ class TaskStopSignal(object):
 
     def __init__(self, task):
         from ....backend_interface import Task
+
         assert isinstance(task, Task)
         self.task = task
         self._task_reset_state_counter = 0
@@ -36,7 +37,10 @@ class TaskStopSignal(object):
             status = str(status)
             message = str(message)
 
-            if status == str(tasks.TaskStatusEnum.in_progress) and "stopping" in message:
+            if (
+                status == str(tasks.TaskStatusEnum.in_progress)
+                and "stopping" in message
+            ):
                 # make sure we syn the entire task object
                 self.task.reload()
                 return TaskStopReason.stopped
@@ -55,13 +59,18 @@ class TaskStopSignal(object):
             if status == str(tasks.TaskStatusEnum.created):
                 self._task_reset_state_counter += 1
 
-                if self._task_reset_state_counter >= self._number_of_consecutive_reset_tests:
+                if (
+                    self._task_reset_state_counter
+                    >= self._number_of_consecutive_reset_tests
+                ):
                     # make sure we syn the entire task object
                     self.task.reload()
                     return TaskStopReason.reset
 
                 self.task.log.warning(
-                    "Task {} was reset! if state is consistent we shall terminate.".format(self.task.id),
+                    "Task {} was reset! if state is consistent we shall terminate.".format(
+                        self.task.id
+                    ),
                 )
             else:
                 self._task_reset_state_counter = 0

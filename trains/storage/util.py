@@ -1,16 +1,25 @@
-from six.moves.urllib.parse import quote, urlparse, urlunparse
-import six
 import fnmatch
+
+import six
+from six.moves.urllib.parse import quote, urlparse, urlunparse
 
 
 def get_config_object_matcher(**patterns):
-    unsupported = {k: v for k, v in patterns.items() if not isinstance(v, six.string_types)}
+    unsupported = {
+        k: v for k, v in patterns.items() if not isinstance(v, six.string_types)
+    }
     if unsupported:
-        raise ValueError('Unsupported object matcher (expecting string): %s'
-                         % ', '.join('%s=%s' % (k, v) for k, v in unsupported.items()))
+        raise ValueError(
+            "Unsupported object matcher (expecting string): %s"
+            % ", ".join("%s=%s" % (k, v) for k, v in unsupported.items())
+        )
 
     # optimize simple patters
-    starts_with = {k: v.rstrip('*') for k, v in patterns.items() if '*' not in v.rstrip('*') and '?' not in v}
+    starts_with = {
+        k: v.rstrip("*")
+        for k, v in patterns.items()
+        if "*" not in v.rstrip("*") and "?" not in v
+    }
     patterns = {k: v for k, v in patterns.items() if v not in starts_with}
 
     def _matcher(**kwargs):
@@ -31,7 +40,7 @@ def get_config_object_matcher(**patterns):
 
 def quote_url(url):
     parsed = urlparse(url)
-    if parsed.scheme not in ('http', 'https'):
+    if parsed.scheme not in ("http", "https"):
         return url
     parsed = parsed._replace(path=quote(parsed.path))
     return urlunparse(parsed)

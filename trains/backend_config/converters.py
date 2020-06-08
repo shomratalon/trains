@@ -1,6 +1,6 @@
 import base64
 from distutils.util import strtobool
-from typing import Union, Optional, Any, TypeVar, Callable, Tuple
+from typing import Any, Callable, Optional, Tuple, TypeVar, Union
 
 import six
 

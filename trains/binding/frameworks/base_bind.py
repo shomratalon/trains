@@ -13,6 +13,7 @@ class PatchBaseModelIO(object):
     :param __patched: True if the model is patched
     :type __patched: bool
     """
+
     @property
     @abstractmethod
     def __main_task(self):

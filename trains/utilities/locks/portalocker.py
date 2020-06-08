@@ -1,22 +1,22 @@
 import os
 import sys
-from . import exceptions
-from . import constants
 
+from . import constants, exceptions
 
-if os.name == 'nt':  # pragma: no cover
+if os.name == "nt":  # pragma: no cover
     import msvcrt
 
     if sys.version_info.major == 2:
         lock_length = -1
     else:
-        lock_length = int(2**31 - 1)
+        lock_length = int(2 ** 31 - 1)
 
     def lock(file_, flags):
         if flags & constants.LOCK_SH:
             import win32file
             import pywintypes
             import winerror
+
             __overlapped = pywintypes.OVERLAPPED()
             if sys.version_info.major == 2:
                 if flags & constants.LOCK_NB:
@@ -41,7 +41,8 @@ if os.name == 'nt':  # pragma: no cover
                     raise exceptions.LockException(
                         exceptions.LockException.LOCK_FAILED,
                         exc_value.strerror,
-                        fh=file_)
+                        fh=file_,
+                    )
                 else:
                     # Q:  Are there exceptions/codes we should be dealing with
                     # here?
@@ -75,14 +76,15 @@ if os.name == 'nt':  # pragma: no cover
                     raise exceptions.LockException(
                         exceptions.LockException.LOCK_FAILED,
                         exc_value.strerror,
-                        fh=file_)
+                        fh=file_,
+                    )
                 finally:
                     if savepos:
                         file_.seek(savepos)
             except IOError as exc_value:
                 raise exceptions.LockException(
-                    exceptions.LockException.LOCK_FAILED, exc_value.strerror,
-                    fh=file_)
+                    exceptions.LockException.LOCK_FAILED, exc_value.strerror, fh=file_
+                )
 
     def unlock(file_):
         try:
@@ -93,15 +95,15 @@ if os.name == 'nt':  # pragma: no cover
             try:
                 msvcrt.locking(file_.fileno(), constants.LOCK_UN, lock_length)
             except IOError as exc_value:
-                if exc_value.strerror == 'Permission denied':
+                if exc_value.strerror == "Permission denied":
                     import pywintypes
                     import win32file
                     import winerror
+
                     __overlapped = pywintypes.OVERLAPPED()
                     hfile = win32file._get_osfhandle(file_.fileno())
                     try:
-                        win32file.UnlockFileEx(
-                            hfile, 0, -0x10000, __overlapped)
+                        win32file.UnlockFileEx(hfile, 0, -0x10000, __overlapped)
                     except pywintypes.error as exc_value:
                         if exc_value.winerror == winerror.ERROR_NOT_LOCKED:
                             # error: (158, 'UnlockFileEx',
@@ -117,22 +119,24 @@ if os.name == 'nt':  # pragma: no cover
                     raise exceptions.LockException(
                         exceptions.LockException.LOCK_FAILED,
                         exc_value.strerror,
-                        fh=file_)
+                        fh=file_,
+                    )
             finally:
                 if savepos:
                     file_.seek(savepos)
         except IOError as exc_value:
             raise exceptions.LockException(
-                exceptions.LockException.LOCK_FAILED, exc_value.strerror,
-                fh=file_)
+                exceptions.LockException.LOCK_FAILED, exc_value.strerror, fh=file_
+            )
 
-elif os.name == 'posix':  # pragma: no cover
+
+elif os.name == "posix":  # pragma: no cover
     import fcntl
 
     def lock(file_, flags):
-        locking_exceptions = IOError,
+        locking_exceptions = (IOError,)
         try:  # pragma: no cover
-            locking_exceptions += BlockingIOError,
+            locking_exceptions += (BlockingIOError,)
         except NameError:  # pragma: no cover
             pass
 
@@ -146,5 +150,6 @@ elif os.name == 'posix':  # pragma: no cover
     def unlock(file_):
         fcntl.flock(file_.fileno(), constants.LOCK_UN)
 
+
 else:  # pragma: no cover
-    raise RuntimeError('PortaLocker only defined for nt and posix platforms')
+    raise RuntimeError("PortaLocker only defined for nt and posix platforms")

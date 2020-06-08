@@ -1,1 +1,1 @@
-from .utils import RLock, Lock
+from .utils import Lock, RLock

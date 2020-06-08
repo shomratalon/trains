@@ -9,7 +9,15 @@ class SetupUploadMixin(object):
     storage_uri = abstractproperty()
 
     def setup_upload(
-            self, bucket_name, host=None, access_key=None, secret_key=None, region=None, multipart=True, https=True):
+        self,
+        bucket_name,
+        host=None,
+        access_key=None,
+        secret_key=None,
+        region=None,
+        multipart=True,
+        https=True,
+    ):
         """
         Setup upload options (currently only S3 is supported)
 
@@ -38,7 +46,9 @@ class SetupUploadMixin(object):
             secret=secret_key,
             multipart=multipart,
             secure=https,
-            region=region
+            region=region,
         )
-        self.storage_uri = ('s3://%(host)s/%(bucket_name)s' if host else 's3://%(bucket_name)s') % locals()
+        self.storage_uri = (
+            "s3://%(host)s/%(bucket_name)s" if host else "s3://%(bucket_name)s"
+        ) % locals()
         StorageHelper.add_configuration(self._bucket_config, log=self.log)

@@ -9,16 +9,14 @@ from math import ceil
 from random import Random
 
 import torch as th
-import torch.nn as nn
 import torch.distributed as dist
+import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
 from torchvision import datasets, transforms
-
 from trains import Task
 
-
-local_dataset_path = './MNIST_data'
+local_dataset_path = "./MNIST_data"
 
 
 class Net(nn.Module):
@@ -48,6 +46,7 @@ class Net(nn.Module):
 
 class Partition(object):
     """ Dataset partitioning helper """
+
     def __init__(self, data, index):
         self.data = data
         self.index = index
@@ -81,18 +80,22 @@ class DataPartitioner(object):
 
 def partition_dataset(num_workers=4):
     """ Partitioning MNIST """
-    dataset = datasets.MNIST(root=local_dataset_path, train=True, download=True,
-                             transform=transforms.Compose([
-                                 transforms.ToTensor(),
-                                 transforms.Normalize((0.1307,), (0.3081,))
-                             ]))
+    dataset = datasets.MNIST(
+        root=local_dataset_path,
+        train=True,
+        download=True,
+        transform=transforms.Compose(
+            [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+        ),
+    )
     size = dist.get_world_size()
     bsz = int(128 / float(size))
     partition_sizes = [1.0 / size for _ in range(size)]
     partition = DataPartitioner(dataset, partition_sizes)
     partition = partition.use(dist.get_rank())
     train_set = th.utils.data.DataLoader(
-        partition, num_workers=num_workers, batch_size=bsz, shuffle=True)
+        partition, num_workers=num_workers, batch_size=bsz, shuffle=True
+    )
     return train_set, bsz
 
 
@@ -106,10 +109,15 @@ def run(num_workers):
     num_batches = ceil(len(train_set.dataset) / float(bsz))
 
     from random import randint
-    param = {'worker_{}_stuff'.format(dist.get_rank()): 'some stuff ' + str(randint(0, 100))}
+
+    param = {
+        "worker_{}_stuff".format(dist.get_rank()): "some stuff " + str(randint(0, 100))
+    }
     Task.current_task().connect(param)
     Task.current_task().upload_artifact(
-        'temp {:02d}'.format(dist.get_rank()), artifact_object={'worker_rank': dist.get_rank()})
+        "temp {:02d}".format(dist.get_rank()),
+        artifact_object={"worker_rank": dist.get_rank()},
+    )
 
     for epoch in range(2):
         epoch_loss = 0.0
@@ -122,13 +130,22 @@ def run(num_workers):
             average_gradients(model)
             optimizer.step()
             if i % 10 == 0:
-                print('{}] Train Epoch {} - {} \tLoss  {:.6f}'.format(dist.get_rank(), epoch, i, loss))
+                print(
+                    "{}] Train Epoch {} - {} \tLoss  {:.6f}".format(
+                        dist.get_rank(), epoch, i, loss
+                    )
+                )
                 Task.current_task().get_logger().report_scalar(
-                    'loss', 'worker {:02d}'.format(dist.get_rank()), value=loss.item(), iteration=i)
+                    "loss",
+                    "worker {:02d}".format(dist.get_rank()),
+                    value=loss.item(),
+                    iteration=i,
+                )
             if i > 100:
                 break
-        print('Rank ', dist.get_rank(), ', epoch ',
-              epoch, ': ', epoch_loss / num_batches)
+        print(
+            "Rank ", dist.get_rank(), ", epoch ", epoch, ": ", epoch_loss / num_batches
+        )
 
 
 def average_gradients(model):
@@ -141,10 +158,12 @@ def average_gradients(model):
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument('--nodes', help='number of nodes', type=int, default=10)
-    parser.add_argument('--workers_in_node', help='number of workers per node', type=int, default=3)
+    parser.add_argument("--nodes", help="number of nodes", type=int, default=10)
+    parser.add_argument(
+        "--workers_in_node", help="number of workers per node", type=int, default=3
+    )
     # this argument we will not be logging, see below Task.init
-    parser.add_argument('--rank', help='current rank', type=int)
+    parser.add_argument("--rank", help="current rank", type=int)
 
     args = parser.parse_args()
 
@@ -152,26 +171,34 @@ if __name__ == "__main__":
     # it will make sure that any sub-process calling Task.init will get the master task object
     # notice that we exclude the `rank` argument, so we can launch multiple sub-processes with trains-agent
     # otherwise, the `rank` will always be set to the original value.
-    task = Task.init("examples", "test torch distributed", auto_connect_arg_parser={'rank': False})
+    task = Task.init(
+        "examples", "test torch distributed", auto_connect_arg_parser={"rank": False}
+    )
 
-    if os.environ.get('MASTER_ADDR'):
-        dist.init_process_group(backend='gloo', rank=args.rank, world_size=args.nodes)
+    if os.environ.get("MASTER_ADDR"):
+        dist.init_process_group(backend="gloo", rank=args.rank, world_size=args.nodes)
         run(args.workers_in_node)
     else:
         # first let's download the dataset, if we have multiple machines,
         # they will take care of it when they get there
         datasets.MNIST(root=local_dataset_path, train=True, download=True)
 
-        os.environ['MASTER_ADDR'] = '127.0.0.1'
-        os.environ['MASTER_PORT'] = '29500'
+        os.environ["MASTER_ADDR"] = "127.0.0.1"
+        os.environ["MASTER_PORT"] = "29500"
 
-        print(os.getpid(), 'ARGS:', args)
+        print(os.getpid(), "ARGS:", args)
         processes = []
         for rank in range(args.nodes):
-            cmd = [sys.executable, sys.argv[0],
-                   '--nodes', str(args.nodes),
-                   '--workers_in_node', str(args.workers_in_node),
-                   '--rank', str(rank)]
+            cmd = [
+                sys.executable,
+                sys.argv[0],
+                "--nodes",
+                str(args.nodes),
+                "--workers_in_node",
+                str(args.workers_in_node),
+                "--rank",
+                str(rank),
+            ]
             print(cmd)
             p = subprocess.Popen(cmd, cwd=os.getcwd(), pass_fds=[], close_fds=True)
             processes.append(p)

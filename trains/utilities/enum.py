@@ -3,6 +3,7 @@
 
 class EnumOptions(object):
     """ Base class for enum-like classes using class-attributes with string values to represent enum key/value pairs """
+
     __cache = None
 
     @classmethod
@@ -13,12 +14,17 @@ class EnumOptions(object):
             Returns a list of attribute names representing the options.
         """
         if cls.__cache is None:
-            cls.__cache = [v for k, v in vars(cls).items() if
-                           not k.startswith('_') and not callable(v) and not isinstance(v, classmethod)]
+            cls.__cache = [
+                v
+                for k, v in vars(cls).items()
+                if not k.startswith("_")
+                and not callable(v)
+                and not isinstance(v, classmethod)
+            ]
         return cls.__cache
 
 
 class Options(object):
     @classmethod
     def _all(cls):
-        return {k: v for k, v in vars(cls) if not k.startswith('_')}
+        return {k: v for k, v in vars(cls) if not k.startswith("_")}

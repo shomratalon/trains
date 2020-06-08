@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function, division, absolute_import
+from __future__ import absolute_import, division, print_function
 
 import concurrent.futures
 
-from .extractor import BaseExtractor
-
 from ..log import logger
+from .extractor import BaseExtractor
 
 
 class ThreadExtractor(BaseExtractor):
@@ -24,7 +23,8 @@ class ThreadExtractor(BaseExtractor):
     def extract(self, job):
         """Extract url by package name."""
         with concurrent.futures.ThreadPoolExecutor(
-                max_workers=self._max_workers) as executor:
+            max_workers=self._max_workers
+        ) as executor:
             for name in self._names:
                 self._futures[executor.submit(job, name)] = name
 

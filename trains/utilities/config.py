@@ -1,7 +1,7 @@
 from __future__ import division
 
-import six
 import humanfriendly
+import six
 
 
 def parse_human_size(value):
@@ -20,9 +20,9 @@ def get_percentage(config, key, required=True, default=None):
     try:
         if isinstance(value, six.string_types):
             value = value.strip()
-            if value.endswith('%'):
+            if value.endswith("%"):
                 # "50%" => 0.5
-                return float(value.strip('%')) / 100.
+                return float(value.strip("%")) / 100.0
             # "50" => 50
 
         value = float(value)
@@ -31,10 +31,10 @@ def get_percentage(config, key, required=True, default=None):
             return value
 
         # 50 => 0.5, 10.5 => 0.105
-        return value / 100.
+        return value / 100.0
 
     except ValueError as e:
-        raise ValueError('Config: failed parsing %s: %s' % (key, e))
+        raise ValueError("Config: failed parsing %s: %s" % (key, e))
 
 
 def get_human_size_default(config, key, default=None):

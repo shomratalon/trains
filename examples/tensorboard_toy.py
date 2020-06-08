@@ -1,23 +1,23 @@
 # TRAINS - Example of tensorboard with tensorflow (without any actual training)
 #
-import tensorflow as tf
 import numpy as np
+import tensorflow as tf
 from PIL import Image
-
 from trains import Task
-task = Task.init(project_name='examples', task_name='tensorboard toy example')
+
+task = Task.init(project_name="examples", task_name="tensorboard toy example")
 
 
 k = tf.placeholder(tf.float32)
 
 # Make a normal distribution, with a shifting mean
-mean_moving_normal = tf.random_normal(shape=[1000], mean=(5*k), stddev=1)
+mean_moving_normal = tf.random_normal(shape=[1000], mean=(5 * k), stddev=1)
 # Record that distribution into a histogram summary
 tf.summary.histogram("normal/moving_mean", mean_moving_normal)
 tf.summary.scalar("normal/value", mean_moving_normal[-1])
 
 # Make a normal distribution with shrinking variance
-variance_shrinking_normal = tf.random_normal(shape=[1000], mean=0, stddev=1-(k))
+variance_shrinking_normal = tf.random_normal(shape=[1000], mean=0, stddev=1 - (k))
 # Record that distribution too
 tf.summary.histogram("normal/shrinking_variance", variance_shrinking_normal)
 tf.summary.scalar("normal/variance_shrinking_normal", variance_shrinking_normal[-1])
@@ -37,22 +37,32 @@ poisson = tf.random_poisson(shape=[1000], lam=k)
 tf.summary.histogram("poisson", poisson)
 
 # And a uniform distribution
-uniform = tf.random_uniform(shape=[1000], maxval=k*10)
+uniform = tf.random_uniform(shape=[1000], maxval=k * 10)
 tf.summary.histogram("uniform", uniform)
 
 # Finally, combine everything together!
-all_distributions = [mean_moving_normal, variance_shrinking_normal, gamma, poisson, uniform]
+all_distributions = [
+    mean_moving_normal,
+    variance_shrinking_normal,
+    gamma,
+    poisson,
+    uniform,
+]
 all_combined = tf.concat(all_distributions, 0)
 tf.summary.histogram("all_combined", all_combined)
 
 # Log text value
-tf.summary.text("this is a test", tf.make_tensor_proto("This is the content", dtype=tf.string))
+tf.summary.text(
+    "this is a test", tf.make_tensor_proto("This is the content", dtype=tf.string)
+)
 
 # convert to 4d [batch, col, row, RGB-channels]
-image_open = Image.open('./samples/picasso.jpg')
+image_open = Image.open("./samples/picasso.jpg")
 image = np.asarray(image_open)
 image_gray = image[:, :, 0][np.newaxis, :, :, np.newaxis]
-image_rgba = np.concatenate((image, 255*np.atleast_3d(np.ones(shape=image.shape[:2], dtype=np.uint8))), axis=2)
+image_rgba = np.concatenate(
+    (image, 255 * np.atleast_3d(np.ones(shape=image.shape[:2], dtype=np.uint8))), axis=2
+)
 image_rgba = image_rgba[np.newaxis, :, :, :]
 image = image[np.newaxis, :, :, :]
 
@@ -73,8 +83,8 @@ writer = tf.summary.FileWriter("/tmp/histogram_example")
 # Setup a loop and write the summaries to disk
 N = 40
 for step in range(N):
-    k_val = step/float(N)
+    k_val = step / float(N)
     summ = sess.run(summaries, feed_dict={k: k_val})
     writer.add_summary(summ, global_step=step)
 
-print('Done!')
+print("Done!")

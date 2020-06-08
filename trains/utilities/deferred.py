@@ -2,6 +2,7 @@ import threading
 from functools import wraps
 
 import attr
+
 import six
 
 
@@ -33,7 +34,9 @@ class DeferredExecutionPool(object):
 
     def copy_from(self, other):
         if not isinstance(self._instance, type(other._instance)):
-            raise ValueError("Copy deferred actions must be with the same instance type")
+            raise ValueError(
+                "Copy deferred actions must be with the same instance type"
+            )
 
         self._pool = other._pool[:]
 
@@ -66,6 +69,7 @@ class DeferredExecution(object):
             If a string is provided, a class instance (self) attribute by that name is evaluated.
         :return:
         """
+
         def decorator(func):
             @wraps(func)
             def wrapper(instance, *args, **kwargs):
@@ -73,7 +77,9 @@ class DeferredExecution(object):
                     self._pools[instance].add(func, *args, **kwargs)
                 else:
                     return func(instance, *args, **kwargs)
+
             return wrapper
+
         return decorator
 
     @staticmethod
@@ -95,13 +101,16 @@ class DeferredExecution(object):
             If a callable is provided, it will be called with the class instance (self) as first argument.
             If a string is provided, a class instance (self) attribute by that name is evaluated.
         """
+
         def decorator(func):
             @wraps(func)
             def wrapper(instance, *args, **kwargs):
                 res = func(instance, *args, **kwargs)
                 self._apply(instance, condition_or_attr_name)
                 return res
+
             return wrapper
+
         return decorator
 
     def apply_before(self, condition_or_attr_name=True):
@@ -111,10 +120,13 @@ class DeferredExecution(object):
             If a callable is provided, it will be called with the class instance (self) as first argument.
             If a string is provided, a class instance (self) attribute by that name is evaluated.
         """
+
         def decorator(func):
             @wraps(func)
             def wrapper(instance, *args, **kwargs):
                 self._apply(instance, condition_or_attr_name)
                 return func(instance, *args, **kwargs)
+
             return wrapper
+
         return decorator

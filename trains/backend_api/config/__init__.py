@@ -1,5 +1,6 @@
-from ...backend_config import Config
 from pathlib2 import Path
+
+from ...backend_config import Config
 
 
 def load(*additional_module_paths):

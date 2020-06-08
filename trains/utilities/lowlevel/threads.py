@@ -1,6 +1,6 @@
 import ctypes
-import threading
 import sys
+import threading
 import time
 
 
@@ -30,8 +30,10 @@ def _lowlevel_async_raise(thread_obj, exception=None):
         NULL = ctypes.c_long(NULL)
 
     try:
-        ret = ctypes.pythonapi.PyThreadState_SetAsyncExc(target_tid, ctypes.py_object(exception))
-    except:
+        ret = ctypes.pythonapi.PyThreadState_SetAsyncExc(
+            target_tid, ctypes.py_object(exception)
+        )
+    except BaseException:
         ret = 0
 
     # ref: http://docs.python.org/c-api/init.html#PyThreadState_SetAsyncExc
@@ -44,7 +46,7 @@ def _lowlevel_async_raise(thread_obj, exception=None):
         # So it is better to clean up the mess.
         try:
             ctypes.pythonapi.PyThreadState_SetAsyncExc(target_tid, NULL)
-        except:
+        except BaseException:
             pass
         # raise SystemError("PyThreadState_SetAsyncExc failed")
         return False
@@ -87,7 +89,9 @@ def threadpool_waited_join(thread_object, timeout):
         return not thread_object.is_alive()
 
     done_signal = threading.Event()
-    waitable = threading.Thread(target=__wait_thread, args=(thread_object, done_signal,))
+    waitable = threading.Thread(
+        target=__wait_thread, args=(thread_object, done_signal,)
+    )
     waitable.daemon = True
     waitable.start()
 
@@ -97,12 +101,14 @@ def threadpool_waited_join(thread_object, timeout):
     return True
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
+
     def demo_thread(*_, **__):
         from time import sleep
+
         for i in range(5):
-            print('.')
-            sleep(1.)
+            print(".")
+            sleep(1.0)
 
     t = threading.Thread(target=demo_thread)
     t.daemon = True

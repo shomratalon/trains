@@ -7,7 +7,6 @@ import requests
 
 from ..backend_api.session import Session
 from ..backend_config import EnvEntry
-
 from .version import Version
 
 
@@ -27,14 +26,18 @@ class CheckPackageUpdates(object):
             cls._package_version_checked = True
             client, version = Session._client[0]
             version = Version(version)
-            is_demo = 'https://demoapi.trains.allegro.ai/'.startswith(Session.get_api_server_host())
+            is_demo = "https://demoapi.trains.allegro.ai/".startswith(
+                Session.get_api_server_host()
+            )
 
             update_server_releases = requests.get(
-                'https://updates.trains.allegro.ai/updates',
-                json={"demo": is_demo,
-                      "versions": {c: str(v) for c, v in Session._client},
-                      "CI": str(os.environ.get('CI', ''))},
-                timeout=3.0
+                "https://updates.trains.allegro.ai/updates",
+                json={
+                    "demo": is_demo,
+                    "versions": {c: str(v) for c, v in Session._client},
+                    "CI": str(os.environ.get("CI", "")),
+                },
+                timeout=3.0,
             )
 
             if update_server_releases.ok:
@@ -46,7 +49,8 @@ class CheckPackageUpdates(object):
             if "version" not in client_answer:
                 return None
 
-            # do not output upgrade message if we are running inside a CI process.
+            # do not output upgrade message if we are running inside a CI
+            # process.
             if EnvEntry("CI", type=bool, ignore_errors=True).get():
                 return None
 
@@ -55,7 +59,11 @@ class CheckPackageUpdates(object):
             if version >= latest_version:
                 return None
             not_patch_upgrade = latest_version.release[:2] == version.release[:2]
-            return str(latest_version), not_patch_upgrade, client_answer.get("description").split("\r\n")
+            return (
+                str(latest_version),
+                not_patch_upgrade,
+                client_answer.get("description").split("\r\n"),
+            )
         except Exception:
             return None
 
@@ -67,9 +75,11 @@ class CheckPackageUpdates(object):
         :type cur_version: Version
         """
         try:
-            _ = requests.get('https://updates.trains.allegro.ai/updates',
-                             data=json.dumps({"versions": {"trains": str(cur_version)}}),
-                             timeout=1.0)
+            _ = requests.get(
+                "https://updates.trains.allegro.ai/updates",
+                data=json.dumps({"versions": {"trains": str(cur_version)}}),
+                timeout=1.0,
+            )
             return
         except Exception:
             pass

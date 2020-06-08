@@ -6,50 +6,62 @@ import threading
 import time
 from argparse import ArgumentParser
 from tempfile import mkstemp
-
-try:
-    from collections.abc import Callable, Sequence as CollectionsSequence
-except ImportError:
-    from collections import Callable, Sequence as CollectionsSequence
-
-from typing import Optional, Union, Mapping, Sequence, Any, Dict, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Union
 
 import psutil
 import six
 from pathlib2 import Path
 
-from .backend_api.services import tasks, projects, queues
-from .backend_api.session.session import Session, ENV_ACCESS_KEY, ENV_SECRET_KEY
+from .backend_api.services import projects, queues, tasks
+from .backend_api.session.session import ENV_ACCESS_KEY, ENV_SECRET_KEY, Session
 from .backend_interface.metrics import Metrics
 from .backend_interface.model import Model as BackendModel
 from .backend_interface.task import Task as _Task
 from .backend_interface.task.args import _Arguments
 from .backend_interface.task.development.worker import DevWorker
 from .backend_interface.task.repo import ScriptInfo
-from .backend_interface.util import get_single_result, exact_match_regex, make_message
+from .backend_interface.util import exact_match_regex, get_single_result, make_message
 from .binding.absl_bind import PatchAbsl
-from .binding.artifacts import Artifacts, Artifact
+from .binding.artifacts import Artifact, Artifacts
 from .binding.environ_bind import EnvironmentBind, PatchOsFork
 from .binding.frameworks.pytorch_bind import PatchPyTorchModelIO
 from .binding.frameworks.tensorflow_bind import TensorflowBinding
 from .binding.frameworks.xgboost_bind import PatchXGBoostModelIO
 from .binding.joblib_bind import PatchedJoblib
 from .binding.matplotlib_bind import PatchedMatplotlib
-from .config import config, DEV_TASK_NO_REUSE, get_is_master_node
-from .config import running_remotely, get_remote_task_id
+from .config import (
+    DEV_TASK_NO_REUSE,
+    config,
+    get_is_master_node,
+    get_remote_task_id,
+    running_remotely,
+)
 from .config.cache import SessionCache
 from .debugging.log import LoggerRoot
 from .errors import UsageError
 from .logger import Logger
-from .model import Model, InputModel, OutputModel, ARCHIVED_TAG
+from .model import ARCHIVED_TAG, InputModel, Model, OutputModel
 from .task_parameters import TaskParameters
-from .utilities.args import argparser_parseargs_called, get_argparser_last_args, \
-    argparser_update_currenttask
+from .utilities.args import (
+    argparser_parseargs_called,
+    argparser_update_currenttask,
+    get_argparser_last_args,
+)
 from .utilities.dicts import ReadOnlyDict
-from .utilities.proxy_object import ProxyDictPreWrite, ProxyDictPostWrite, flatten_dictionary, \
-    nested_from_flat_dictionary, naive_nested_from_flat_dictionary
+from .utilities.proxy_object import (
+    ProxyDictPostWrite,
+    ProxyDictPreWrite,
+    flatten_dictionary,
+    naive_nested_from_flat_dictionary,
+    nested_from_flat_dictionary,
+)
 from .utilities.resource_monitor import ResourceMonitor
 from .utilities.seed import make_deterministic
+
+try:
+    from collections.abc import Callable, Sequence as CollectionsSequence
+except ImportError:
+    from collections import Callable, Sequence as CollectionsSequence
 
 
 if TYPE_CHECKING:
@@ -108,9 +120,11 @@ class Task(_Task):
     __main_task = None  # type: Task
     __exit_hook = None
     __forked_proc_main_pid = None
-    __task_id_reuse_time_window_in_hours = float(config.get('development.task_reuse_time_window_in_hours', 24.0))
-    __detect_repo_async = config.get('development.vcs_repo_detect_async', False)
-    __default_output_uri = config.get('development.default_output_uri', None)
+    __task_id_reuse_time_window_in_hours = float(
+        config.get("development.task_reuse_time_window_in_hours", 24.0)
+    )
+    __detect_repo_async = config.get("development.vcs_repo_detect_async", False)
+    __default_output_uri = config.get("development.default_output_uri", None)
 
     class _ConnectedParametersType(object):
         argparse = "argument_parser"
@@ -120,7 +134,8 @@ class Task(_Task):
         @classmethod
         def _options(cls):
             return {
-                var for var, val in vars(cls).items()
+                var
+                for var, val in vars(cls).items()
                 if isinstance(val, six.string_types)
             }
 
@@ -132,7 +147,8 @@ class Task(_Task):
         """
         if private is not Task.__create_protection:
             raise UsageError(
-                'Task object cannot be instantiated externally, use Task.current_task() or Task.get_task(...)')
+                "Task object cannot be instantiated externally, use Task.current_task() or Task.get_task(...)"
+            )
         self._repo_detect_lock = threading.RLock()
 
         super(Task, self).__init__(**kwargs)
@@ -288,9 +304,9 @@ class Task(_Task):
 
         def verify_defaults_match():
             validate = [
-                ('project name', project_name, cls.__main_task.get_project_name()),
-                ('task name', task_name, cls.__main_task.name),
-                ('task type', str(task_type), str(cls.__main_task.task_type)),
+                ("project name", project_name, cls.__main_task.get_project_name()),
+                ("task name", task_name, cls.__main_task.name),
+                ("task type", str(task_type), str(cls.__main_task.task_type)),
             ]
 
             for field, default, current in validate:
@@ -299,9 +315,7 @@ class Task(_Task):
                         "Current task already created "
                         "and requested {field} '{default}' does not match current {field} '{current}'. "
                         "If you wish to create additional tasks use `Task.create`".format(
-                            field=field,
-                            default=default,
-                            current=current,
+                            field=field, default=default, current=current,
                         )
                     )
 
@@ -336,8 +350,10 @@ class Task(_Task):
             return cls.__main_task
 
         # check that we are not a child process, in that case do nothing.
-        # we should not get here unless this is Windows platform, all others support fork
+        # we should not get here unless this is Windows platform, all others
+        # support fork
         if cls.__is_subprocess():
+
             class _TaskStub(object):
                 def __call__(self, *args, **kwargs):
                     return self
@@ -355,7 +371,8 @@ class Task(_Task):
         elif running_remotely() and not get_is_master_node():
             # make sure we only do it once per process
             cls.__forked_proc_main_pid = os.getpid()
-            # make sure everyone understands we should act as if we are a subprocess (fake pid 1)
+            # make sure everyone understands we should act as if we are a
+            # subprocess (fake pid 1)
             cls.__update_master_pid_task(pid=1, task=get_remote_task_id())
         else:
             # set us as master process (without task ID)
@@ -364,12 +381,16 @@ class Task(_Task):
 
         if task_type is None:
             # Backwards compatibility: if called from Task.current_task and task_type
-            # was not specified, keep legacy default value of TaskTypes.training
+            # was not specified, keep legacy default value of
+            # TaskTypes.training
             task_type = cls.TaskTypes.training
         elif isinstance(task_type, six.string_types):
             if task_type not in Task.TaskTypes.__members__:
-                raise ValueError("Task type '{}' not supported, options are: {}".format(
-                    task_type, Task.TaskTypes.__members__.keys()))
+                raise ValueError(
+                    "Task type '{}' not supported, options are: {}".format(
+                        task_type, Task.TaskTypes.__members__.keys()
+                    )
+                )
             task_type = Task.TaskTypes.__members__[task_type]
 
         try:
@@ -381,8 +402,14 @@ class Task(_Task):
                         task_name,
                         task_type,
                         reuse_last_task_id,
-                        detect_repo=False if (isinstance(auto_connect_frameworks, dict) and
-                                              not auto_connect_frameworks.get('detect_repository', True)) else True
+                        detect_repo=False
+                        if (
+                            isinstance(auto_connect_frameworks, dict)
+                            and not auto_connect_frameworks.get(
+                                "detect_repository", True
+                            )
+                        )
+                        else True,
                     )
                     # set defaults
                     if output_uri:
@@ -415,27 +442,43 @@ class Task(_Task):
             raise
         else:
             Task.__main_task = task
-            # register the main task for at exit hooks (there should only be one)
+            # register the main task for at exit hooks (there should only be
+            # one)
             task.__register_at_exit(task._at_exit)
             # patch OS forking
             PatchOsFork.patch_fork()
             if auto_connect_frameworks:
-                is_auto_connect_frameworks_bool = not isinstance(auto_connect_frameworks, dict)
-                if is_auto_connect_frameworks_bool or auto_connect_frameworks.get('scikit', True):
+                is_auto_connect_frameworks_bool = not isinstance(
+                    auto_connect_frameworks, dict
+                )
+                if is_auto_connect_frameworks_bool or auto_connect_frameworks.get(
+                    "scikit", True
+                ):
                     PatchedJoblib.update_current_task(task)
-                if is_auto_connect_frameworks_bool or auto_connect_frameworks.get('matplotlib', True):
+                if is_auto_connect_frameworks_bool or auto_connect_frameworks.get(
+                    "matplotlib", True
+                ):
                     PatchedMatplotlib.update_current_task(Task.__main_task)
-                if is_auto_connect_frameworks_bool or auto_connect_frameworks.get('tensorflow', True):
+                if is_auto_connect_frameworks_bool or auto_connect_frameworks.get(
+                    "tensorflow", True
+                ):
                     PatchAbsl.update_current_task(Task.__main_task)
                     TensorflowBinding.update_current_task(task)
-                if is_auto_connect_frameworks_bool or auto_connect_frameworks.get('pytorch', True):
+                if is_auto_connect_frameworks_bool or auto_connect_frameworks.get(
+                    "pytorch", True
+                ):
                     PatchPyTorchModelIO.update_current_task(task)
-                if is_auto_connect_frameworks_bool or auto_connect_frameworks.get('xgboost', True):
+                if is_auto_connect_frameworks_bool or auto_connect_frameworks.get(
+                    "xgboost", True
+                ):
                     PatchXGBoostModelIO.update_current_task(task)
             if auto_resource_monitoring and not is_sub_process_task_id:
                 task._resource_monitor = ResourceMonitor(
-                    task, report_mem_used_per_process=not config.get(
-                        'development.worker.report_global_mem_used', False))
+                    task,
+                    report_mem_used_per_process=not config.get(
+                        "development.worker.report_global_mem_used", False
+                    ),
+                )
                 task._resource_monitor.start()
 
             # make sure all random generators are initialized with new seed
@@ -451,26 +494,29 @@ class Task(_Task):
                 if isinstance(auto_connect_arg_parser, dict):
                     task._arguments.exclude_parser_args(auto_connect_arg_parser)
 
-                # Check if parse args already called. If so, sync task parameters with parser
+                # Check if parse args already called. If so, sync task
+                # parameters with parser
                 if argparser_parseargs_called():
                     parser, parsed_args = get_argparser_last_args()
                     task._connect_argparse(parser=parser, parsed_args=parsed_args)
             elif argparser_parseargs_called():
                 # actually we have nothing to do, in remote running, the argparser will ignore
                 # all non argparser parameters, only caveat if parameter connected with the same name
-                # as the argparser this will be solved once sections are introduced to parameters
+                # as the argparser this will be solved once sections are
+                # introduced to parameters
                 pass
 
         # Make sure we start the logger, it will patch the main logging object and pipe all output
         # if we are running locally and using development mode worker, we will pipe all stdout to logger.
-        # The logger will automatically take care of all patching (we just need to make sure to initialize it)
+        # The logger will automatically take care of all patching (we just need
+        # to make sure to initialize it)
         logger = task.get_logger()
         # show the debug metrics page in the log, it is very convenient
         if not is_sub_process_task_id:
             logger.report_text(
-                'TRAINS results page: {}/projects/{}/experiments/{}/output/log'.format(
+                "TRAINS results page: {}/projects/{}/experiments/{}/output/log".format(
                     task._get_app_server(),
-                    task.project if task.project is not None else '*',
+                    task.project if task.project is not None else "*",
                     task.id,
                 ),
             )
@@ -510,8 +556,10 @@ class Task(_Task):
         """
         if not project_name:
             if not cls.__main_task:
-                raise ValueError("Please provide project_name, no global task context found "
-                                 "(Task.current_task hasn't been called)")
+                raise ValueError(
+                    "Please provide project_name, no global task context found "
+                    "(Task.current_task hasn't been called)"
+                )
             project_name = cls.__main_task.get_project_name()
 
         try:
@@ -540,11 +588,16 @@ class Task(_Task):
 
         :return: The Task specified by Id, or project name / experiment name combination.
         """
-        return cls.__get_task(task_id=task_id, project_name=project_name, task_name=task_name)
+        return cls.__get_task(
+            task_id=task_id, project_name=project_name, task_name=task_name
+        )
 
     @classmethod
-    def get_tasks(cls, task_ids=None, project_name=None, task_name=None, task_filter=None):
-        # type: (Optional[Sequence[str]], Optional[str], Optional[str], Optional[Dict]) -> Sequence[Task]
+    def get_tasks(
+        cls, task_ids=None, project_name=None, task_name=None, task_filter=None
+    ):
+        # type: (Optional[Sequence[str]], Optional[str], Optional[str],
+        # Optional[Dict]) -> Sequence[Task]
         """
         Get a list of Tasks by one of the following:
 
@@ -569,8 +622,12 @@ class Task(_Task):
         :param dict task_filter: filter and order Tasks. See service.tasks.GetAllRequest for details
         :return: The Tasks specified by the parameter combinations (see the parameters).
         """
-        return cls.__get_tasks(task_ids=task_ids, project_name=project_name,
-                               task_name=task_name, **(task_filter or {}))
+        return cls.__get_tasks(
+            task_ids=task_ids,
+            project_name=project_name,
+            task_name=task_name,
+            **(task_filter or {})
+        )
 
     @property
     def output_uri(self):
@@ -583,10 +640,13 @@ class Task(_Task):
         # check if we have the correct packages / configuration
         if value and value != self.storage_uri:
             from .storage.helper import StorageHelper
+
             helper = StorageHelper.get(value)
             if not helper:
-                raise ValueError("Could not get access credentials for '{}' "
-                                 ", check configuration file ~/trains.conf".format(value))
+                raise ValueError(
+                    "Could not get access credentials for '{}' "
+                    ", check configuration file ~/trains.conf".format(value)
+                )
             helper.check_write_permissions(value)
         self.storage_uri = value
 
@@ -598,13 +658,17 @@ class Task(_Task):
 
         :return: The artifacts.
         """
-        if not Session.check_min_api_version('2.3'):
+        if not Session.check_min_api_version("2.3"):
             return ReadOnlyDict()
         artifacts_pairs = []
         if self.data.execution and self.data.execution.artifacts:
-            artifacts_pairs = [(a.key, Artifact(a)) for a in self.data.execution.artifacts]
+            artifacts_pairs = [
+                (a.key, Artifact(a)) for a in self.data.execution.artifacts
+            ]
         if self._artifacts_manager:
-            artifacts_pairs += list(self._artifacts_manager.registered_artifacts.items())
+            artifacts_pairs += list(
+                self._artifacts_manager.registered_artifacts.items()
+            )
         return ReadOnlyDict(artifacts_pairs)
 
     @property
@@ -619,12 +683,12 @@ class Task(_Task):
 
     @classmethod
     def clone(
-            cls,
-            source_task=None,  # type: Optional[Union[Task, str]]
-            name=None,  # type: Optional[str]
-            comment=None,  # type: Optional[str]
-            parent=None,  # type: Optional[str]
-            project=None,  # type: Optional[str]
+        cls,
+        source_task=None,  # type: Optional[Union[Task, str]]
+        name=None,  # type: Optional[str]
+        comment=None,  # type: Optional[str]
+        parent=None,  # type: Optional[str]
+        project=None,  # type: Optional[str]
     ):
         # type: (...) -> Task
         """
@@ -648,11 +712,15 @@ class Task(_Task):
         :return: The new cloned Task (experiment).
         """
         assert isinstance(source_task, (six.string_types, Task))
-        if not Session.check_min_api_version('2.4'):
-            raise ValueError("Trains-server does not support DevOps features, "
-                             "upgrade trains-server to 0.12.0 or above")
+        if not Session.check_min_api_version("2.4"):
+            raise ValueError(
+                "Trains-server does not support DevOps features, "
+                "upgrade trains-server to 0.12.0 or above"
+            )
 
-        task_id = source_task if isinstance(source_task, six.string_types) else source_task.id
+        task_id = (
+            source_task if isinstance(source_task, six.string_types) else source_task.id
+        )
         if not parent:
             if isinstance(source_task, six.string_types):
                 source_task = cls.get_task(task_id=source_task)
@@ -660,8 +728,13 @@ class Task(_Task):
         elif isinstance(parent, Task):
             parent = parent.id
 
-        cloned_task_id = cls._clone_task(cloned_task_id=task_id, name=name, comment=comment,
-                                         parent=parent, project=project)
+        cloned_task_id = cls._clone_task(
+            cloned_task_id=task_id,
+            name=name,
+            comment=comment,
+            parent=parent,
+            project=project,
+        )
         cloned_task = cls.get_task(task_id=cloned_task_id)
         return cloned_task
 
@@ -711,21 +784,28 @@ class Task(_Task):
               - ``execution.queue`` - The Id of the queue where the Task is enqueued. ``null`` indicates not enqueued.
         """
         assert isinstance(task, (six.string_types, Task))
-        if not Session.check_min_api_version('2.4'):
-            raise ValueError("Trains-server does not support DevOps features, "
-                             "upgrade trains-server to 0.12.0 or above")
+        if not Session.check_min_api_version("2.4"):
+            raise ValueError(
+                "Trains-server does not support DevOps features, "
+                "upgrade trains-server to 0.12.0 or above"
+            )
 
         task_id = task if isinstance(task, six.string_types) else task.id
         session = cls._get_default_session()
         if not queue_id:
-            req = queues.GetAllRequest(name=exact_match_regex(queue_name), only_fields=["id"])
+            req = queues.GetAllRequest(
+                name=exact_match_regex(queue_name), only_fields=["id"]
+            )
             res = cls._send(session=session, req=req)
             if not res.response.queues:
                 raise ValueError('Could not find queue named "{}"'.format(queue_name))
             queue_id = res.response.queues[0].id
             if len(res.response.queues) > 1:
-                LoggerRoot.get_base_logger().info("Multiple queues with name={}, selecting queue id={}".format(
-                    queue_name, queue_id))
+                LoggerRoot.get_base_logger().info(
+                    "Multiple queues with name={}, selecting queue id={}".format(
+                        queue_name, queue_id
+                    )
+                )
 
         req = tasks.EnqueueRequest(task=task_id, queue=queue_id)
         res = cls._send(session=session, req=req)
@@ -772,9 +852,11 @@ class Task(_Task):
         - ``updated`` - The number of Tasks updated (an integer or ``null``).
         """
         assert isinstance(task, (six.string_types, Task))
-        if not Session.check_min_api_version('2.4'):
-            raise ValueError("Trains-server does not support DevOps features, "
-                             "upgrade trains-server to 0.12.0 or above")
+        if not Session.check_min_api_version("2.4"):
+            raise ValueError(
+                "Trains-server does not support DevOps features, "
+                "upgrade trains-server to 0.12.0 or above"
+            )
 
         task_id = task if isinstance(task, six.string_types) else task.id
         session = cls._get_default_session()
@@ -831,7 +913,10 @@ class Task(_Task):
             if isinstance(mutable, mutable_type):
                 return method(mutable)
 
-        raise Exception('Unsupported mutable type %s: no connect function found' % type(mutable).__name__)
+        raise Exception(
+            "Unsupported mutable type %s: no connect function found"
+            % type(mutable).__name__
+        )
 
     def connect_configuration(self, configuration):
         # type: (Union[Mapping, Path, str]) -> Union[Mapping, Path, str]
@@ -870,17 +955,22 @@ class Task(_Task):
             specified, then a path to a local configuration file is returned. Configuration object.
         """
         if not isinstance(configuration, (dict, Path, six.string_types)):
-            raise ValueError("connect_configuration supports `dict`, `str` and 'Path' types, "
-                             "{} is not supported".format(type(configuration)))
+            raise ValueError(
+                "connect_configuration supports `dict`, `str` and 'Path' types, "
+                "{} is not supported".format(type(configuration))
+            )
 
         # parameter dictionary
         if isinstance(configuration, dict):
+
             def _update_config_dict(task, config_dict):
                 task._set_model_config(config_dict=config_dict)
 
             if not running_remotely() or not self.is_main_task():
                 self._set_model_config(config_dict=configuration)
-                configuration = ProxyDictPostWrite(self, _update_config_dict, **configuration)
+                configuration = ProxyDictPostWrite(
+                    self, _update_config_dict, **configuration
+                )
             else:
                 configuration.clear()
                 configuration.update(self._get_model_config_dict())
@@ -894,22 +984,32 @@ class Task(_Task):
             if not configuration_path.is_file():
                 ValueError("Configuration file does not exist")
             try:
-                with open(configuration_path.as_posix(), 'rt') as f:
+                with open(configuration_path.as_posix(), "rt") as f:
                     configuration_text = f.read()
             except Exception:
-                raise ValueError("Could not connect configuration file {}, file could not be read".format(
-                    configuration_path.as_posix()))
+                raise ValueError(
+                    "Could not connect configuration file {}, file could not be read".format(
+                        configuration_path.as_posix()
+                    )
+                )
             self._set_model_config(config_text=configuration_text)
             return configuration
         else:
             configuration_text = self._get_model_config_text()
             configuration_path = Path(configuration)
-            fd, local_filename = mkstemp(prefix='trains_task_config_',
-                                         suffix=configuration_path.suffixes[-1] if
-                                         configuration_path.suffixes else '.txt')
-            os.write(fd, configuration_text.encode('utf-8'))
+            fd, local_filename = mkstemp(
+                prefix="trains_task_config_",
+                suffix=configuration_path.suffixes[-1]
+                if configuration_path.suffixes
+                else ".txt",
+            )
+            os.write(fd, configuration_text.encode("utf-8"))
             os.close(fd)
-            return Path(local_filename) if isinstance(configuration, Path) else local_filename
+            return (
+                Path(local_filename)
+                if isinstance(configuration, Path)
+                else local_filename
+            )
 
     def connect_label_enumeration(self, enumeration):
         # type: (Dict[str, int]) -> Dict[str, int]
@@ -932,8 +1032,10 @@ class Task(_Task):
         :return: The label enumeration dictionary (JSON).
         """
         if not isinstance(enumeration, dict):
-            raise ValueError("connect_label_enumeration supports only `dict` type, "
-                             "{} is not supported".format(type(enumeration)))
+            raise ValueError(
+                "connect_label_enumeration supports only `dict` type, "
+                "{} is not supported".format(type(enumeration))
+            )
 
         if not running_remotely() or not self.is_main_task():
             self.set_model_label_enumeration(enumeration)
@@ -1029,9 +1131,10 @@ class Task(_Task):
         # store is main before we call at_exit, because will will Null it
         is_main = self.is_main_task()
 
-        # wait for repository detection (5 minutes should be reasonable time to detect all packages)
+        # wait for repository detection (5 minutes should be reasonable time to
+        # detect all packages)
         if self._logger and not self.__is_subprocess():
-            self._wait_for_repo_detection(timeout=300.)
+            self._wait_for_repo_detection(timeout=300.0)
 
         self.__shutdown()
         # unregister atexit callbacks and signal hooks, if we are the main task
@@ -1039,7 +1142,8 @@ class Task(_Task):
             self.__register_at_exit(None)
 
     def register_artifact(self, name, artifact, metadata=None, uniqueness_columns=True):
-        # type: (str, pandas.DataFrame, Dict, Union[bool, Sequence[str]]) -> None
+        # type: (str, pandas.DataFrame, Dict, Union[bool, Sequence[str]]) ->
+        # None
         """
         Register (add) an artifact for the current Task. Registered artifacts are dynamically sychronized with the
         **Trains Server** (backend). If a registered artifact is updated, the update is stored in the
@@ -1066,12 +1170,19 @@ class Task(_Task):
             which is the same as ``artifact.columns``.
         :type uniqueness_columns: sequence, str, ``True``
         """
-        if not isinstance(uniqueness_columns, CollectionsSequence) and uniqueness_columns is not True:
-            raise ValueError('uniqueness_columns should be a List (sequence) or True')
+        if (
+            not isinstance(uniqueness_columns, CollectionsSequence)
+            and uniqueness_columns is not True
+        ):
+            raise ValueError("uniqueness_columns should be a List (sequence) or True")
         if isinstance(uniqueness_columns, str):
             uniqueness_columns = [uniqueness_columns]
         self._artifacts_manager.register_artifact(
-            name=name, artifact=artifact, metadata=metadata, uniqueness_columns=uniqueness_columns)
+            name=name,
+            artifact=artifact,
+            metadata=metadata,
+            uniqueness_columns=uniqueness_columns,
+        )
 
     def unregister_artifact(self, name):
         # type: (str) -> None
@@ -1101,9 +1212,10 @@ class Task(_Task):
     def upload_artifact(
         self,
         name,  # type: str
-        artifact_object,  # type: Union[str, Mapping, pandas.DataFrame, numpy.ndarray, Image.Image]
+        artifact_object,
+        # type: Union[str, Mapping, pandas.DataFrame, numpy.ndarray, Image.Image]
         metadata=None,  # type: Optional[Mapping]
-        delete_after_upload=False  # type: bool
+        delete_after_upload=False,  # type: bool
     ):
         # type: (...) -> bool
         """
@@ -1138,8 +1250,12 @@ class Task(_Task):
 
         :raise: If the artifact object type is not supported, raise a ``ValueError``.
         """
-        return self._artifacts_manager.upload_artifact(name=name, artifact_object=artifact_object,
-                                                       metadata=metadata, delete_after_upload=delete_after_upload)
+        return self._artifacts_manager.upload_artifact(
+            name=name,
+            artifact_object=artifact_object,
+            metadata=metadata,
+            delete_after_upload=delete_after_upload,
+        )
 
     def get_models(self):
         # type: () -> Dict[str, List[Model]]
@@ -1152,8 +1268,10 @@ class Task(_Task):
         :return dict: dict with keys input/output, each is list of Model objects.
             Example: {'input': [trains.Model()], 'output': [trains.Model()]}
         """
-        task_models = {'input': self._get_models(model_type='input'),
-                       'output': self._get_models(model_type='output')}
+        task_models = {
+            "input": self._get_models(model_type="input"),
+            "output": self._get_models(model_type="output"),
+        }
         return task_models
 
     def is_current_task(self):
@@ -1246,7 +1364,10 @@ class Task(_Task):
         :return: The last reported iteration number.
         """
         self._reload_last_iteration()
-        return max(self.data.last_iteration, self._reporter.max_iteration if self._reporter else 0)
+        return max(
+            self.data.last_iteration,
+            self._reporter.max_iteration if self._reporter else 0,
+        )
 
     def set_last_iteration(self, last_iteration):
         # type: (int) -> None
@@ -1305,8 +1426,10 @@ class Task(_Task):
         scalar_metrics = dict()
         for i in metrics.values():
             for j in i.values():
-                scalar_metrics.setdefault(j['metric'], {}).setdefault(
-                    j['variant'], {'last': j['value'], 'min': j['min_value'], 'max': j['max_value']})
+                scalar_metrics.setdefault(j["metric"], {}).setdefault(
+                    j["variant"],
+                    {"last": j["value"], "min": j["min_value"], "max": j["max_value"]},
+                )
         return scalar_metrics
 
     def get_parameters_as_dict(self):
@@ -1329,8 +1452,17 @@ class Task(_Task):
         self._arguments.copy_from_dict(flatten_dictionary(dictionary))
 
     @classmethod
-    def set_credentials(cls, api_host=None, web_host=None, files_host=None, key=None, secret=None, host=None):
-        # type: (Optional[str], Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]) -> ()
+    def set_credentials(
+        cls,
+        api_host=None,
+        web_host=None,
+        files_host=None,
+        key=None,
+        secret=None,
+        host=None,
+    ):
+        # type: (Optional[str], Optional[str], Optional[str], Optional[str],
+        # Optional[str], Optional[str]) -> ()
         """
         Set new default **Trains Server** (backend) host and credentials.
 
@@ -1371,8 +1503,8 @@ class Task(_Task):
                 ENV_SECRET_KEY.set(secret)
         if host:
             Session.default_host = host
-            Session.default_web = web_host or ''
-            Session.default_files = files_host or ''
+            Session.default_web = web_host or ""
+            Session.default_files = files_host or ""
 
     def _set_model_config(self, config_text=None, config_dict=None):
         # type: (Optional[str], Optional[Mapping]) -> None
@@ -1384,7 +1516,9 @@ class Task(_Task):
         :param config_dict: model configuration parameters dictionary.
             If `config_dict` is not None, `config_text` must not be provided.
         """
-        design = OutputModel._resolve_config(config_text=config_text, config_dict=config_dict)
+        design = OutputModel._resolve_config(
+            config_text=config_text, config_dict=config_dict
+        )
         super(Task, self)._set_model_design(design=design)
 
     def _get_model_config_text(self):
@@ -1420,22 +1554,34 @@ class Task(_Task):
 
     @classmethod
     def _create_dev_task(
-        cls, default_project_name, default_task_name, default_task_type, reuse_last_task_id, detect_repo=True
+        cls,
+        default_project_name,
+        default_task_name,
+        default_task_type,
+        reuse_last_task_id,
+        detect_repo=True,
     ):
         if not default_project_name or not default_task_name:
-            # get project name and task name from repository name and entry_point
-            result, _ = ScriptInfo.get(create_requirements=False, check_uncommitted=False)
+            # get project name and task name from repository name and
+            # entry_point
+            result, _ = ScriptInfo.get(
+                create_requirements=False, check_uncommitted=False
+            )
             if not default_project_name:
                 # noinspection PyBroadException
                 try:
-                    parts = result.script['repository'].split('/')
-                    default_project_name = (parts[-1] or parts[-2]).replace('.git', '') or 'Untitled'
+                    parts = result.script["repository"].split("/")
+                    default_project_name = (parts[-1] or parts[-2]).replace(
+                        ".git", ""
+                    ) or "Untitled"
                 except Exception:
-                    default_project_name = 'Untitled'
+                    default_project_name = "Untitled"
             if not default_task_name:
                 # noinspection PyBroadException
                 try:
-                    default_task_name = os.path.splitext(os.path.basename(result.script['entry_point']))[0]
+                    default_task_name = os.path.splitext(
+                        os.path.basename(result.script["entry_point"])
+                    )[0]
                 except Exception:
                     pass
 
@@ -1445,9 +1591,7 @@ class Task(_Task):
         else:
             # if we have a previous session to use, get the task id from it
             default_task = cls.__get_last_used_task_id(
-                default_project_name,
-                default_task_name,
-                default_task_type.value,
+                default_project_name, default_task_name, default_task_type.value,
             )
 
         closed_old_task = False
@@ -1460,7 +1604,7 @@ class Task(_Task):
             elif not reuse_last_task_id or not cls.__task_is_relevant(default_task):
                 default_task_id = None
             else:
-                default_task_id = default_task.get('id') if default_task else None
+                default_task_id = default_task.get("id") if default_task else None
 
             if default_task_id:
                 try:
@@ -1469,13 +1613,29 @@ class Task(_Task):
                         task_id=default_task_id,
                         log_to_backend=True,
                     )
-                    task_tags = task.data.system_tags if hasattr(task.data, 'system_tags') else task.data.tags
-                    task_artifacts = task.data.execution.artifacts \
-                        if hasattr(task.data.execution, 'artifacts') else None
-                    if ((str(task._status) in (str(tasks.TaskStatusEnum.published), str(tasks.TaskStatusEnum.closed)))
-                            or task.output_model_id or (ARCHIVED_TAG in task_tags)
-                            or (cls._development_tag not in task_tags)
-                            or task_artifacts):
+                    task_tags = (
+                        task.data.system_tags
+                        if hasattr(task.data, "system_tags")
+                        else task.data.tags
+                    )
+                    task_artifacts = (
+                        task.data.execution.artifacts
+                        if hasattr(task.data.execution, "artifacts")
+                        else None
+                    )
+                    if (
+                        (
+                            str(task._status)
+                            in (
+                                str(tasks.TaskStatusEnum.published),
+                                str(tasks.TaskStatusEnum.closed),
+                            )
+                        )
+                        or task.output_model_id
+                        or (ARCHIVED_TAG in task_tags)
+                        or (cls._development_tag not in task_tags)
+                        or task_artifacts
+                    ):
                         # If the task is published or closed, we shouldn't reset it so we can't use it in dev mode
                         # If the task is archived, or already has an output model,
                         #  we shouldn't use it in development mode either
@@ -1484,14 +1644,18 @@ class Task(_Task):
                     else:
                         with task._edit_lock:
                             # from now on, there is no need to reload, we just clear stuff,
-                            # this flag will be cleared off once we actually refresh at the end of the function
+                            # this flag will be cleared off once we actually
+                            # refresh at the end of the function
                             task._reload_skip_flag = True
                             # reset the task, so we can update it
                             task.reset(set_started_on_success=False, force=False)
                             # clear the heaviest stuff first
                             task._clear_task(
                                 system_tags=[cls._development_tag],
-                                comment=make_message('Auto-generated at %(time)s by %(user)s@%(host)s'))
+                                comment=make_message(
+                                    "Auto-generated at %(time)s by %(user)s@%(host)s"
+                                ),
+                            )
 
                 except (Exception, ValueError):
                     # we failed reusing task, create a new one
@@ -1506,12 +1670,18 @@ class Task(_Task):
                 task_type=default_task_type,
                 log_to_backend=True,
             )
-            # no need to reload yet, we clear this before the end of the function
+            # no need to reload yet, we clear this before the end of the
+            # function
             task._reload_skip_flag = True
 
         if in_dev_mode:
             # update this session, for later use
-            cls.__update_last_used_task_id(default_project_name, default_task_name, default_task_type.value, task.id)
+            cls.__update_last_used_task_id(
+                default_project_name,
+                default_task_name,
+                default_task_type.value,
+                task.id,
+            )
             # set default docker image from env.
             task._set_default_docker_image()
 
@@ -1521,21 +1691,30 @@ class Task(_Task):
         task._reload_skip_flag = False
         task.reload()
 
-        # force update of base logger to this current task (this is the main logger task)
+        # force update of base logger to this current task (this is the main
+        # logger task)
         task._setup_log(replace_existing=True)
         logger = task.get_logger()
         if closed_old_task:
-            logger.report_text('TRAINS Task: Closing old development task id={}'.format(default_task.get('id')))
+            logger.report_text(
+                "TRAINS Task: Closing old development task id={}".format(
+                    default_task.get("id")
+                )
+            )
         # print warning, reusing/creating a task
         if default_task_id:
-            logger.report_text('TRAINS Task: overwriting (reusing) task id=%s' % task.id)
+            logger.report_text(
+                "TRAINS Task: overwriting (reusing) task id=%s" % task.id
+            )
         else:
-            logger.report_text('TRAINS Task: created new task id=%s' % task.id)
+            logger.report_text("TRAINS Task: created new task id=%s" % task.id)
 
         # update current repository and put warning into logs
         if detect_repo:
             if in_dev_mode and cls.__detect_repo_async:
-                task._detect_repo_async_thread = threading.Thread(target=task._update_repository)
+                task._detect_repo_async_thread = threading.Thread(
+                    target=task._update_repository
+                )
                 task._detect_repo_async_thread.daemon = True
                 task._detect_repo_async_thread.start()
             else:
@@ -1565,7 +1744,8 @@ class Task(_Task):
             # do not recreate logger after task was closed/quit
             if self._at_exit_called:
                 raise ValueError("Cannot use Task Logger after task was closed")
-            # force update of base logger to this current task (this is the main logger task)
+            # force update of base logger to this current task (this is the
+            # main logger task)
             self._setup_log(replace_existing=self.is_main_task())
             # Get a logger object
             self._logger = Logger(private_task=self)
@@ -1614,13 +1794,15 @@ class Task(_Task):
         # at least until we support multiple input models
         # notice that we do not check the task's input model because we allow task reuse and overwrite
         # add into comment that we are using this model
-        comment = self.comment or ''
-        if not comment.endswith('\n'):
-            comment += '\n'
-        comment += 'Using model id: {}'.format(model.id)
+        comment = self.comment or ""
+        if not comment.endswith("\n"):
+            comment += "\n"
+        comment += "Using model id: {}".format(model.id)
         self.set_comment(comment)
         if self._last_input_model_id and self._last_input_model_id != model.id:
-            self.log.info('Task connect, second input model is not supported, adding into comment section')
+            self.log.info(
+                "Task connect, second input model is not supported, adding into comment section"
+            )
             return
         self._last_input_model_id = model.id
         model.connect(self)
@@ -1650,10 +1832,11 @@ class Task(_Task):
         # do not allow argparser to connect to jupyter notebook
         # noinspection PyBroadException
         try:
-            if 'IPython' in sys.modules:
+            if "IPython" in sys.modules:
                 from IPython import get_ipython
+
                 ip = get_ipython()
-                if ip is not None and 'IPKernelApp' in ip.config:
+                if ip is not None and "IPKernelApp" in ip.config:
                     return parser
         except Exception:
             pass
@@ -1674,7 +1857,8 @@ class Task(_Task):
             self._arguments.copy_to_parser(parser, parsed_args)
         else:
             self._arguments.copy_defaults_from_argparse(
-                parser, args=args, namespace=namespace, parsed_args=parsed_args)
+                parser, args=args, namespace=namespace, parsed_args=parsed_args
+            )
         return parser
 
     def _connect_dictionary(self, dictionary):
@@ -1702,7 +1886,9 @@ class Task(_Task):
         return dictionary
 
     def _connect_task_parameters(self, attr_class):
-        self._try_set_connected_parameter_type(self._ConnectedParametersType.task_parameters)
+        self._try_set_connected_parameter_type(
+            self._ConnectedParametersType.task_parameters
+        )
 
         if running_remotely() and self.is_main_task():
             attr_class.update_from_dict(self.get_parameters())
@@ -1733,7 +1919,7 @@ class Task(_Task):
 
         self.log.warning(
             "### TASK STOPPED - USER ABORTED - {} ###".format(
-                stop_reason.upper().replace('_', ' ')
+                stop_reason.upper().replace("_", " ")
             )
         )
         self.flush(wait_for_uploads=True)
@@ -1798,19 +1984,27 @@ class Task(_Task):
                     # if negative timeout, just kill the thread:
                     if timeout is not None and timeout < 0:
                         from .utilities.lowlevel.threads import kill_thread
+
                         kill_thread(self._detect_repo_async_thread)
                     else:
-                        self.log.info('Waiting for repository detection and full package requirement analysis')
+                        self.log.info(
+                            "Waiting for repository detection and full package requirement analysis"
+                        )
                         self._detect_repo_async_thread.join(timeout=timeout)
                         # because join has no return value
                         if self._detect_repo_async_thread.is_alive():
-                            self.log.info('Repository and package analysis timed out ({} sec), '
-                                          'giving up'.format(timeout))
+                            self.log.info(
+                                "Repository and package analysis timed out ({} sec), "
+                                "giving up".format(timeout)
+                            )
                             # done waiting, kill the thread
                             from .utilities.lowlevel.threads import kill_thread
+
                             kill_thread(self._detect_repo_async_thread)
                         else:
-                            self.log.info('Finished repository detection and package analysis')
+                            self.log.info(
+                                "Finished repository detection and package analysis"
+                            )
                 self._detect_repo_async_thread = None
             except Exception:
                 pass
@@ -1855,47 +2049,66 @@ class Task(_Task):
             task_status = None
             wait_for_std_log = True
             if not running_remotely() and self.is_main_task() and not is_sub_process:
-                # check if we crashed, ot the signal is not interrupt (manual break)
-                task_status = ('stopped', )
+                # check if we crashed, ot the signal is not interrupt (manual
+                # break)
+                task_status = ("stopped",)
                 if self.__exit_hook:
                     is_exception = self.__exit_hook.exception
                     # check if we are running inside a debugger
-                    if not is_exception and sys.modules.get('pydevd'):
+                    if not is_exception and sys.modules.get("pydevd"):
                         try:
                             is_exception = sys.last_type
-                        except:
+                        except BaseException:
                             pass
 
-                    if (is_exception and not isinstance(self.__exit_hook.exception, KeyboardInterrupt)) \
-                            or (not self.__exit_hook.remote_user_aborted and self.__exit_hook.signal not in (None, 2)):
-                        task_status = ('failed', 'Exception')
+                    if (
+                        is_exception
+                        and not isinstance(
+                            self.__exit_hook.exception, KeyboardInterrupt
+                        )
+                    ) or (
+                        not self.__exit_hook.remote_user_aborted
+                        and self.__exit_hook.signal not in (None, 2)
+                    ):
+                        task_status = ("failed", "Exception")
                         wait_for_uploads = False
                     else:
-                        wait_for_uploads = (self.__exit_hook.remote_user_aborted or self.__exit_hook.signal is None)
-                        if not self.__exit_hook.remote_user_aborted and self.__exit_hook.signal is None and \
-                                not is_exception:
-                            task_status = ('completed', )
+                        wait_for_uploads = (
+                            self.__exit_hook.remote_user_aborted
+                            or self.__exit_hook.signal is None
+                        )
+                        if (
+                            not self.__exit_hook.remote_user_aborted
+                            and self.__exit_hook.signal is None
+                            and not is_exception
+                        ):
+                            task_status = ("completed",)
                         else:
-                            task_status = ('stopped', )
-                            # user aborted. do not bother flushing the stdout logs
+                            task_status = ("stopped",)
+                            # user aborted. do not bother flushing the stdout
+                            # logs
                             wait_for_std_log = self.__exit_hook.signal is not None
 
             # wait for repository detection (if we didn't crash)
             if wait_for_uploads and self._logger:
                 # we should print summary here
                 self._summary_artifacts()
-                # make sure that if we crashed the thread we are not waiting forever
+                # make sure that if we crashed the thread we are not waiting
+                # forever
                 if not is_sub_process:
-                    self._wait_for_repo_detection(timeout=10.)
+                    self._wait_for_repo_detection(timeout=10.0)
 
-            # kill the repo thread (negative timeout, do not wait), if it hasn't finished yet.
+            # kill the repo thread (negative timeout, do not wait), if it
+            # hasn't finished yet.
             self._wait_for_repo_detection(timeout=-1)
 
             # wait for uploads
             print_done_waiting = False
-            if wait_for_uploads and (BackendModel.get_num_results() > 0 or
-                                     (self._reporter and self.reporter.get_num_results() > 0)):
-                self.log.info('Waiting to finish uploads')
+            if wait_for_uploads and (
+                BackendModel.get_num_results() > 0
+                or (self._reporter and self.reporter.get_num_results() > 0)
+            ):
+                self.log.info("Waiting to finish uploads")
                 print_done_waiting = True
             # from here, do not send log in background thread
             if wait_for_uploads:
@@ -1904,19 +2117,21 @@ class Task(_Task):
                 if self._reporter:
                     self.reporter.stop()
                     if self.is_main_task():
-                        # notice: this will close the reporting for all the Tasks in the system
+                        # notice: this will close the reporting for all the
+                        # Tasks in the system
                         Metrics.close_async_threads()
                         # notice: this will close the jupyter monitoring
                         ScriptInfo.close()
                 if self.is_main_task():
                     try:
                         from .storage.helper import StorageHelper
+
                         StorageHelper.close_async_threads()
-                    except:
+                    except BaseException:
                         pass
 
                 if print_done_waiting:
-                    self.log.info('Finished uploading')
+                    self.log.info("Finished uploading")
             elif self._logger:
                 self._logger._flush_stdout_handler()
 
@@ -1934,16 +2149,18 @@ class Task(_Task):
                 # change task status
                 if not task_status:
                     pass
-                elif task_status[0] == 'failed':
+                elif task_status[0] == "failed":
                     self.mark_failed(status_reason=task_status[1])
-                elif task_status[0] == 'completed':
+                elif task_status[0] == "completed":
                     self.completed()
-                elif task_status[0] == 'stopped':
+                elif task_status[0] == "stopped":
                     self.stopped()
 
             if self._logger:
                 self._logger.set_flush_period(None)
-                self._logger._close_stdout_handler(wait=wait_for_uploads or wait_for_std_log)
+                self._logger._close_stdout_handler(
+                    wait=wait_for_uploads or wait_for_std_log
+                )
 
             # this is so in theory we can close a main task and start a new one
             if self.is_main_task():
@@ -1961,7 +2178,9 @@ class Task(_Task):
             self._edit_lock = None
 
     @classmethod
-    def __register_at_exit(cls, exit_callback, only_remove_signal_and_exception_hooks=False):
+    def __register_at_exit(
+        cls, exit_callback, only_remove_signal_and_exception_hooks=False
+    ):
         class ExitHooks(object):
             _orig_exit = None
             _orig_exc_handler = None
@@ -2010,14 +2229,28 @@ class Task(_Task):
                 if self._exit_callback:
                     atexit.register(self._exit_callback)
 
-                # TODO: check if sub-process hooks are safe enough, for the time being allow it
+                # TODO: check if sub-process hooks are safe enough, for the
+                # time being allow it
                 if not self._org_handlers:  # ## and not Task._Task__is_subprocess():
-                    if sys.platform == 'win32':
-                        catch_signals = [signal.SIGINT, signal.SIGTERM, signal.SIGSEGV, signal.SIGABRT,
-                                         signal.SIGILL, signal.SIGFPE]
+                    if sys.platform == "win32":
+                        catch_signals = [
+                            signal.SIGINT,
+                            signal.SIGTERM,
+                            signal.SIGSEGV,
+                            signal.SIGABRT,
+                            signal.SIGILL,
+                            signal.SIGFPE,
+                        ]
                     else:
-                        catch_signals = [signal.SIGINT, signal.SIGTERM, signal.SIGSEGV, signal.SIGABRT,
-                                         signal.SIGILL, signal.SIGFPE, signal.SIGQUIT]
+                        catch_signals = [
+                            signal.SIGINT,
+                            signal.SIGTERM,
+                            signal.SIGSEGV,
+                            signal.SIGABRT,
+                            signal.SIGILL,
+                            signal.SIGFPE,
+                            signal.SIGQUIT,
+                        ]
                     for s in catch_signals:
                         # noinspection PyBroadException
                         try:
@@ -2032,12 +2265,16 @@ class Task(_Task):
 
             def exc_handler(self, exctype, value, traceback, *args, **kwargs):
                 if self._except_recursion_protection_flag:
-                    return sys.__excepthook__(exctype, value, traceback, *args, **kwargs)
+                    return sys.__excepthook__(
+                        exctype, value, traceback, *args, **kwargs
+                    )
 
                 self._except_recursion_protection_flag = True
                 self.exception = value
                 if self._orig_exc_handler:
-                    ret = self._orig_exc_handler(exctype, value, traceback, *args, **kwargs)
+                    ret = self._orig_exc_handler(
+                        exctype, value, traceback, *args, **kwargs
+                    )
                 else:
                     ret = sys.__excepthook__(exctype, value, traceback, *args, **kwargs)
                 self._except_recursion_protection_flag = False
@@ -2108,44 +2345,50 @@ class Task(_Task):
     @classmethod
     def __get_task(cls, task_id=None, project_name=None, task_name=None):
         if task_id:
-            return cls(private=cls.__create_protection, task_id=task_id, log_to_backend=False)
+            return cls(
+                private=cls.__create_protection, task_id=task_id, log_to_backend=False
+            )
 
         if project_name:
             res = cls._send(
                 cls._get_default_session(),
-                projects.GetAllRequest(
-                    name=exact_match_regex(project_name)
-                )
+                projects.GetAllRequest(name=exact_match_regex(project_name)),
             )
-            project = get_single_result(entity='project', query=project_name, results=res.response.projects)
+            project = get_single_result(
+                entity="project", query=project_name, results=res.response.projects
+            )
         else:
             project = None
 
-        system_tags = 'system_tags' if hasattr(tasks.Task, 'system_tags') else 'tags'
+        system_tags = "system_tags" if hasattr(tasks.Task, "system_tags") else "tags"
         res = cls._send(
             cls._get_default_session(),
             tasks.GetAllRequest(
                 project=[project.id] if project else None,
                 name=exact_match_regex(task_name) if task_name else None,
-                only_fields=['id', 'name', 'last_update', system_tags]
-            )
+                only_fields=["id", "name", "last_update", system_tags],
+            ),
         )
         res_tasks = res.response.tasks
         # if we have more than one result, first filter 'archived' results:
         if len(res_tasks) > 1:
-            filtered_tasks = [t for t in res_tasks if not getattr(t, system_tags, None) or
-                              'archived' not in getattr(t, system_tags, None)]
+            filtered_tasks = [
+                t
+                for t in res_tasks
+                if not getattr(t, system_tags, None)
+                or "archived" not in getattr(t, system_tags, None)
+            ]
             if filtered_tasks:
                 res_tasks = filtered_tasks
 
-        task = get_single_result(entity='task', query=task_name, results=res_tasks, raise_on_error=False)
+        task = get_single_result(
+            entity="task", query=task_name, results=res_tasks, raise_on_error=False
+        )
         if not task:
             return None
 
         return cls(
-            private=cls.__create_protection,
-            task_id=task.id,
-            log_to_backend=False,
+            private=cls.__create_protection, task_id=task.id, log_to_backend=False,
         )
 
     @classmethod
@@ -2153,11 +2396,21 @@ class Task(_Task):
         if task_ids:
             if isinstance(task_ids, six.string_types):
                 task_ids = [task_ids]
-            return [cls(private=cls.__create_protection, task_id=task_id, log_to_backend=False)
-                    for task_id in task_ids]
+            return [
+                cls(
+                    private=cls.__create_protection,
+                    task_id=task_id,
+                    log_to_backend=False,
+                )
+                for task_id in task_ids
+            ]
 
-        return [cls(private=cls.__create_protection, task_id=task.id, log_to_backend=False)
-                for task in cls._query_tasks(project_name=project_name, task_name=task_name, **kwargs)]
+        return [
+            cls(private=cls.__create_protection, task_id=task.id, log_to_backend=False)
+            for task in cls._query_tasks(
+                project_name=project_name, task_name=task_name, **kwargs
+            )
+        ]
 
     @classmethod
     def _query_tasks(cls, task_ids=None, project_name=None, task_name=None, **kwargs):
@@ -2169,19 +2422,19 @@ class Task(_Task):
         if project_name:
             res = cls._send(
                 cls._get_default_session(),
-                projects.GetAllRequest(
-                    name=exact_match_regex(project_name)
-                )
+                projects.GetAllRequest(name=exact_match_regex(project_name)),
             )
-            project = get_single_result(entity='project', query=project_name, results=res.response.projects)
+            project = get_single_result(
+                entity="project", query=project_name, results=res.response.projects
+            )
         else:
             project = None
 
-        system_tags = 'system_tags' if hasattr(tasks.Task, 'system_tags') else 'tags'
-        only_fields = ['id', 'name', 'last_update', system_tags]
+        system_tags = "system_tags" if hasattr(tasks.Task, "system_tags") else "tags"
+        only_fields = ["id", "name", "last_update", system_tags]
 
-        if kwargs and kwargs.get('only_fields'):
-            only_fields = list(set(kwargs.pop('only_fields')) | set(only_fields))
+        if kwargs and kwargs.get("only_fields"):
+            only_fields = list(set(kwargs.pop("only_fields")) | set(only_fields))
 
         res = cls._send(
             cls._get_default_session(),
@@ -2191,7 +2444,7 @@ class Task(_Task):
                 name=task_name if task_name else None,
                 only_fields=only_fields,
                 **kwargs
-            )
+            ),
         )
 
         return res.response.tasks
@@ -2204,12 +2457,19 @@ class Task(_Task):
         return ":".join(map(normalize, args))
 
     @classmethod
-    def __get_last_used_task_id(cls, default_project_name, default_task_name, default_task_type):
+    def __get_last_used_task_id(
+        cls, default_project_name, default_task_name, default_task_type
+    ):
         hash_key = cls.__get_hash_key(
-            cls._get_api_server(), default_project_name, default_task_name, default_task_type)
+            cls._get_api_server(),
+            default_project_name,
+            default_task_name,
+            default_task_type,
+        )
 
         # check if we have a cached task_id we can reuse
-        # it must be from within the last 24h and with the same project/name/type
+        # it must be from within the last 24h and with the same
+        # project/name/type
         task_sessions = SessionCache.load_dict(str(cls))
 
         task_data = task_sessions.get(hash_key)
@@ -2217,12 +2477,12 @@ class Task(_Task):
             return None
 
         try:
-            task_data['type'] = cls.TaskTypes(task_data['type'])
+            task_data["type"] = cls.TaskTypes(task_data["type"])
         except (ValueError, KeyError):
             LoggerRoot.get_base_logger().warning(
                 "Corrupted session cache entry: {}. "
                 "Unsupported task type: {}"
-                "Creating a new task.".format(hash_key, task_data['type']),
+                "Creating a new task.".format(hash_key, task_data["type"]),
             )
 
             return None
@@ -2230,20 +2490,32 @@ class Task(_Task):
         return task_data
 
     @classmethod
-    def __update_last_used_task_id(cls, default_project_name, default_task_name, default_task_type, task_id):
+    def __update_last_used_task_id(
+        cls, default_project_name, default_task_name, default_task_type, task_id
+    ):
         hash_key = cls.__get_hash_key(
-            cls._get_api_server(), default_project_name, default_task_name, default_task_type)
+            cls._get_api_server(),
+            default_project_name,
+            default_task_name,
+            default_task_type,
+        )
 
         task_id = str(task_id)
         # update task session cache
         task_sessions = SessionCache.load_dict(str(cls))
-        last_task_session = {'time': time.time(), 'project': default_project_name, 'name': default_task_name,
-                             'type': default_task_type, 'id': task_id}
+        last_task_session = {
+            "time": time.time(),
+            "project": default_project_name,
+            "name": default_task_name,
+            "type": default_task_type,
+            "id": task_id,
+        }
 
         # remove stale sessions
         for k in list(task_sessions.keys()):
-            if ((time.time() - task_sessions[k].get('time', 0)) >
-                    60 * 60 * cls.__task_id_reuse_time_window_in_hours):
+            if (
+                time.time() - task_sessions[k].get("time", 0)
+            ) > 60 * 60 * cls.__task_id_reuse_time_window_in_hours:
                 task_sessions.pop(k)
         # update current session
         task_sessions[hash_key] = last_task_session
@@ -2252,11 +2524,13 @@ class Task(_Task):
 
     @classmethod
     def __task_timed_out(cls, task_data):
-        return \
-            task_data and \
-            task_data.get('id') and \
-            task_data.get('time') and \
-            (time.time() - task_data.get('time')) > (60 * 60 * cls.__task_id_reuse_time_window_in_hours)
+        return (
+            task_data
+            and task_data.get("id")
+            and task_data.get("time")
+            and (time.time() - task_data.get("time"))
+            > (60 * 60 * cls.__task_id_reuse_time_window_in_hours)
+        )
 
     @classmethod
     def __get_task_api_obj(cls, task_id, only_fields=None):
@@ -2295,12 +2569,12 @@ class Task(_Task):
         if cls.__task_timed_out(task_data):
             return False
 
-        task_id = task_data.get('id')
+        task_id = task_data.get("id")
 
         if not task_id:
             return False
 
-        task = cls.__get_task_api_obj(task_id, ('id', 'name', 'project', 'type'))
+        task = cls.__get_task_api_obj(task_id, ("id", "name", "project", "type"))
 
         if task is None:
             return False
@@ -2309,29 +2583,32 @@ class Task(_Task):
         if task.project:
             project = cls._send(
                 cls._get_default_session(),
-                projects.GetByIdRequest(project=task.project)
+                projects.GetByIdRequest(project=task.project),
             ).response.project
 
             if project:
                 project_name = project.name
 
         compares = (
-            (task.name, 'name'),
-            (project_name, 'project'),
-            (task.type, 'type'),
+            (task.name, "name"),
+            (project_name, "project"),
+            (task.type, "type"),
         )
 
         # compare after casting to string to avoid enum instance issues
-        # remember we might have replaced the api version by now, so enums are different
-        return all(six.text_type(server_data) == six.text_type(task_data.get(task_data_key))
-                   for server_data, task_data_key in compares)
+        # remember we might have replaced the api version by now, so enums are
+        # different
+        return all(
+            six.text_type(server_data) == six.text_type(task_data.get(task_data_key))
+            for server_data, task_data_key in compares
+        )
 
     @classmethod
     def __close_timed_out_task(cls, task_data):
         if not task_data:
             return False
 
-        task = cls.__get_task_api_obj(task_data.get('id'), ('id', 'status'))
+        task = cls.__get_task_api_obj(task_data.get("id"), ("id", "status"))
 
         if task is None:
             return False
@@ -2351,7 +2628,7 @@ class Task(_Task):
                 tasks.StoppedRequest(
                     task=task.id,
                     force=True,
-                    status_message="Stopped timed out development task"
+                    status_message="Stopped timed out development task",
                 ),
             )
 

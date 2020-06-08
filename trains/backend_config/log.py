@@ -7,7 +7,7 @@ def logger(path=None):
     name = "trains"
     if path:
         p = Path(path)
-        module = (p.parent if p.stem.startswith('_') else p).stem
+        module = (p.parent if p.stem.startswith("_") else p).stem
         name = "trains.%s" % module
     return logging.getLogger(name)
 
@@ -22,7 +22,9 @@ def initialize(logging_config=None, extra=None):
             def _log(self, level, msg, args, exc_info=None, extra=None, **kwargs):
                 extra = extra or {}
                 extra.update(self.__extra)
-                super(_Logger, self)._log(level, msg, args, exc_info=exc_info, extra=extra, **kwargs)
+                super(_Logger, self)._log(
+                    level, msg, args, exc_info=exc_info, extra=extra, **kwargs
+                )
 
         Logger.manager.loggerClass = _Logger
 

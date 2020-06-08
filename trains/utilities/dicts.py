@@ -6,6 +6,7 @@ _epsilon = 0.00001
 class ReadOnlyDict(dict):
     def __readonly__(self, *args, **kwargs):
         raise ValueError("This is a read only dictionary")
+
     __setitem__ = __readonly__
     __delitem__ = __readonly__
     pop = __readonly__
@@ -52,7 +53,7 @@ class BlobsDict(dict):
         # ans instead of -
         # elif isinstance(val, Blob):
         # we ask:
-        elif hasattr(val, '__class__') and val.__class__.__name__ == 'Blob':
+        elif hasattr(val, "__class__") and val.__class__.__name__ == "Blob":
             return val.data
         else:
             return val
@@ -65,18 +66,18 @@ class NestedBlobsDict(BlobsDict):
     def __init__(self, *args, **kwargs):
         super(NestedBlobsDict, self).__init__(*args, **kwargs)
 
-    def __getitem__(self, keys_str=''):
+    def __getitem__(self, keys_str=""):
 
-        if keys_str == '':
+        if keys_str == "":
             return super(NestedBlobsDict, self).__getitem__(self)
 
-        keylist = keys_str.split('.')
+        keylist = keys_str.split(".")
 
         cur = super(NestedBlobsDict, self).__getitem__(keylist[0])
         if len(keylist) == 1:
             return cur
         else:
-            return NestedBlobsDict(cur)['.'.join(keylist[1:])]
+            return NestedBlobsDict(cur)[".".join(keylist[1:])]
 
     def __contains__(self, keys_str):
         keylist = self.keys()
@@ -88,7 +89,7 @@ class NestedBlobsDict(BlobsDict):
     def get(self, keys_str, default=None):
         try:
             return self[keys_str]
-        except:
+        except BaseException:
             return None
 
     def _keys(self, cur_dict, path):
@@ -98,19 +99,19 @@ class NestedBlobsDict(BlobsDict):
         for key in cur_keys:
             if isinstance(cur_dict[key], dict):
                 if len(path) > 0:
-                    deep_keys.extend(self._keys(cur_dict[key], path + '.' + key))
+                    deep_keys.extend(self._keys(cur_dict[key], path + "." + key))
                 else:
                     deep_keys.extend(self._keys(cur_dict[key], key))
             else:
                 if len(path) > 0:
-                    deep_keys.append(path + '.' + key)
+                    deep_keys.append(path + "." + key)
                 else:
                     deep_keys.append(key)
 
         return deep_keys
 
     def keys(self):
-        return self._keys(self, '')
+        return self._keys(self, "")
 
 
 def merge_dicts(dict1, dict2):

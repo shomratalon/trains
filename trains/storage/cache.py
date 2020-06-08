@@ -3,10 +3,10 @@ import shutil
 
 from pathlib2 import Path
 
-from .helper import StorageHelper
-from .util import quote_url
 from ..config import get_cache_dir
 from ..debugging.log import LoggerRoot
+from .helper import StorageHelper
+from .util import quote_url
 
 
 class CacheManager(object):
@@ -32,7 +32,9 @@ class CacheManager(object):
             try:
                 direct_access = helper._driver.get_direct_access(remote_url)
             except (OSError, ValueError):
-                LoggerRoot.get_base_logger().warning("Failed accessing local file: {}".format(remote_url))
+                LoggerRoot.get_base_logger().warning(
+                    "Failed accessing local file: {}".format(remote_url)
+                )
                 return None
 
             if direct_access:
@@ -93,7 +95,7 @@ class CacheManager(object):
                 return atime
 
             files = sorted(folder.iterdir(), reverse=True, key=sort_max_access_time)
-            files = files[self._file_limit:]
+            files = files[self._file_limit :]
             for f in files:
                 if not f.is_dir():
                     f.unlink()

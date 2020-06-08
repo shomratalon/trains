@@ -1,27 +1,28 @@
 from functools import partial
-from multiprocessing.pool import ThreadPool
 from multiprocessing import Lock
+from multiprocessing.pool import ThreadPool
 from time import time
 
 from humanfriendly import format_timespan
 from pathlib2 import Path
 
 from ...backend_api.services import events as api_events
-from ..base import InterfaceBase
 from ...config import config
 from ...debugging import get_logger
 from ...storage.helper import StorageHelper
-
+from ..base import InterfaceBase
 from .events import MetricsEventAdapter
 
-
-log = get_logger('metrics')
+log = get_logger("metrics")
 
 
 class Metrics(InterfaceBase):
     """ Metrics manager and batch writer """
+
     _storage_lock = Lock()
-    _file_upload_starvation_warning_sec = config.get('network.metrics.file_upload_starvation_warning_sec', None)
+    _file_upload_starvation_warning_sec = config.get(
+        "network.metrics.file_upload_starvation_warning_sec", None
+    )
     _file_upload_retries = 3
     _upload_pool = None
     _file_upload_pool = None
@@ -39,16 +40,28 @@ class Metrics(InterfaceBase):
             storage_uri = storage_uri or self._storage_uri
             return StorageHelper.get(storage_uri)
         except Exception as e:
-            log.error('Failed getting storage helper for %s: %s' % (storage_uri, str(e)))
+            log.error(
+                "Failed getting storage helper for %s: %s" % (storage_uri, str(e))
+            )
         finally:
             self._storage_lock.release()
 
-    def __init__(self, session, task_id, storage_uri, storage_uri_suffix='metrics', iteration_offset=0, log=None):
+    def __init__(
+        self,
+        session,
+        task_id,
+        storage_uri,
+        storage_uri_suffix="metrics",
+        iteration_offset=0,
+        log=None,
+    ):
         super(Metrics, self).__init__(session, log=log)
         self._task_id = task_id
         self._task_iteration_offset = iteration_offset
-        self._storage_uri = storage_uri.rstrip('/') if storage_uri else None
-        self._storage_key_prefix = storage_uri_suffix.strip('/') if storage_uri_suffix else None
+        self._storage_uri = storage_uri.rstrip("/") if storage_uri else None
+        self._storage_key_prefix = (
+            storage_uri_suffix.strip("/") if storage_uri_suffix else None
+        )
         self._file_related_event_time = None
         self._file_upload_time = None
 
@@ -65,7 +78,7 @@ class Metrics(InterfaceBase):
         if not events:
             return
 
-        storage_uri = kwargs.pop('storage_uri', self._storage_uri)
+        storage_uri = kwargs.pop("storage_uri", self._storage_uri)
 
         if not async_enable:
             return self._do_write_events(events, storage_uri)
@@ -80,7 +93,8 @@ class Metrics(InterfaceBase):
         return self._upload_pool.apply_async(
             safe_call,
             args=(events, storage_uri),
-            callback=partial(self._callback_wrapper, callback))
+            callback=partial(self._callback_wrapper, callback),
+        )
 
     def set_iteration_offset(self, offset):
         self._task_iteration_offset = offset
@@ -95,10 +109,10 @@ class Metrics(InterfaceBase):
             return
         elif isinstance(res, Exception):
             # error
-            self.log.error('Error trying to send metrics: %s' % str(res))
+            self.log.error("Error trying to send metrics: %s" % str(res))
         elif not res.ok():
             # bad result, log error
-            self.log.error('Failed reporting metrics: %s' % str(res.meta))
+            self.log.error("Failed reporting metrics: %s" % str(res.meta))
         # call callback, even if we received an error
         if callback:
             callback(res)
@@ -126,17 +140,21 @@ class Metrics(InterfaceBase):
             entry = ev.get_file_entry()
             kwargs = {}
             if entry:
-                key, url = ev.get_target_full_upload_uri(storage_uri, self.storage_key_prefix, quote_uri=False)
+                key, url = ev.get_target_full_upload_uri(
+                    storage_uri, self.storage_key_prefix, quote_uri=False
+                )
                 kwargs[entry.key_prop] = key
                 kwargs[entry.url_prop] = url
                 if not entry.stream:
                     # if entry has no stream, we won't upload it
                     entry = None
                 else:
-                    if not hasattr(entry.stream, 'read'):
-                        raise ValueError('Invalid file object %s' % entry.stream)
+                    if not hasattr(entry.stream, "read"):
+                        raise ValueError("Invalid file object %s" % entry.stream)
                     entry.url = url
-            ev.update(task=self._task_id, iter_offset=self._task_iteration_offset, **kwargs)
+            ev.update(
+                task=self._task_id, iter_offset=self._task_iteration_offset, **kwargs
+            )
             return entry
 
         # prepare event needing file upload
@@ -158,13 +176,19 @@ class Metrics(InterfaceBase):
 
                 try:
                     storage = self._get_storage(upload_uri)
-                    url = storage.upload_from_stream(e.stream, e.url, retries=self._file_upload_retries)
+                    url = storage.upload_from_stream(
+                        e.stream, e.url, retries=self._file_upload_retries
+                    )
                     e.event.update(url=url)
                 except Exception as exp:
-                    log.warning("Failed uploading to {} ({})".format(
-                        upload_uri if upload_uri else "(Could not calculate upload uri)",
-                        exp,
-                    ))
+                    log.warning(
+                        "Failed uploading to {} ({})".format(
+                            upload_uri
+                            if upload_uri
+                            else "(Could not calculate upload uri)",
+                            exp,
+                        )
+                    )
 
                     e.set_exception(exp)
                 e.stream.close()
@@ -181,21 +205,27 @@ class Metrics(InterfaceBase):
             # remember the last time we uploaded a file
             self._file_upload_time = time()
 
-        t_f, t_u, t_ref = \
-            (self._file_related_event_time, self._file_upload_time, self._file_upload_starvation_warning_sec)
+        t_f, t_u, t_ref = (
+            self._file_related_event_time,
+            self._file_upload_time,
+            self._file_upload_starvation_warning_sec,
+        )
         if t_f and t_u and t_ref and (t_f - t_u) > t_ref:
-            log.warning('Possible metrics file upload starvation: files were not uploaded for %s' %
-                        format_timespan(t_ref))
+            log.warning(
+                "Possible metrics file upload starvation: files were not uploaded for %s"
+                % format_timespan(t_ref)
+            )
 
         # send the events in a batched request
         good_events = [ev for ev in events if ev.upload_exception is None]
         error_events = [ev for ev in events if ev.upload_exception is not None]
 
         if error_events:
-            log.error("Not uploading {}/{} events because the data upload failed".format(
-                len(error_events),
-                len(events),
-            ))
+            log.error(
+                "Not uploading {}/{} events because the data upload failed".format(
+                    len(error_events), len(events),
+                )
+            )
 
         if good_events:
             _events = [ev.get_api_event() for ev in good_events]
@@ -212,7 +242,8 @@ class Metrics(InterfaceBase):
             Metrics._upload_pool = ThreadPool(processes=1)
         if not Metrics._file_upload_pool:
             Metrics._file_upload_pool = ThreadPool(
-                processes=config.get('network.metrics.file_upload_threads', 4))
+                processes=config.get("network.metrics.file_upload_threads", 4)
+            )
 
     @staticmethod
     def close_async_threads():
@@ -225,12 +256,12 @@ class Metrics(InterfaceBase):
             try:
                 file_pool.terminate()
                 file_pool.join()
-            except:
+            except BaseException:
                 pass
 
         if pool:
             try:
                 pool.terminate()
                 pool.join()
-            except:
+            except BaseException:
                 pass

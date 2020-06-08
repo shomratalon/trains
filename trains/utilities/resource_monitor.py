@@ -1,12 +1,13 @@
 import logging
 import os
 import warnings
+from threading import Event, Thread
 from time import time
-from threading import Thread, Event
+from typing import Text
 
 import psutil
 from pathlib2 import Path
-from typing import Text
+
 from ..binding.frameworks.tensorflow_bind import IsTensorboardInit
 
 try:
@@ -16,12 +17,19 @@ except ImportError:
 
 
 class ResourceMonitor(object):
-    _title_machine = ':monitor:machine'
-    _title_gpu = ':monitor:gpu'
+    _title_machine = ":monitor:machine"
+    _title_gpu = ":monitor:gpu"
 
-    def __init__(self, task, sample_frequency_per_sec=2., report_frequency_sec=30.,
-                 first_report_sec=None, wait_for_first_iteration_to_start_sec=180.0,
-                 max_wait_for_first_iteration_to_start_sec=1800., report_mem_used_per_process=True):
+    def __init__(
+        self,
+        task,
+        sample_frequency_per_sec=2.0,
+        report_frequency_sec=30.0,
+        first_report_sec=None,
+        wait_for_first_iteration_to_start_sec=180.0,
+        max_wait_for_first_iteration_to_start_sec=1800.0,
+        report_mem_used_per_process=True,
+    ):
         self._task = task
         self._sample_frequency = sample_frequency_per_sec
         self._report_frequency = report_frequency_sec
@@ -41,13 +49,16 @@ class ResourceMonitor(object):
         self._last_process_pool = {}
         self._last_process_id_list = []
         if not self._gpustat:
-            self._task.get_logger().report_text('TRAINS Monitor: GPU monitoring is not available')
+            self._task.get_logger().report_text(
+                "TRAINS Monitor: GPU monitoring is not available"
+            )
         else:  # if running_remotely():
             try:
-                active_gpus = os.environ.get('NVIDIA_VISIBLE_DEVICES', '') or \
-                    os.environ.get('CUDA_VISIBLE_DEVICES', '')
+                active_gpus = os.environ.get(
+                    "NVIDIA_VISIBLE_DEVICES", ""
+                ) or os.environ.get("CUDA_VISIBLE_DEVICES", "")
                 if active_gpus:
-                    self._active_gpus = [int(g.strip()) for g in active_gpus.split(',')]
+                    self._active_gpus = [int(g.strip()) for g in active_gpus.split(",")]
             except Exception:
                 pass
 
@@ -64,7 +75,7 @@ class ResourceMonitor(object):
     def _run(self):
         try:
             self._daemon()
-        except:
+        except BaseException:
             pass
 
     def _daemon(self):
@@ -87,7 +98,9 @@ class ResourceMonitor(object):
         # repeated_iterations = 0
         while True:
             last_report = time()
-            current_report_frequency = self._report_frequency if reported != 0 else self._first_report_sec
+            current_report_frequency = (
+                self._report_frequency if reported != 0 else self._first_report_sec
+            )
             while (time() - last_report) < current_report_frequency:
                 # wait for self._sample_frequency seconds, if event set quit
                 if self._exit_event.wait(1.0 / self._sample_frequency):
@@ -99,22 +112,31 @@ class ResourceMonitor(object):
                     pass
 
             seconds_since_started += int(round(time() - last_report))
-            # check if we do not report any metric (so it means the last iteration will not be changed)
+            # check if we do not report any metric (so it means the last
+            # iteration will not be changed)
             if fallback_to_sec_as_iterations is None:
                 if IsTensorboardInit.tensorboard_used():
                     fallback_to_sec_as_iterations = False
                 elif seconds_since_started >= self._wait_for_first_iteration:
-                    self._task.get_logger().report_text('TRAINS Monitor: Could not detect iteration reporting, '
-                                                        'falling back to iterations as seconds-from-start')
+                    self._task.get_logger().report_text(
+                        "TRAINS Monitor: Could not detect iteration reporting, "
+                        "falling back to iterations as seconds-from-start"
+                    )
                     fallback_to_sec_as_iterations = True
-            elif fallback_to_sec_as_iterations is True and seconds_since_started <= self._max_check_first_iteration:
+            elif (
+                fallback_to_sec_as_iterations is True
+                and seconds_since_started <= self._max_check_first_iteration
+            ):
                 if self._check_logger_reported():
                     fallback_to_sec_as_iterations = False
-                    self._task.get_logger().report_text('TRAINS Monitor: Reporting detected, '
-                                                        'reverting back to iteration based reporting')
+                    self._task.get_logger().report_text(
+                        "TRAINS Monitor: Reporting detected, "
+                        "reverting back to iteration based reporting"
+                    )
 
             clear_readouts = True
-            # if we do not have last_iteration, we just use seconds as iteration
+            # if we do not have last_iteration, we just use seconds as
+            # iteration
             if fallback_to_sec_as_iterations:
                 iteration = seconds_since_started
             else:
@@ -142,16 +164,23 @@ class ResourceMonitor(object):
                     fallback_to_sec_as_iterations = False
                     clear_readouts = True
 
-            # start reporting only when we figured out, if this is seconds based, or iterations based
+            # start reporting only when we figured out, if this is seconds
+            # based, or iterations based
             average_readouts = self._get_average_readouts()
             if fallback_to_sec_as_iterations is not None:
                 for k, v in average_readouts.items():
                     # noinspection PyBroadException
                     try:
-                        title = self._title_gpu if k.startswith('gpu_') else self._title_machine
+                        title = (
+                            self._title_gpu
+                            if k.startswith("gpu_")
+                            else self._title_machine
+                        )
                         # 3 points after the dot
-                        value = round(v * 1000) / 1000.
-                        self._task.get_logger().report_scalar(title=title, series=k, iteration=iteration, value=value)
+                        value = round(v * 1000) / 1000.0
+                        self._task.get_logger().report_scalar(
+                            title=title, series=k, iteration=iteration, value=value
+                        )
                     except Exception:
                         pass
                 # clear readouts if this is update is not averaged
@@ -167,7 +196,7 @@ class ResourceMonitor(object):
         self._previous_readouts_ts = time()
         for k, v in readouts.items():
             # cumulative measurements
-            if k.endswith('_mbs'):
+            if k.endswith("_mbs"):
                 v = (v - self._previous_readouts.get(k, v)) / elapsed
 
             self._readouts[k] = self._readouts.get(k, 0.0) + v
@@ -178,7 +207,9 @@ class ResourceMonitor(object):
         return self._num_readouts
 
     def _get_average_readouts(self):
-        average_readouts = dict((k, v / float(self._num_readouts)) for k, v in self._readouts.items())
+        average_readouts = dict(
+            (k, v / float(self._num_readouts)) for k, v in self._readouts.items()
+        )
         return average_readouts
 
     def _clear_readouts(self):
@@ -201,18 +232,32 @@ class ResourceMonitor(object):
 
         virtual_memory = psutil.virtual_memory()
         # stats["memory_used_gb"] = bytes_to_megabytes(virtual_memory.used) / 1024
-        stats["memory_used_gb"] = bytes_to_megabytes(
-            self._get_process_used_memory() if self._process_info else virtual_memory.used) / 1024
+        stats["memory_used_gb"] = (
+            bytes_to_megabytes(
+                self._get_process_used_memory()
+                if self._process_info
+                else virtual_memory.used
+            )
+            / 1024
+        )
         stats["memory_free_gb"] = bytes_to_megabytes(virtual_memory.available) / 1024
         disk_use_percentage = psutil.disk_usage(Text(Path.home())).percent
         stats["disk_free_percent"] = 100.0 - disk_use_percentage
         with warnings.catch_warnings():
-            if logging.root.level > logging.DEBUG:  # If the logging level is bigger than debug, ignore
+            if (
+                logging.root.level > logging.DEBUG
+            ):  # If the logging level is bigger than debug, ignore
                 # psutil.sensors_temperatures warnings
                 warnings.simplefilter("ignore", category=RuntimeWarning)
-            sensor_stat = (psutil.sensors_temperatures() if hasattr(psutil, "sensors_temperatures") else {})
+            sensor_stat = (
+                psutil.sensors_temperatures()
+                if hasattr(psutil, "sensors_temperatures")
+                else {}
+            )
         if "coretemp" in sensor_stat and len(sensor_stat["coretemp"]):
-            stats["cpu_temperature"] = max([float(t.current) for t in sensor_stat["coretemp"]])
+            stats["cpu_temperature"] = max(
+                [float(t.current) for t in sensor_stat["coretemp"]]
+            )
 
         # update cached measurements
         net_stats = psutil.net_io_counters()
@@ -230,8 +275,10 @@ class ResourceMonitor(object):
                 # something happened and we can't use gpu stats,
                 self._gpustat_fail += 1
                 if self._gpustat_fail >= 3:
-                    self._task.get_logger().report_text('TRAINS Monitor: GPU monitoring failed getting GPU reading, '
-                                                        'switching off GPU monitoring')
+                    self._task.get_logger().report_text(
+                        "TRAINS Monitor: GPU monitoring failed getting GPU reading, "
+                        "switching off GPU monitoring"
+                    )
                     self._gpustat = None
 
         return stats
@@ -270,10 +317,13 @@ class ResourceMonitor(object):
             return a_mem_size
 
         # only run the memory usage query once per reporting period
-        # because this memory query is relatively slow, and changes very little.
-        if self._last_process_pool.get('cpu') and \
-                (time() - self._last_process_pool['cpu'][0]) < self._report_frequency:
-            return self._last_process_pool['cpu'][1]
+        # because this memory query is relatively slow, and changes very
+        # little.
+        if (
+            self._last_process_pool.get("cpu")
+            and (time() - self._last_process_pool["cpu"][0]) < self._report_frequency
+        ):
+            return self._last_process_pool["cpu"][1]
 
         # if we have no parent process, return 0 (it's an error)
         if not self._process_info:
@@ -281,7 +331,7 @@ class ResourceMonitor(object):
 
         self._last_process_id_list = []
         mem_size = mem_usage_children(0, self._process_info)
-        self._last_process_pool['cpu'] = time(), mem_size
+        self._last_process_pool["cpu"] = time(), mem_size
 
         return mem_size
 
@@ -293,34 +343,49 @@ class ResourceMonitor(object):
         # On the rest of the samples we return the previous memory measurement
 
         # update mem used by our process and sub processes
-        if self._process_info and (not self._last_process_pool.get('gpu') or
-                                   (time() - self._last_process_pool['gpu'][0]) >= self._report_frequency):
+        if self._process_info and (
+            not self._last_process_pool.get("gpu")
+            or (time() - self._last_process_pool["gpu"][0]) >= self._report_frequency
+        ):
             gpu_stat = self._gpustat.new_query(per_process_stats=True)
             gpu_mem = {}
             for i, g in enumerate(gpu_stat.gpus):
                 gpu_mem[i] = 0
                 for p in g.processes:
-                    if p['pid'] in self._last_process_id_list:
-                        gpu_mem[i] += p.get('gpu_memory_usage', 0)
-            self._last_process_pool['gpu'] = time(), gpu_mem
+                    if p["pid"] in self._last_process_id_list:
+                        gpu_mem[i] += p.get("gpu_memory_usage", 0)
+            self._last_process_pool["gpu"] = time(), gpu_mem
         else:
             # if we do no need to update the memory usage, run global query
-            # if we have no parent process (backward compatibility), return global stats
+            # if we have no parent process (backward compatibility), return
+            # global stats
             gpu_stat = self._gpustat.new_query()
-            gpu_mem = self._last_process_pool['gpu'][1] if self._last_process_pool.get('gpu') else None
+            gpu_mem = (
+                self._last_process_pool["gpu"][1]
+                if self._last_process_pool.get("gpu")
+                else None
+            )
 
         # generate the statistics dict for actual report
         stats = {}
         for i, g in enumerate(gpu_stat.gpus):
-            # only monitor the active gpu's, if none were selected, monitor everything
+            # only monitor the active gpu's, if none were selected, monitor
+            # everything
             if self._active_gpus and i not in self._active_gpus:
                 continue
             stats["gpu_%d_temperature" % i] = float(g["temperature.gpu"])
             stats["gpu_%d_utilization" % i] = float(g["utilization.gpu"])
-            stats["gpu_%d_mem_usage" % i] = 100. * float(g["memory.used"]) / float(g["memory.total"])
+            stats["gpu_%d_mem_usage" % i] = (
+                100.0 * float(g["memory.used"]) / float(g["memory.total"])
+            )
             # already in MBs
-            stats["gpu_%d_mem_free_gb" % i] = float(g["memory.total"] - g["memory.used"]) / 1024
-            # use previously sampled process gpu memory, or global if it does not exist
-            stats["gpu_%d_mem_used_gb" % i] = float(gpu_mem[i] if gpu_mem else g["memory.used"]) / 1024
+            stats["gpu_%d_mem_free_gb" % i] = (
+                float(g["memory.total"] - g["memory.used"]) / 1024
+            )
+            # use previously sampled process gpu memory, or global if it does
+            # not exist
+            stats["gpu_%d_mem_used_gb" % i] = (
+                float(gpu_mem[i] if gpu_mem else g["memory.used"]) / 1024
+            )
 
         return stats

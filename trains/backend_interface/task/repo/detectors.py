@@ -1,19 +1,20 @@
 import abc
 import os
-from subprocess import call, CalledProcessError
+from subprocess import CalledProcessError, call
 
 import attr
+
 import six
 from pathlib2 import Path
 
 from ....config.defs import (
-    VCS_REPO_TYPE,
-    VCS_DIFF,
-    VCS_STATUS,
-    VCS_ROOT,
     VCS_BRANCH,
     VCS_COMMIT_ID,
+    VCS_DIFF,
+    VCS_REPO_TYPE,
     VCS_REPOSITORY_URL,
+    VCS_ROOT,
+    VCS_STATUS,
 )
 from ....debugging import get_logger
 from .util import get_command_output
@@ -45,12 +46,12 @@ class Result(object):
 class Detector(object):
     """ Base class for repository detection """
 
-    """ 
-    Commands are represented using the result class, where each attribute contains 
-    the command used to obtain the value of the same attribute in the actual result. 
+    """
+    Commands are represented using the result class, where each attribute contains
+    the command used to obtain the value of the same attribute in the actual result.
     """
 
-    _fallback = '_fallback'
+    _fallback = "_fallback"
 
     @attr.s
     class Commands(object):
@@ -81,13 +82,19 @@ class Detector(object):
 
         except (CalledProcessError, UnicodeDecodeError) as ex:
             if not name.endswith(self._fallback):
-                fallback_command = attr.asdict(self._get_commands()).get(name + self._fallback)
+                fallback_command = attr.asdict(self._get_commands()).get(
+                    name + self._fallback
+                )
                 if fallback_command:
                     try:
                         return get_command_output(fallback_command, path)
                     except (CalledProcessError, UnicodeDecodeError):
                         pass
-            _logger.warning("Can't get {} information for {} repo in {}".format(name, self.type_name, path))
+            _logger.warning(
+                "Can't get {} information for {} repo in {}".format(
+                    name, self.type_name, path
+                )
+            )
             # full details only in debug
             _logger.debug(
                 "Can't get {} information for {} repo in {}: {}".format(
@@ -207,7 +214,7 @@ class GitDetector(Detector):
         #     info.url += ".git"
 
         if (info.branch or "").startswith("origin/"):
-            info.branch = info.branch[len("origin/"):]
+            info.branch = info.branch[len("origin/") :]
 
         return info
 
@@ -228,7 +235,7 @@ class EnvDetector(Detector):
         """
         try:
             return os.path.abspath((Path.cwd() / root).absolute().as_posix())
-        except:
+        except BaseException:
             return Path.cwd()
 
     def _get_info(self, _, include_diff=False):
@@ -236,11 +243,16 @@ class EnvDetector(Detector):
 
         if not repository_url:
             raise DetectionError("No VCS environment data")
-        status = VCS_STATUS.get() or ''
-        diff = VCS_DIFF.get() or ''
-        modified = bool(diff or (status and [s for s in status.split('\n') if s.strip().startswith('M ')]))
+        status = VCS_STATUS.get() or ""
+        diff = VCS_DIFF.get() or ""
+        modified = bool(
+            diff
+            or (
+                status and [s for s in status.split("\n") if s.strip().startswith("M ")]
+            )
+        )
         if modified and not diff:
-            diff = '# Repository modified, but no git diff could be extracted.'
+            diff = "# Repository modified, but no git diff could be extracted."
         return Result(
             url=repository_url,
             branch=VCS_BRANCH.get(),

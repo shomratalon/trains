@@ -15,10 +15,20 @@ class StdStreamPatch(object):
 
     @staticmethod
     def patch_std_streams(logger):
-        if DevWorker.report_stdout and not PrintPatchLogger.patched and not running_remotely():
-            StdStreamPatch._stdout_proxy = PrintPatchLogger(sys.stdout, logger, level=logging.INFO)
-            StdStreamPatch._stderr_proxy = PrintPatchLogger(sys.stderr, logger, level=logging.ERROR)
-            logger._task_handler = TaskHandler(logger._task.session, logger._task.id, capacity=100)
+        if (
+            DevWorker.report_stdout
+            and not PrintPatchLogger.patched
+            and not running_remotely()
+        ):
+            StdStreamPatch._stdout_proxy = PrintPatchLogger(
+                sys.stdout, logger, level=logging.INFO
+            )
+            StdStreamPatch._stderr_proxy = PrintPatchLogger(
+                sys.stderr, logger, level=logging.ERROR
+            )
+            logger._task_handler = TaskHandler(
+                logger._task.session, logger._task.id, capacity=100
+            )
             # noinspection PyBroadException
             try:
                 if StdStreamPatch._stdout_original_write is None:
@@ -26,10 +36,10 @@ class StdStreamPatch(object):
                 if StdStreamPatch._stderr_original_write is None:
                     StdStreamPatch._stderr_original_write = sys.stderr.write
                 # this will only work in python 3, guard it with try/catch
-                if not hasattr(sys.stdout, '_original_write'):
+                if not hasattr(sys.stdout, "_original_write"):
                     sys.stdout._original_write = sys.stdout.write
                 sys.stdout.write = StdStreamPatch._stdout__patched__write__
-                if not hasattr(sys.stderr, '_original_write'):
+                if not hasattr(sys.stderr, "_original_write"):
                     sys.stderr._original_write = sys.stderr.write
                 sys.stderr.write = StdStreamPatch._stderr__patched__write__
             except Exception:
@@ -53,12 +63,13 @@ class StdStreamPatch(object):
             # noinspection PyBroadException
             try:
                 from loguru import logger
+
                 register_stderr = None
                 register_stdout = None
                 for k, v in logger._handlers.items():
-                    if v._name == '<stderr>':
+                    if v._name == "<stderr>":
                         register_stderr = k
-                    elif v._name == '<stdout>':
+                    elif v._name == "<stdout>":
                         register_stderr = k
                 if register_stderr is not None:
                     logger.remove(register_stderr)
@@ -70,7 +81,9 @@ class StdStreamPatch(object):
                 pass
 
         elif DevWorker.report_stdout and not running_remotely():
-            logger._task_handler = TaskHandler(logger._task.session, logger._task.id, capacity=100)
+            logger._task_handler = TaskHandler(
+                logger._task.session, logger._task.id, capacity=100
+            )
             if StdStreamPatch._stdout_proxy:
                 StdStreamPatch._stdout_proxy.connect(logger)
             if StdStreamPatch._stderr_proxy:
@@ -119,6 +132,7 @@ class PrintPatchLogger(object):
     Allowed patching a stream into the logger.
     Used for capturing and logging stdin and stderr when running in development mode pseudo worker.
     """
+
     patched = False
     lock = threading.Lock()
     recursion_protect_lock = threading.RLock()
@@ -128,27 +142,28 @@ class PrintPatchLogger(object):
         self._terminal = stream
         self._log = logger
         self._log_level = level
-        self._cur_line = ''
+        self._cur_line = ""
 
     def write(self, message):
-        # make sure that we do not end up in infinite loop (i.e. log.console ends up calling us)
+        # make sure that we do not end up in infinite loop (i.e. log.console
+        # ends up calling us)
         if self._log and not PrintPatchLogger.recursion_protect_lock._is_owned():
             try:
                 self.lock.acquire()
                 with PrintPatchLogger.recursion_protect_lock:
-                    if hasattr(self._terminal, '_original_write'):
+                    if hasattr(self._terminal, "_original_write"):
                         self._terminal._original_write(message)
                     else:
                         self._terminal.write(message)
 
-                do_flush = '\n' in message
-                do_cr = '\r' in message
+                do_flush = "\n" in message
+                do_cr = "\r" in message
                 self._cur_line += message
                 if (not do_flush and not do_cr) or not message:
                     return
-                last_lf = self._cur_line.rindex('\n' if do_flush else '\r')
-                next_line = self._cur_line[last_lf + 1:]
-                cur_line = self._cur_line[:last_lf + 1].rstrip()
+                last_lf = self._cur_line.rindex("\n" if do_flush else "\r")
+                next_line = self._cur_line[last_lf + 1 :]
+                cur_line = self._cur_line[: last_lf + 1].rstrip()
                 self._cur_line = next_line
             finally:
                 self.lock.release()
@@ -158,18 +173,20 @@ class PrintPatchLogger(object):
                     # noinspection PyBroadException
                     try:
                         if self._log:
-                            self._log._console(cur_line, level=self._log_level, omit_console=True)
+                            self._log._console(
+                                cur_line, level=self._log_level, omit_console=True
+                            )
                     except Exception:
                         # what can we do, nothing
                         pass
         else:
-            if hasattr(self._terminal, '_original_write'):
+            if hasattr(self._terminal, "_original_write"):
                 self._terminal._original_write(message)
             else:
                 self._terminal.write(message)
 
     def connect(self, logger):
-        self._cur_line = ''
+        self._cur_line = ""
         self._log = logger
 
     def disconnect(self, logger=None):
@@ -178,12 +195,12 @@ class PrintPatchLogger(object):
             self.connect(None)
 
     def __getattr__(self, attr):
-        if attr in ['_log', '_terminal', '_log_level', '_cur_line']:
+        if attr in ["_log", "_terminal", "_log_level", "_cur_line"]:
             return self.__dict__.get(attr)
         return getattr(self._terminal, attr)
 
     def __setattr__(self, key, value):
-        if key in ['_log', '_terminal', '_log_level', '_cur_line']:
+        if key in ["_log", "_terminal", "_log_level", "_cur_line"]:
             self.__dict__[key] = value
         else:
             return setattr(self._terminal, key, value)

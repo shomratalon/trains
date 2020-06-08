@@ -9,16 +9,16 @@ class Timer(object):
     """A class implementing a simple timer, with a reset option """
 
     def __init__(self):
-        self._start_time = 0.
-        self._diff = 0.
-        self._total_time = 0.
-        self._average_time = 0.
+        self._start_time = 0.0
+        self._diff = 0.0
+        self._total_time = 0.0
+        self._average_time = 0.0
         self._calls = 0
         self.tic()
 
     def reset(self):
-        self._start_time = 0.
-        self._diff = 0.
+        self._start_time = 0.0
+        self._diff = 0.0
         self.reset_average()
 
     def reset_average(self):
@@ -75,7 +75,7 @@ class TimersMixin(object):
 
     def add_timer(self, name, timer=None):
         if name in self._timers:
-            raise ValueError('timer %s already exists' % name)
+            raise ValueError("timer %s already exists" % name)
         timer = timer or Timer()
         self._timers[name] = timer
         return timer
@@ -109,4 +109,6 @@ class TimersMixin(object):
         return [self._call_timer(name, lambda t: t.toc()) for name in names]
 
     def toc_with_reset_timer(self, name, average=True, reset_if_calls=1000):
-        return self._call_timer(name, lambda t: t.toc_with_reset(average, reset_if_calls))
+        return self._call_timer(
+            name, lambda t: t.toc_with_reset(average, reset_if_calls)
+        )

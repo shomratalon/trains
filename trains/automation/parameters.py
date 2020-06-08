@@ -1,13 +1,14 @@
 import sys
 from itertools import product
 from random import Random as BaseRandom
-from typing import Mapping, Any, Sequence, Optional, Union
+from typing import Any, Mapping, Optional, Sequence, Union
 
 
 class RandomSeed(object):
     """
     Base class controlling random sampling for every optimization strategy
     """
+
     _random = BaseRandom(1337)
     _seed = 1337
 
@@ -72,8 +73,15 @@ class Parameter(RandomSeed):
 
         :return dict:  dict representation of the object (serialization)
         """
-        serialize = {'__class__': str(self.__class__).split('.')[-1][:-2]}
-        serialize.update(dict(((k, v.to_dict() if hasattr(v, 'to_dict') else v) for k, v in self.__dict__.items())))
+        serialize = {"__class__": str(self.__class__).split(".")[-1][:-2]}
+        serialize.update(
+            dict(
+                (
+                    (k, v.to_dict() if hasattr(v, "to_dict") else v)
+                    for k, v in self.__dict__.items()
+                )
+            )
+        )
         return serialize
 
     @classmethod
@@ -85,7 +93,7 @@ class Parameter(RandomSeed):
         :return Parameter:  Parameter object
         """
         a_dict = a_dict.copy()
-        a_cls = a_dict.pop('__class__', None)
+        a_cls = a_dict.pop("__class__", None)
         if not a_cls:
             return None
         try:
@@ -93,8 +101,10 @@ class Parameter(RandomSeed):
         except AttributeError:
             return None
         instance = a_cls.__new__(a_cls)
-        instance.__dict__ = dict((k, cls.from_dict(v) if isinstance(v, dict) and '__class__' in v else v)
-                                 for k, v in a_dict.items())
+        instance.__dict__ = dict(
+            (k, cls.from_dict(v) if isinstance(v, dict) and "__class__" in v else v)
+            for k, v in a_dict.items()
+        )
         return instance
 
 
@@ -104,12 +114,12 @@ class UniformParameterRange(Parameter):
     """
 
     def __init__(
-            self,
-            name,  # type: str
-            min_value,  # type: float
-            max_value,  # type: float
-            step_size=None,  # type: Optional[float]
-            include_max_value=True  # type: bool
+        self,
+        name,  # type: str
+        min_value,  # type: float
+        max_value,  # type: float
+        step_size=None,  # type: Optional[float]
+        include_max_value=True,  # type: bool
     ):
         # type: (...) -> UniformParameterRange
         """
@@ -137,7 +147,10 @@ class UniformParameterRange(Parameter):
         if not self.step_size:
             return {self.name: self._random.uniform(self.min_value, self.max_value)}
         steps = (self.max_value - self.min_value) / self.step_size
-        return {self.name: self.min_value + (self._random.randrange(start=0, stop=round(steps)) * self.step_size)}
+        return {
+            self.name: self.min_value
+            + (self._random.randrange(start=0, stop=round(steps)) * self.step_size)
+        }
 
     def to_list(self):
         # type: () -> Sequence[Mapping[str, float]]
@@ -146,9 +159,9 @@ class UniformParameterRange(Parameter):
         if self.step_size is not defined, return 100 points between minmax values
         :return list: list of dicts {name: float}
         """
-        step_size = self.step_size or (self.max_value - self.min_value) / 100.
+        step_size = self.step_size or (self.max_value - self.min_value) / 100.0
         steps = (self.max_value - self.min_value) / self.step_size
-        values = [v*step_size for v in range(0, int(steps))]
+        values = [v * step_size for v in range(0, int(steps))]
         if self.include_max and (not values or values[-1] < self.max_value):
             values.append(self.max_value)
         return [{self.name: v} for v in values]
@@ -182,9 +195,13 @@ class UniformIntegerParameterRange(Parameter):
 
         :return dict: {self.name: random value [self.min_value, self.max_value)}
         """
-        return {self.name: self._random.randrange(
-            start=self.min_value, step=self.step_size,
-            stop=self.max_value + (0 if not self.include_max else self.step_size))}
+        return {
+            self.name: self._random.randrange(
+                start=self.min_value,
+                step=self.step_size,
+                stop=self.max_value + (0 if not self.include_max else self.step_size),
+            )
+        }
 
     def to_list(self):
         # type: () -> Sequence[Mapping[str, int]]
@@ -240,7 +257,8 @@ class ParameterSet(Parameter):
     """
 
     def __init__(self, parameter_combinations=()):
-        # type: (Sequence[Mapping[str, Union[float, int, str, Parameter]]]) -> ParameterSet
+        # type: (Sequence[Mapping[str, Union[float, int, str, Parameter]]]) ->
+        # ParameterSet
         """
         Uniformly sample values form a list of discrete options (combinations) of parameters
 
@@ -278,7 +296,9 @@ class ParameterSet(Parameter):
                 if isinstance(v, Parameter):
                     single_option[k] = v.to_list()
                 else:
-                    single_option[k] = [{k: v}, ]
+                    single_option[k] = [
+                        {k: v},
+                    ]
 
             for state in product(*single_option.values()):
                 combinations.append(dict(kv for d in state for kv in d.items()))

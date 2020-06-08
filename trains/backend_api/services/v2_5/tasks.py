@@ -3,15 +3,21 @@ tasks service
 
 Provides a management API for tasks in the system.
 """
-import six
+import enum
 import types
 from datetime import datetime
-import enum
 
+import six
 from dateutil.parser import parse as parse_datetime
 
-from ....backend_api.session import Request, BatchRequest, Response, NonStrictDataModel, schema_property, StringEnum
-
+from ....backend_api.session import (
+    BatchRequest,
+    NonStrictDataModel,
+    Request,
+    Response,
+    StringEnum,
+    schema_property,
+)
 
 
 class MultiFieldPatternData(NonStrictDataModel):
@@ -21,27 +27,28 @@ class MultiFieldPatternData(NonStrictDataModel):
     :param fields: List of field names
     :type fields: Sequence[str]
     """
+
     _schema = {
-        'properties': {
-            'fields': {
-                'description': 'List of field names',
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+        "properties": {
+            "fields": {
+                "description": "List of field names",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'pattern': {
-                'description': 'Pattern string (regex)',
-                'type': ['string', 'null'],
+            "pattern": {
+                "description": "Pattern string (regex)",
+                "type": ["string", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, pattern=None, fields=None, **kwargs):
+
+    def __init__(self, pattern=None, fields=None, **kwargs):
         super(MultiFieldPatternData, self).__init__(**kwargs)
         self.pattern = pattern
         self.fields = fields
 
-    @schema_property('pattern')
+    @schema_property("pattern")
     def pattern(self):
         return self._property_pattern
 
@@ -54,7 +61,7 @@ class MultiFieldPatternData(NonStrictDataModel):
         self.assert_isinstance(value, "pattern", six.string_types)
         self._property_pattern = value
 
-    @schema_property('fields')
+    @schema_property("fields")
     def fields(self):
         return self._property_fields
 
@@ -94,47 +101,60 @@ class Script(NonStrictDataModel):
     :param diff: Uncommitted changes found in the repository when task was run
     :type diff: str
     """
+
     _schema = {
-        'properties': {
-            'binary': {
-                'default': 'python',
-                'description': 'Binary to use when running the script',
-                'type': ['string', 'null'],
+        "properties": {
+            "binary": {
+                "default": "python",
+                "description": "Binary to use when running the script",
+                "type": ["string", "null"],
             },
-            'branch': {
-                'description': 'Repository branch id If not provided and tag not provided, default repository branch is used.',
-                'type': ['string', 'null'],
+            "branch": {
+                "description": "Repository branch id If not provided and tag not provided, default repository branch is used.",
+                "type": ["string", "null"],
             },
-            'diff': {
-                'description': 'Uncommitted changes found in the repository when task was run',
-                'type': ['string', 'null'],
+            "diff": {
+                "description": "Uncommitted changes found in the repository when task was run",
+                "type": ["string", "null"],
             },
-            'entry_point': {
-                'description': 'Path to execute within the repository',
-                'type': ['string', 'null'],
+            "entry_point": {
+                "description": "Path to execute within the repository",
+                "type": ["string", "null"],
             },
-            'repository': {
-                'description': 'Name of the repository where the script is located',
-                'type': ['string', 'null'],
+            "repository": {
+                "description": "Name of the repository where the script is located",
+                "type": ["string", "null"],
             },
-            'requirements': {
-                'description': 'A JSON object containing requirements strings by key',
-                'type': ['object', 'null'],
+            "requirements": {
+                "description": "A JSON object containing requirements strings by key",
+                "type": ["object", "null"],
             },
-            'tag': {'description': 'Repository tag', 'type': ['string', 'null']},
-            'version_num': {
-                'description': 'Version (changeset) number. Optional (default is head version) Unused if tag is provided.',
-                'type': ['string', 'null'],
+            "tag": {"description": "Repository tag", "type": ["string", "null"]},
+            "version_num": {
+                "description": "Version (changeset) number. Optional (default is head version) Unused if tag is provided.",
+                "type": ["string", "null"],
             },
-            'working_dir': {
-                'description': 'Path to the folder from which to run the script Default - root folder of repository',
-                'type': ['string', 'null'],
+            "working_dir": {
+                "description": "Path to the folder from which to run the script Default - root folder of repository",
+                "type": ["string", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
+
     def __init__(
-            self, binary="python", repository=None, tag=None, branch=None, version_num=None, entry_point=None, working_dir=None, requirements=None, diff=None, **kwargs):
+        self,
+        binary="python",
+        repository=None,
+        tag=None,
+        branch=None,
+        version_num=None,
+        entry_point=None,
+        working_dir=None,
+        requirements=None,
+        diff=None,
+        **kwargs
+    ):
         super(Script, self).__init__(**kwargs)
         self.binary = binary
         self.repository = repository
@@ -146,7 +166,7 @@ class Script(NonStrictDataModel):
         self.requirements = requirements
         self.diff = diff
 
-    @schema_property('binary')
+    @schema_property("binary")
     def binary(self):
         return self._property_binary
 
@@ -159,7 +179,7 @@ class Script(NonStrictDataModel):
         self.assert_isinstance(value, "binary", six.string_types)
         self._property_binary = value
 
-    @schema_property('repository')
+    @schema_property("repository")
     def repository(self):
         return self._property_repository
 
@@ -172,7 +192,7 @@ class Script(NonStrictDataModel):
         self.assert_isinstance(value, "repository", six.string_types)
         self._property_repository = value
 
-    @schema_property('tag')
+    @schema_property("tag")
     def tag(self):
         return self._property_tag
 
@@ -185,7 +205,7 @@ class Script(NonStrictDataModel):
         self.assert_isinstance(value, "tag", six.string_types)
         self._property_tag = value
 
-    @schema_property('branch')
+    @schema_property("branch")
     def branch(self):
         return self._property_branch
 
@@ -198,7 +218,7 @@ class Script(NonStrictDataModel):
         self.assert_isinstance(value, "branch", six.string_types)
         self._property_branch = value
 
-    @schema_property('version_num')
+    @schema_property("version_num")
     def version_num(self):
         return self._property_version_num
 
@@ -211,7 +231,7 @@ class Script(NonStrictDataModel):
         self.assert_isinstance(value, "version_num", six.string_types)
         self._property_version_num = value
 
-    @schema_property('entry_point')
+    @schema_property("entry_point")
     def entry_point(self):
         return self._property_entry_point
 
@@ -224,7 +244,7 @@ class Script(NonStrictDataModel):
         self.assert_isinstance(value, "entry_point", six.string_types)
         self._property_entry_point = value
 
-    @schema_property('working_dir')
+    @schema_property("working_dir")
     def working_dir(self):
         return self._property_working_dir
 
@@ -237,7 +257,7 @@ class Script(NonStrictDataModel):
         self.assert_isinstance(value, "working_dir", six.string_types)
         self._property_working_dir = value
 
-    @schema_property('requirements')
+    @schema_property("requirements")
     def requirements(self):
         return self._property_requirements
 
@@ -250,7 +270,7 @@ class Script(NonStrictDataModel):
         self.assert_isinstance(value, "requirements", (dict,))
         self._property_requirements = value
 
-    @schema_property('diff')
+    @schema_property("diff")
     def diff(self):
         return self._property_diff
 
@@ -275,31 +295,31 @@ class Output(NonStrictDataModel):
     :param error: Last error text
     :type error: str
     """
+
     _schema = {
-        'properties': {
-            'destination': {
-                'description': 'Storage id. This is where output files will be stored.',
-                'type': ['string', 'null'],
+        "properties": {
+            "destination": {
+                "description": "Storage id. This is where output files will be stored.",
+                "type": ["string", "null"],
             },
-            'error': {'description': 'Last error text', 'type': ['string', 'null']},
-            'model': {'description': 'Model id.', 'type': ['string', 'null']},
-            'result': {
-                'description': "Task result. Values: 'success', 'failure'",
-                'type': ['string', 'null'],
+            "error": {"description": "Last error text", "type": ["string", "null"]},
+            "model": {"description": "Model id.", "type": ["string", "null"]},
+            "result": {
+                "description": "Task result. Values: 'success', 'failure'",
+                "type": ["string", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, destination=None, model=None, result=None, error=None, **kwargs):
+
+    def __init__(self, destination=None, model=None, result=None, error=None, **kwargs):
         super(Output, self).__init__(**kwargs)
         self.destination = destination
         self.model = model
         self.result = result
         self.error = error
 
-
-    @schema_property('destination')
+    @schema_property("destination")
     def destination(self):
         return self._property_destination
 
@@ -312,7 +332,7 @@ class Output(NonStrictDataModel):
         self.assert_isinstance(value, "destination", six.string_types)
         self._property_destination = value
 
-    @schema_property('model')
+    @schema_property("model")
     def model(self):
         return self._property_model
 
@@ -325,7 +345,7 @@ class Output(NonStrictDataModel):
         self.assert_isinstance(value, "model", six.string_types)
         self._property_model = value
 
-    @schema_property('result')
+    @schema_property("result")
     def result(self):
         return self._property_result
 
@@ -338,7 +358,7 @@ class Output(NonStrictDataModel):
         self.assert_isinstance(value, "result", six.string_types)
         self._property_result = value
 
-    @schema_property('error')
+    @schema_property("error")
     def error(self):
         return self._property_error
 
@@ -352,8 +372,6 @@ class Output(NonStrictDataModel):
         self._property_error = value
 
 
-
-
 class ArtifactTypeData(NonStrictDataModel):
     """
     :param preview: Description or textual data
@@ -363,31 +381,32 @@ class ArtifactTypeData(NonStrictDataModel):
     :param data_hash: Hash of raw data, without any headers or descriptive parts
     :type data_hash: str
     """
+
     _schema = {
-        'properties': {
-            'content_type': {
-                'description': 'System defined raw data content type',
-                'type': ['string', 'null'],
+        "properties": {
+            "content_type": {
+                "description": "System defined raw data content type",
+                "type": ["string", "null"],
             },
-            'data_hash': {
-                'description': 'Hash of raw data, without any headers or descriptive parts',
-                'type': ['string', 'null'],
+            "data_hash": {
+                "description": "Hash of raw data, without any headers or descriptive parts",
+                "type": ["string", "null"],
             },
-            'preview': {
-                'description': 'Description or textual data',
-                'type': ['string', 'null'],
+            "preview": {
+                "description": "Description or textual data",
+                "type": ["string", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, preview=None, content_type=None, data_hash=None, **kwargs):
+
+    def __init__(self, preview=None, content_type=None, data_hash=None, **kwargs):
         super(ArtifactTypeData, self).__init__(**kwargs)
         self.preview = preview
         self.content_type = content_type
         self.data_hash = data_hash
 
-    @schema_property('preview')
+    @schema_property("preview")
     def preview(self):
         return self._property_preview
 
@@ -400,7 +419,7 @@ class ArtifactTypeData(NonStrictDataModel):
         self.assert_isinstance(value, "preview", six.string_types)
         self._property_preview = value
 
-    @schema_property('content_type')
+    @schema_property("content_type")
     def content_type(self):
         return self._property_content_type
 
@@ -413,7 +432,7 @@ class ArtifactTypeData(NonStrictDataModel):
         self.assert_isinstance(value, "content_type", six.string_types)
         self._property_content_type = value
 
-    @schema_property('data_hash')
+    @schema_property("data_hash")
     def data_hash(self):
         return self._property_data_hash
 
@@ -448,41 +467,54 @@ class Artifact(NonStrictDataModel):
     :param display_data: User-defined list of key/value pairs, sorted
     :type display_data: Sequence[Sequence[str]]
     """
+
     _schema = {
-        'properties': {
-            'content_size': {
-                'description': 'Raw data length in bytes',
-                'type': 'integer',
+        "properties": {
+            "content_size": {
+                "description": "Raw data length in bytes",
+                "type": "integer",
             },
-            'display_data': {
-                'description': 'User-defined list of key/value pairs, sorted',
-                'items': {'items': {'type': 'string'}, 'type': 'array'},
-                'type': 'array',
+            "display_data": {
+                "description": "User-defined list of key/value pairs, sorted",
+                "items": {"items": {"type": "string"}, "type": "array"},
+                "type": "array",
             },
-            'hash': {'description': 'Hash of entire raw data', 'type': 'string'},
-            'key': {'description': 'Entry key', 'type': 'string'},
-            'mode': {
-                'default': 'output',
-                'description': 'System defined input/output indication',
-                'enum': ['input', 'output'],
-                'type': 'string',
+            "hash": {"description": "Hash of entire raw data", "type": "string"},
+            "key": {"description": "Entry key", "type": "string"},
+            "mode": {
+                "default": "output",
+                "description": "System defined input/output indication",
+                "enum": ["input", "output"],
+                "type": "string",
             },
-            'timestamp': {
-                'description': 'Epoch time when artifact was created',
-                'type': 'integer',
+            "timestamp": {
+                "description": "Epoch time when artifact was created",
+                "type": "integer",
             },
-            'type': {'description': 'System defined type', 'type': 'string'},
-            'type_data': {
-                '$ref': '#/definitions/artifact_type_data',
-                'description': 'Additional fields defined by the system',
+            "type": {"description": "System defined type", "type": "string"},
+            "type_data": {
+                "$ref": "#/definitions/artifact_type_data",
+                "description": "Additional fields defined by the system",
             },
-            'uri': {'description': 'Raw data location', 'type': 'string'},
+            "uri": {"description": "Raw data location", "type": "string"},
         },
-        'required': ['key', 'type'],
-        'type': 'object',
+        "required": ["key", "type"],
+        "type": "object",
     }
+
     def __init__(
-            self, key, type, mode="output", uri=None, content_size=None, hash=None, timestamp=None, type_data=None, display_data=None, **kwargs):
+        self,
+        key,
+        type,
+        mode="output",
+        uri=None,
+        content_size=None,
+        hash=None,
+        timestamp=None,
+        type_data=None,
+        display_data=None,
+        **kwargs
+    ):
         super(Artifact, self).__init__(**kwargs)
         self.key = key
         self.type = type
@@ -494,7 +526,7 @@ class Artifact(NonStrictDataModel):
         self.type_data = type_data
         self.display_data = display_data
 
-    @schema_property('key')
+    @schema_property("key")
     def key(self):
         return self._property_key
 
@@ -507,7 +539,7 @@ class Artifact(NonStrictDataModel):
         self.assert_isinstance(value, "key", six.string_types)
         self._property_key = value
 
-    @schema_property('type')
+    @schema_property("type")
     def type(self):
         return self._property_type
 
@@ -520,7 +552,7 @@ class Artifact(NonStrictDataModel):
         self.assert_isinstance(value, "type", six.string_types)
         self._property_type = value
 
-    @schema_property('mode')
+    @schema_property("mode")
     def mode(self):
         return self._property_mode
 
@@ -533,7 +565,7 @@ class Artifact(NonStrictDataModel):
         self.assert_isinstance(value, "mode", six.string_types)
         self._property_mode = value
 
-    @schema_property('uri')
+    @schema_property("uri")
     def uri(self):
         return self._property_uri
 
@@ -546,7 +578,7 @@ class Artifact(NonStrictDataModel):
         self.assert_isinstance(value, "uri", six.string_types)
         self._property_uri = value
 
-    @schema_property('content_size')
+    @schema_property("content_size")
     def content_size(self):
         return self._property_content_size
 
@@ -561,7 +593,7 @@ class Artifact(NonStrictDataModel):
         self.assert_isinstance(value, "content_size", six.integer_types)
         self._property_content_size = value
 
-    @schema_property('hash')
+    @schema_property("hash")
     def hash(self):
         return self._property_hash
 
@@ -574,7 +606,7 @@ class Artifact(NonStrictDataModel):
         self.assert_isinstance(value, "hash", six.string_types)
         self._property_hash = value
 
-    @schema_property('timestamp')
+    @schema_property("timestamp")
     def timestamp(self):
         return self._property_timestamp
 
@@ -589,7 +621,7 @@ class Artifact(NonStrictDataModel):
         self.assert_isinstance(value, "timestamp", six.integer_types)
         self._property_timestamp = value
 
-    @schema_property('type_data')
+    @schema_property("type_data")
     def type_data(self):
         return self._property_type_data
 
@@ -604,7 +636,7 @@ class Artifact(NonStrictDataModel):
             self.assert_isinstance(value, "type_data", ArtifactTypeData)
         self._property_type_data = value
 
-    @schema_property('display_data')
+    @schema_property("display_data")
     def display_data(self):
         return self._property_display_data
 
@@ -643,49 +675,61 @@ class Execution(NonStrictDataModel):
     :param artifacts: Task artifacts
     :type artifacts: Sequence[Artifact]
     """
+
     _schema = {
-        'properties': {
-            'artifacts': {
-                'description': 'Task artifacts',
-                'items': {'$ref': '#/definitions/artifact'},
-                'type': ['array', 'null'],
+        "properties": {
+            "artifacts": {
+                "description": "Task artifacts",
+                "items": {"$ref": "#/definitions/artifact"},
+                "type": ["array", "null"],
             },
-            'docker_cmd': {
-                'description': 'Command for running docker script for the execution of the task',
-                'type': ['string', 'null'],
+            "docker_cmd": {
+                "description": "Command for running docker script for the execution of the task",
+                "type": ["string", "null"],
             },
-            'framework': {
-                'description': 'Framework related to the task. Case insensitive. Mandatory for Training tasks. ',
-                'type': ['string', 'null'],
+            "framework": {
+                "description": "Framework related to the task. Case insensitive. Mandatory for Training tasks. ",
+                "type": ["string", "null"],
             },
-            'model': {
-                'description': 'Execution input model ID Not applicable for Register (Import) tasks',
-                'type': ['string', 'null'],
+            "model": {
+                "description": "Execution input model ID Not applicable for Register (Import) tasks",
+                "type": ["string", "null"],
             },
-            'model_desc': {
-                'additionalProperties': True,
-                'description': 'Json object representing the Model descriptors',
-                'type': ['object', 'null'],
+            "model_desc": {
+                "additionalProperties": True,
+                "description": "Json object representing the Model descriptors",
+                "type": ["object", "null"],
             },
-            'model_labels': {
-                'additionalProperties': {'type': 'integer'},
-                'description': "Json object representing the ids of the labels in the model.\n                The keys are the layers' names and the values are the IDs.\n                Not applicable for Register (Import) tasks.\n                Mandatory for Training tasks",
-                'type': ['object', 'null'],
+            "model_labels": {
+                "additionalProperties": {"type": "integer"},
+                "description": "Json object representing the ids of the labels in the model.\n                The keys are the layers' names and the values are the IDs.\n                Not applicable for Register (Import) tasks.\n                Mandatory for Training tasks",
+                "type": ["object", "null"],
             },
-            'parameters': {
-                'additionalProperties': True,
-                'description': 'Json object containing the Task parameters',
-                'type': ['object', 'null'],
+            "parameters": {
+                "additionalProperties": True,
+                "description": "Json object containing the Task parameters",
+                "type": ["object", "null"],
             },
-            'queue': {
-                'description': 'Queue ID where task was queued.',
-                'type': ['string', 'null'],
+            "queue": {
+                "description": "Queue ID where task was queued.",
+                "type": ["string", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
+
     def __init__(
-            self, queue=None, parameters=None, model=None, model_desc=None, model_labels=None, framework=None, docker_cmd=None, artifacts=None, **kwargs):
+        self,
+        queue=None,
+        parameters=None,
+        model=None,
+        model_desc=None,
+        model_labels=None,
+        framework=None,
+        docker_cmd=None,
+        artifacts=None,
+        **kwargs
+    ):
         super(Execution, self).__init__(**kwargs)
         self.queue = queue
         self.parameters = parameters
@@ -696,7 +740,7 @@ class Execution(NonStrictDataModel):
         self.docker_cmd = docker_cmd
         self.artifacts = artifacts
 
-    @schema_property('queue')
+    @schema_property("queue")
     def queue(self):
         return self._property_queue
 
@@ -709,7 +753,7 @@ class Execution(NonStrictDataModel):
         self.assert_isinstance(value, "queue", six.string_types)
         self._property_queue = value
 
-    @schema_property('parameters')
+    @schema_property("parameters")
     def parameters(self):
         return self._property_parameters
 
@@ -722,7 +766,7 @@ class Execution(NonStrictDataModel):
         self.assert_isinstance(value, "parameters", (dict,))
         self._property_parameters = value
 
-    @schema_property('model')
+    @schema_property("model")
     def model(self):
         return self._property_model
 
@@ -735,7 +779,7 @@ class Execution(NonStrictDataModel):
         self.assert_isinstance(value, "model", six.string_types)
         self._property_model = value
 
-    @schema_property('model_desc')
+    @schema_property("model_desc")
     def model_desc(self):
         return self._property_model_desc
 
@@ -748,7 +792,7 @@ class Execution(NonStrictDataModel):
         self.assert_isinstance(value, "model_desc", (dict,))
         self._property_model_desc = value
 
-    @schema_property('model_labels')
+    @schema_property("model_labels")
     def model_labels(self):
         return self._property_model_labels
 
@@ -761,7 +805,7 @@ class Execution(NonStrictDataModel):
         self.assert_isinstance(value, "model_labels", (dict,))
         self._property_model_labels = value
 
-    @schema_property('framework')
+    @schema_property("framework")
     def framework(self):
         return self._property_framework
 
@@ -774,7 +818,7 @@ class Execution(NonStrictDataModel):
         self.assert_isinstance(value, "framework", six.string_types)
         self._property_framework = value
 
-    @schema_property('docker_cmd')
+    @schema_property("docker_cmd")
     def docker_cmd(self):
         return self._property_docker_cmd
 
@@ -787,7 +831,7 @@ class Execution(NonStrictDataModel):
         self.assert_isinstance(value, "docker_cmd", six.string_types)
         self._property_docker_cmd = value
 
-    @schema_property('artifacts')
+    @schema_property("artifacts")
     def artifacts(self):
         return self._property_artifacts
 
@@ -836,27 +880,36 @@ class LastMetricsEvent(NonStrictDataModel):
     :param max_value: Maximum value reported
     :type max_value: float
     """
+
     _schema = {
-        'properties': {
-            'max_value': {
-                'description': 'Maximum value reported',
-                'type': ['number', 'null'],
+        "properties": {
+            "max_value": {
+                "description": "Maximum value reported",
+                "type": ["number", "null"],
             },
-            'metric': {'description': 'Metric name', 'type': ['string', 'null']},
-            'min_value': {
-                'description': 'Minimum value reported',
-                'type': ['number', 'null'],
+            "metric": {"description": "Metric name", "type": ["string", "null"]},
+            "min_value": {
+                "description": "Minimum value reported",
+                "type": ["number", "null"],
             },
-            'value': {
-                'description': 'Last value reported',
-                'type': ['number', 'null'],
+            "value": {
+                "description": "Last value reported",
+                "type": ["number", "null"],
             },
-            'variant': {'description': 'Variant name', 'type': ['string', 'null']},
+            "variant": {"description": "Variant name", "type": ["string", "null"]},
         },
-        'type': 'object',
+        "type": "object",
     }
+
     def __init__(
-            self, metric=None, variant=None, value=None, min_value=None, max_value=None, **kwargs):
+        self,
+        metric=None,
+        variant=None,
+        value=None,
+        min_value=None,
+        max_value=None,
+        **kwargs
+    ):
         super(LastMetricsEvent, self).__init__(**kwargs)
         self.metric = metric
         self.variant = variant
@@ -864,7 +917,7 @@ class LastMetricsEvent(NonStrictDataModel):
         self.min_value = min_value
         self.max_value = max_value
 
-    @schema_property('metric')
+    @schema_property("metric")
     def metric(self):
         return self._property_metric
 
@@ -877,7 +930,7 @@ class LastMetricsEvent(NonStrictDataModel):
         self.assert_isinstance(value, "metric", six.string_types)
         self._property_metric = value
 
-    @schema_property('variant')
+    @schema_property("variant")
     def variant(self):
         return self._property_variant
 
@@ -890,7 +943,7 @@ class LastMetricsEvent(NonStrictDataModel):
         self.assert_isinstance(value, "variant", six.string_types)
         self._property_variant = value
 
-    @schema_property('value')
+    @schema_property("value")
     def value(self):
         return self._property_value
 
@@ -903,7 +956,7 @@ class LastMetricsEvent(NonStrictDataModel):
         self.assert_isinstance(value, "value", six.integer_types + (float,))
         self._property_value = value
 
-    @schema_property('min_value')
+    @schema_property("min_value")
     def min_value(self):
         return self._property_min_value
 
@@ -916,7 +969,7 @@ class LastMetricsEvent(NonStrictDataModel):
         self.assert_isinstance(value, "min_value", six.integer_types + (float,))
         self._property_min_value = value
 
-    @schema_property('max_value')
+    @schema_property("max_value")
     def max_value(self):
         return self._property_max_value
 
@@ -935,10 +988,11 @@ class LastMetricsVariants(NonStrictDataModel):
     Last metric events, one for each variant hash
 
     """
+
     _schema = {
-        'additionalProperties': {'$ref': '#/definitions/last_metrics_event'},
-        'description': 'Last metric events, one for each variant hash',
-        'type': 'object',
+        "additionalProperties": {"$ref": "#/definitions/last_metrics_event"},
+        "description": "Last metric events, one for each variant hash",
+        "type": "object",
     }
 
 
@@ -1001,123 +1055,147 @@ class Task(NonStrictDataModel):
         hash
     :type last_metrics: dict
     """
+
     _schema = {
-        'properties': {
-            'comment': {
-                'description': 'Free text comment',
-                'type': ['string', 'null'],
+        "properties": {
+            "comment": {
+                "description": "Free text comment",
+                "type": ["string", "null"],
             },
-            'company': {'description': 'Company ID', 'type': ['string', 'null']},
-            'completed': {
-                'description': 'Task end time (UTC)',
-                'format': 'date-time',
-                'type': ['string', 'null'],
+            "company": {"description": "Company ID", "type": ["string", "null"]},
+            "completed": {
+                "description": "Task end time (UTC)",
+                "format": "date-time",
+                "type": ["string", "null"],
             },
-            'created': {
-                'description': 'Task creation time (UTC) ',
-                'format': 'date-time',
-                'type': ['string', 'null'],
+            "created": {
+                "description": "Task creation time (UTC) ",
+                "format": "date-time",
+                "type": ["string", "null"],
             },
-            'execution': {
-                'description': 'Task execution params',
-                'oneOf': [{'$ref': '#/definitions/execution'}, {'type': 'null'}],
+            "execution": {
+                "description": "Task execution params",
+                "oneOf": [{"$ref": "#/definitions/execution"}, {"type": "null"}],
             },
-            'id': {'description': 'Task id', 'type': ['string', 'null']},
-            'last_iteration': {
-                'description': 'Last iteration reported for this task',
-                'type': ['integer', 'null'],
+            "id": {"description": "Task id", "type": ["string", "null"]},
+            "last_iteration": {
+                "description": "Last iteration reported for this task",
+                "type": ["integer", "null"],
             },
-            'last_metrics': {
-                'additionalProperties': {
-                    '$ref': '#/definitions/last_metrics_variants',
+            "last_metrics": {
+                "additionalProperties": {
+                    "$ref": "#/definitions/last_metrics_variants",
                 },
-                'description': 'Last metric variants (hash to events), one for each metric hash',
-                'type': ['object', 'null'],
+                "description": "Last metric variants (hash to events), one for each metric hash",
+                "type": ["object", "null"],
             },
-            'last_update': {
-                'description': 'Last time this task was created, updated, changed or events for this task were reported',
-                'format': 'date-time',
-                'type': ['string', 'null'],
+            "last_update": {
+                "description": "Last time this task was created, updated, changed or events for this task were reported",
+                "format": "date-time",
+                "type": ["string", "null"],
             },
-            'last_worker': {
-                'description': 'ID of last worker that handled the task',
-                'type': ['string', 'null'],
+            "last_worker": {
+                "description": "ID of last worker that handled the task",
+                "type": ["string", "null"],
             },
-            'last_worker_report': {
-                'description': 'Last time a worker reported while working on this task',
-                'format': 'date-time',
-                'type': ['string', 'null'],
+            "last_worker_report": {
+                "description": "Last time a worker reported while working on this task",
+                "format": "date-time",
+                "type": ["string", "null"],
             },
-            'name': {'description': 'Task Name', 'type': ['string', 'null']},
-            'output': {
-                'description': 'Task output params',
-                'oneOf': [{'$ref': '#/definitions/output'}, {'type': 'null'}],
+            "name": {"description": "Task Name", "type": ["string", "null"]},
+            "output": {
+                "description": "Task output params",
+                "oneOf": [{"$ref": "#/definitions/output"}, {"type": "null"}],
             },
-            'parent': {'description': 'Parent task id', 'type': ['string', 'null']},
-            'project': {
-                'description': 'Project ID of the project to which this task is assigned',
-                'type': ['string', 'null'],
+            "parent": {"description": "Parent task id", "type": ["string", "null"]},
+            "project": {
+                "description": "Project ID of the project to which this task is assigned",
+                "type": ["string", "null"],
             },
-            'published': {
-                'description': 'Last status change time',
-                'format': 'date-time',
-                'type': ['string', 'null'],
+            "published": {
+                "description": "Last status change time",
+                "format": "date-time",
+                "type": ["string", "null"],
             },
-            'script': {
-                'description': 'Script info',
-                'oneOf': [{'$ref': '#/definitions/script'}, {'type': 'null'}],
+            "script": {
+                "description": "Script info",
+                "oneOf": [{"$ref": "#/definitions/script"}, {"type": "null"}],
             },
-            'started': {
-                'description': 'Task start time (UTC)',
-                'format': 'date-time',
-                'type': ['string', 'null'],
+            "started": {
+                "description": "Task start time (UTC)",
+                "format": "date-time",
+                "type": ["string", "null"],
             },
-            'status': {
-                'description': '',
-                'oneOf': [
-                    {'$ref': '#/definitions/task_status_enum'},
-                    {'type': 'null'},
+            "status": {
+                "description": "",
+                "oneOf": [
+                    {"$ref": "#/definitions/task_status_enum"},
+                    {"type": "null"},
                 ],
             },
-            'status_changed': {
-                'description': 'Last status change time',
-                'format': 'date-time',
-                'type': ['string', 'null'],
+            "status_changed": {
+                "description": "Last status change time",
+                "format": "date-time",
+                "type": ["string", "null"],
             },
-            'status_message': {
-                'description': 'free text string representing info about the status',
-                'type': ['string', 'null'],
+            "status_message": {
+                "description": "free text string representing info about the status",
+                "type": ["string", "null"],
             },
-            'status_reason': {
-                'description': 'Reason for last status change',
-                'type': ['string', 'null'],
+            "status_reason": {
+                "description": "Reason for last status change",
+                "type": ["string", "null"],
             },
-            'system_tags': {
-                'description': "System tags list. This field is reserved for system use, please don't use it.",
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "system_tags": {
+                "description": "System tags list. This field is reserved for system use, please don't use it.",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'tags': {
-                'description': 'User-defined tags list',
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "tags": {
+                "description": "User-defined tags list",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'type': {
-                'description': "Type of task. Values: 'training', 'testing'",
-                'oneOf': [
-                    {'$ref': '#/definitions/task_type_enum'},
-                    {'type': 'null'},
-                ],
+            "type": {
+                "description": "Type of task. Values: 'training', 'testing'",
+                "oneOf": [{"$ref": "#/definitions/task_type_enum"}, {"type": "null"},],
             },
-            'user': {
-                'description': 'Associated user id',
-                'type': ['string', 'null'],
-            },
+            "user": {"description": "Associated user id", "type": ["string", "null"],},
         },
-        'type': 'object',
+        "type": "object",
     }
+
     def __init__(
-            self, id=None, name=None, user=None, company=None, type=None, status=None, comment=None, created=None, started=None, completed=None, parent=None, project=None, output=None, execution=None, script=None, tags=None, system_tags=None, status_changed=None, status_message=None, status_reason=None, published=None, last_worker=None, last_worker_report=None, last_update=None, last_iteration=None, last_metrics=None, **kwargs):
+        self,
+        id=None,
+        name=None,
+        user=None,
+        company=None,
+        type=None,
+        status=None,
+        comment=None,
+        created=None,
+        started=None,
+        completed=None,
+        parent=None,
+        project=None,
+        output=None,
+        execution=None,
+        script=None,
+        tags=None,
+        system_tags=None,
+        status_changed=None,
+        status_message=None,
+        status_reason=None,
+        published=None,
+        last_worker=None,
+        last_worker_report=None,
+        last_update=None,
+        last_iteration=None,
+        last_metrics=None,
+        **kwargs
+    ):
         super(Task, self).__init__(**kwargs)
         self.id = id
         self.name = name
@@ -1146,7 +1224,7 @@ class Task(NonStrictDataModel):
         self.last_iteration = last_iteration
         self.last_metrics = last_metrics
 
-    @schema_property('id')
+    @schema_property("id")
     def id(self):
         return self._property_id
 
@@ -1159,7 +1237,7 @@ class Task(NonStrictDataModel):
         self.assert_isinstance(value, "id", six.string_types)
         self._property_id = value
 
-    @schema_property('name')
+    @schema_property("name")
     def name(self):
         return self._property_name
 
@@ -1172,7 +1250,7 @@ class Task(NonStrictDataModel):
         self.assert_isinstance(value, "name", six.string_types)
         self._property_name = value
 
-    @schema_property('user')
+    @schema_property("user")
     def user(self):
         return self._property_user
 
@@ -1185,7 +1263,7 @@ class Task(NonStrictDataModel):
         self.assert_isinstance(value, "user", six.string_types)
         self._property_user = value
 
-    @schema_property('company')
+    @schema_property("company")
     def company(self):
         return self._property_company
 
@@ -1198,7 +1276,7 @@ class Task(NonStrictDataModel):
         self.assert_isinstance(value, "company", six.string_types)
         self._property_company = value
 
-    @schema_property('type')
+    @schema_property("type")
     def type(self):
         return self._property_type
 
@@ -1216,7 +1294,7 @@ class Task(NonStrictDataModel):
             self.assert_isinstance(value, "type", enum.Enum)
         self._property_type = value
 
-    @schema_property('status')
+    @schema_property("status")
     def status(self):
         return self._property_status
 
@@ -1234,7 +1312,7 @@ class Task(NonStrictDataModel):
             self.assert_isinstance(value, "status", enum.Enum)
         self._property_status = value
 
-    @schema_property('comment')
+    @schema_property("comment")
     def comment(self):
         return self._property_comment
 
@@ -1247,7 +1325,7 @@ class Task(NonStrictDataModel):
         self.assert_isinstance(value, "comment", six.string_types)
         self._property_comment = value
 
-    @schema_property('created')
+    @schema_property("created")
     def created(self):
         return self._property_created
 
@@ -1262,7 +1340,7 @@ class Task(NonStrictDataModel):
             value = parse_datetime(value)
         self._property_created = value
 
-    @schema_property('started')
+    @schema_property("started")
     def started(self):
         return self._property_started
 
@@ -1277,7 +1355,7 @@ class Task(NonStrictDataModel):
             value = parse_datetime(value)
         self._property_started = value
 
-    @schema_property('completed')
+    @schema_property("completed")
     def completed(self):
         return self._property_completed
 
@@ -1292,7 +1370,7 @@ class Task(NonStrictDataModel):
             value = parse_datetime(value)
         self._property_completed = value
 
-    @schema_property('parent')
+    @schema_property("parent")
     def parent(self):
         return self._property_parent
 
@@ -1305,7 +1383,7 @@ class Task(NonStrictDataModel):
         self.assert_isinstance(value, "parent", six.string_types)
         self._property_parent = value
 
-    @schema_property('project')
+    @schema_property("project")
     def project(self):
         return self._property_project
 
@@ -1318,7 +1396,7 @@ class Task(NonStrictDataModel):
         self.assert_isinstance(value, "project", six.string_types)
         self._property_project = value
 
-    @schema_property('output')
+    @schema_property("output")
     def output(self):
         return self._property_output
 
@@ -1333,7 +1411,7 @@ class Task(NonStrictDataModel):
             self.assert_isinstance(value, "output", Output)
         self._property_output = value
 
-    @schema_property('execution')
+    @schema_property("execution")
     def execution(self):
         return self._property_execution
 
@@ -1348,7 +1426,7 @@ class Task(NonStrictDataModel):
             self.assert_isinstance(value, "execution", Execution)
         self._property_execution = value
 
-    @schema_property('script')
+    @schema_property("script")
     def script(self):
         return self._property_script
 
@@ -1363,7 +1441,7 @@ class Task(NonStrictDataModel):
             self.assert_isinstance(value, "script", Script)
         self._property_script = value
 
-    @schema_property('tags')
+    @schema_property("tags")
     def tags(self):
         return self._property_tags
 
@@ -1378,7 +1456,7 @@ class Task(NonStrictDataModel):
         self.assert_isinstance(value, "tags", six.string_types, is_array=True)
         self._property_tags = value
 
-    @schema_property('system_tags')
+    @schema_property("system_tags")
     def system_tags(self):
         return self._property_system_tags
 
@@ -1393,7 +1471,7 @@ class Task(NonStrictDataModel):
         self.assert_isinstance(value, "system_tags", six.string_types, is_array=True)
         self._property_system_tags = value
 
-    @schema_property('status_changed')
+    @schema_property("status_changed")
     def status_changed(self):
         return self._property_status_changed
 
@@ -1408,7 +1486,7 @@ class Task(NonStrictDataModel):
             value = parse_datetime(value)
         self._property_status_changed = value
 
-    @schema_property('status_message')
+    @schema_property("status_message")
     def status_message(self):
         return self._property_status_message
 
@@ -1421,7 +1499,7 @@ class Task(NonStrictDataModel):
         self.assert_isinstance(value, "status_message", six.string_types)
         self._property_status_message = value
 
-    @schema_property('status_reason')
+    @schema_property("status_reason")
     def status_reason(self):
         return self._property_status_reason
 
@@ -1434,7 +1512,7 @@ class Task(NonStrictDataModel):
         self.assert_isinstance(value, "status_reason", six.string_types)
         self._property_status_reason = value
 
-    @schema_property('published')
+    @schema_property("published")
     def published(self):
         return self._property_published
 
@@ -1449,7 +1527,7 @@ class Task(NonStrictDataModel):
             value = parse_datetime(value)
         self._property_published = value
 
-    @schema_property('last_worker')
+    @schema_property("last_worker")
     def last_worker(self):
         return self._property_last_worker
 
@@ -1462,7 +1540,7 @@ class Task(NonStrictDataModel):
         self.assert_isinstance(value, "last_worker", six.string_types)
         self._property_last_worker = value
 
-    @schema_property('last_worker_report')
+    @schema_property("last_worker_report")
     def last_worker_report(self):
         return self._property_last_worker_report
 
@@ -1472,11 +1550,14 @@ class Task(NonStrictDataModel):
             self._property_last_worker_report = None
             return
 
-        self.assert_isinstance(value, "last_worker_report", six.string_types + (datetime,))
+        self.assert_isinstance(
+            value, "last_worker_report", six.string_types + (datetime,)
+        )
         if not isinstance(value, datetime):
             value = parse_datetime(value)
         self._property_last_worker_report = value
-    @schema_property('last_update')
+
+    @schema_property("last_update")
     def last_update(self):
         return self._property_last_update
 
@@ -1491,7 +1572,7 @@ class Task(NonStrictDataModel):
             value = parse_datetime(value)
         self._property_last_update = value
 
-    @schema_property('last_iteration')
+    @schema_property("last_iteration")
     def last_iteration(self):
         return self._property_last_iteration
 
@@ -1506,7 +1587,7 @@ class Task(NonStrictDataModel):
         self.assert_isinstance(value, "last_iteration", six.integer_types)
         self._property_last_iteration = value
 
-    @schema_property('last_metrics')
+    @schema_property("last_metrics")
     def last_metrics(self):
         return self._property_last_metrics
 
@@ -1538,35 +1619,37 @@ class CloseRequest(Request):
     _action = "close"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'force': {
-                'default': False,
-                'description': 'Allows forcing state change even if transition is not supported',
-                'type': ['boolean', 'null'],
+        "definitions": {},
+        "properties": {
+            "force": {
+                "default": False,
+                "description": "Allows forcing state change even if transition is not supported",
+                "type": ["boolean", "null"],
             },
-            'status_message': {
-                'description': 'Extra information regarding status change',
-                'type': 'string',
+            "status_message": {
+                "description": "Extra information regarding status change",
+                "type": "string",
             },
-            'status_reason': {
-                'description': 'Reason for status change',
-                'type': 'string',
+            "status_reason": {
+                "description": "Reason for status change",
+                "type": "string",
             },
-            'task': {'description': 'Task ID', 'type': 'string'},
+            "task": {"description": "Task ID", "type": "string"},
         },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, force=False, status_reason=None, status_message=None, **kwargs):
+        self, task, force=False, status_reason=None, status_message=None, **kwargs
+    ):
         super(CloseRequest, self).__init__(**kwargs)
         self.force = force
         self.task = task
         self.status_reason = status_reason
         self.status_message = status_message
 
-    @schema_property('force')
+    @schema_property("force")
     def force(self):
         return self._property_force
 
@@ -1579,7 +1662,7 @@ class CloseRequest(Request):
         self.assert_isinstance(value, "force", (bool,))
         self._property_force = value
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -1592,7 +1675,7 @@ class CloseRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('status_reason')
+    @schema_property("status_reason")
     def status_reason(self):
         return self._property_status_reason
 
@@ -1605,7 +1688,7 @@ class CloseRequest(Request):
         self.assert_isinstance(value, "status_reason", six.string_types)
         self._property_status_reason = value
 
-    @schema_property('status_message')
+    @schema_property("status_message")
     def status_message(self):
         return self._property_status_message
 
@@ -1628,33 +1711,34 @@ class CloseResponse(Response):
     :param fields: Updated fields names and values
     :type fields: dict
     """
+
     _service = "tasks"
     _action = "close"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'fields': {
-                'additionalProperties': True,
-                'description': 'Updated fields names and values',
-                'type': ['object', 'null'],
+        "definitions": {},
+        "properties": {
+            "fields": {
+                "additionalProperties": True,
+                "description": "Updated fields names and values",
+                "type": ["object", "null"],
             },
-            'updated': {
-                'description': 'Number of tasks updated (0 or 1)',
-                'enum': [0, 1],
-                'type': ['integer', 'null'],
+            "updated": {
+                "description": "Number of tasks updated (0 or 1)",
+                "enum": [0, 1],
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, updated=None, fields=None, **kwargs):
+
+    def __init__(self, updated=None, fields=None, **kwargs):
         super(CloseResponse, self).__init__(**kwargs)
         self.updated = updated
         self.fields = fields
 
-    @schema_property('updated')
+    @schema_property("updated")
     def updated(self):
         return self._property_updated
 
@@ -1669,7 +1753,7 @@ class CloseResponse(Response):
         self.assert_isinstance(value, "updated", six.integer_types)
         self._property_updated = value
 
-    @schema_property('fields')
+    @schema_property("fields")
     def fields(self):
         return self._property_fields
 
@@ -1702,35 +1786,37 @@ class CompletedRequest(Request):
     _action = "completed"
     _version = "2.2"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'force': {
-                'default': False,
-                'description': 'If not true, call fails if the task status is not in_progress/stopped',
-                'type': ['boolean', 'null'],
+        "definitions": {},
+        "properties": {
+            "force": {
+                "default": False,
+                "description": "If not true, call fails if the task status is not in_progress/stopped",
+                "type": ["boolean", "null"],
             },
-            'status_message': {
-                'description': 'Extra information regarding status change',
-                'type': 'string',
+            "status_message": {
+                "description": "Extra information regarding status change",
+                "type": "string",
             },
-            'status_reason': {
-                'description': 'Reason for status change',
-                'type': 'string',
+            "status_reason": {
+                "description": "Reason for status change",
+                "type": "string",
             },
-            'task': {'description': 'Task ID', 'type': 'string'},
+            "task": {"description": "Task ID", "type": "string"},
         },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, force=False, status_reason=None, status_message=None, **kwargs):
+        self, task, force=False, status_reason=None, status_message=None, **kwargs
+    ):
         super(CompletedRequest, self).__init__(**kwargs)
         self.force = force
         self.task = task
         self.status_reason = status_reason
         self.status_message = status_message
 
-    @schema_property('force')
+    @schema_property("force")
     def force(self):
         return self._property_force
 
@@ -1743,7 +1829,7 @@ class CompletedRequest(Request):
         self.assert_isinstance(value, "force", (bool,))
         self._property_force = value
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -1756,7 +1842,7 @@ class CompletedRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('status_reason')
+    @schema_property("status_reason")
     def status_reason(self):
         return self._property_status_reason
 
@@ -1769,7 +1855,7 @@ class CompletedRequest(Request):
         self.assert_isinstance(value, "status_reason", six.string_types)
         self._property_status_reason = value
 
-    @schema_property('status_message')
+    @schema_property("status_message")
     def status_message(self):
         return self._property_status_message
 
@@ -1792,33 +1878,34 @@ class CompletedResponse(Response):
     :param fields: Updated fields names and values
     :type fields: dict
     """
+
     _service = "tasks"
     _action = "completed"
     _version = "2.2"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'fields': {
-                'additionalProperties': True,
-                'description': 'Updated fields names and values',
-                'type': ['object', 'null'],
+        "definitions": {},
+        "properties": {
+            "fields": {
+                "additionalProperties": True,
+                "description": "Updated fields names and values",
+                "type": ["object", "null"],
             },
-            'updated': {
-                'description': 'Number of tasks updated (0 or 1)',
-                'enum': [0, 1],
-                'type': ['integer', 'null'],
+            "updated": {
+                "description": "Number of tasks updated (0 or 1)",
+                "enum": [0, 1],
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, updated=None, fields=None, **kwargs):
+
+    def __init__(self, updated=None, fields=None, **kwargs):
         super(CompletedResponse, self).__init__(**kwargs)
         self.updated = updated
         self.fields = fields
 
-    @schema_property('updated')
+    @schema_property("updated")
     def updated(self):
         return self._property_updated
 
@@ -1833,7 +1920,7 @@ class CompletedResponse(Response):
         self.assert_isinstance(value, "updated", six.integer_types)
         self._property_updated = value
 
-    @schema_property('fields')
+    @schema_property("fields")
     def fields(self):
         return self._property_fields
 
@@ -1882,204 +1969,206 @@ class CreateRequest(Request):
     _action = "create"
     _version = "2.1"
     _schema = {
-        'definitions': {
-            'artifact': {
-                'properties': {
-                    'content_size': {
-                        'description': 'Raw data length in bytes',
-                        'type': 'integer',
+        "definitions": {
+            "artifact": {
+                "properties": {
+                    "content_size": {
+                        "description": "Raw data length in bytes",
+                        "type": "integer",
                     },
-                    'display_data': {
-                        'description': 'User-defined list of key/value pairs, sorted',
-                        'items': {'items': {'type': 'string'}, 'type': 'array'},
-                        'type': 'array',
+                    "display_data": {
+                        "description": "User-defined list of key/value pairs, sorted",
+                        "items": {"items": {"type": "string"}, "type": "array"},
+                        "type": "array",
                     },
-                    'hash': {
-                        'description': 'Hash of entire raw data',
-                        'type': 'string',
+                    "hash": {
+                        "description": "Hash of entire raw data",
+                        "type": "string",
                     },
-                    'key': {'description': 'Entry key', 'type': 'string'},
-                    'mode': {
-                        'default': 'output',
-                        'description': 'System defined input/output indication',
-                        'enum': ['input', 'output'],
-                        'type': 'string',
+                    "key": {"description": "Entry key", "type": "string"},
+                    "mode": {
+                        "default": "output",
+                        "description": "System defined input/output indication",
+                        "enum": ["input", "output"],
+                        "type": "string",
                     },
-                    'timestamp': {
-                        'description': 'Epoch time when artifact was created',
-                        'type': 'integer',
+                    "timestamp": {
+                        "description": "Epoch time when artifact was created",
+                        "type": "integer",
                     },
-                    'type': {
-                        'description': 'System defined type',
-                        'type': 'string',
+                    "type": {"description": "System defined type", "type": "string",},
+                    "type_data": {
+                        "$ref": "#/definitions/artifact_type_data",
+                        "description": "Additional fields defined by the system",
                     },
-                    'type_data': {
-                        '$ref': '#/definitions/artifact_type_data',
-                        'description': 'Additional fields defined by the system',
-                    },
-                    'uri': {'description': 'Raw data location', 'type': 'string'},
+                    "uri": {"description": "Raw data location", "type": "string"},
                 },
-                'required': ['key', 'type'],
-                'type': 'object',
+                "required": ["key", "type"],
+                "type": "object",
             },
-            'artifact_type_data': {
-                'properties': {
-                    'content_type': {
-                        'description': 'System defined raw data content type',
-                        'type': ['string', 'null'],
+            "artifact_type_data": {
+                "properties": {
+                    "content_type": {
+                        "description": "System defined raw data content type",
+                        "type": ["string", "null"],
                     },
-                    'data_hash': {
-                        'description': 'Hash of raw data, without any headers or descriptive parts',
-                        'type': ['string', 'null'],
+                    "data_hash": {
+                        "description": "Hash of raw data, without any headers or descriptive parts",
+                        "type": ["string", "null"],
                     },
-                    'preview': {
-                        'description': 'Description or textual data',
-                        'type': ['string', 'null'],
+                    "preview": {
+                        "description": "Description or textual data",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'execution': {
-                'properties': {
-                    'artifacts': {
-                        'description': 'Task artifacts',
-                        'items': {'$ref': '#/definitions/artifact'},
-                        'type': ['array', 'null'],
+            "execution": {
+                "properties": {
+                    "artifacts": {
+                        "description": "Task artifacts",
+                        "items": {"$ref": "#/definitions/artifact"},
+                        "type": ["array", "null"],
                     },
-                    'docker_cmd': {
-                        'description': 'Command for running docker script for the execution of the task',
-                        'type': ['string', 'null'],
+                    "docker_cmd": {
+                        "description": "Command for running docker script for the execution of the task",
+                        "type": ["string", "null"],
                     },
-                    'framework': {
-                        'description': 'Framework related to the task. Case insensitive. Mandatory for Training tasks. ',
-                        'type': ['string', 'null'],
+                    "framework": {
+                        "description": "Framework related to the task. Case insensitive. Mandatory for Training tasks. ",
+                        "type": ["string", "null"],
                     },
-                    'model': {
-                        'description': 'Execution input model ID Not applicable for Register (Import) tasks',
-                        'type': ['string', 'null'],
+                    "model": {
+                        "description": "Execution input model ID Not applicable for Register (Import) tasks",
+                        "type": ["string", "null"],
                     },
-                    'model_desc': {
-                        'additionalProperties': True,
-                        'description': 'Json object representing the Model descriptors',
-                        'type': ['object', 'null'],
+                    "model_desc": {
+                        "additionalProperties": True,
+                        "description": "Json object representing the Model descriptors",
+                        "type": ["object", "null"],
                     },
-                    'model_labels': {
-                        'additionalProperties': {'type': 'integer'},
-                        'description': "Json object representing the ids of the labels in the model.\n                The keys are the layers' names and the values are the IDs.\n                Not applicable for Register (Import) tasks.\n                Mandatory for Training tasks",
-                        'type': ['object', 'null'],
+                    "model_labels": {
+                        "additionalProperties": {"type": "integer"},
+                        "description": "Json object representing the ids of the labels in the model.\n                The keys are the layers' names and the values are the IDs.\n                Not applicable for Register (Import) tasks.\n                Mandatory for Training tasks",
+                        "type": ["object", "null"],
                     },
-                    'parameters': {
-                        'additionalProperties': True,
-                        'description': 'Json object containing the Task parameters',
-                        'type': ['object', 'null'],
+                    "parameters": {
+                        "additionalProperties": True,
+                        "description": "Json object containing the Task parameters",
+                        "type": ["object", "null"],
                     },
-                    'queue': {
-                        'description': 'Queue ID where task was queued.',
-                        'type': ['string', 'null'],
+                    "queue": {
+                        "description": "Queue ID where task was queued.",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'script': {
-                'properties': {
-                    'binary': {
-                        'default': 'python',
-                        'description': 'Binary to use when running the script',
-                        'type': ['string', 'null'],
+            "script": {
+                "properties": {
+                    "binary": {
+                        "default": "python",
+                        "description": "Binary to use when running the script",
+                        "type": ["string", "null"],
                     },
-                    'branch': {
-                        'description': 'Repository branch id If not provided and tag not provided, default repository branch is used.',
-                        'type': ['string', 'null'],
+                    "branch": {
+                        "description": "Repository branch id If not provided and tag not provided, default repository branch is used.",
+                        "type": ["string", "null"],
                     },
-                    'diff': {
-                        'description': 'Uncommitted changes found in the repository when task was run',
-                        'type': ['string', 'null'],
+                    "diff": {
+                        "description": "Uncommitted changes found in the repository when task was run",
+                        "type": ["string", "null"],
                     },
-                    'entry_point': {
-                        'description': 'Path to execute within the repository',
-                        'type': ['string', 'null'],
+                    "entry_point": {
+                        "description": "Path to execute within the repository",
+                        "type": ["string", "null"],
                     },
-                    'repository': {
-                        'description': 'Name of the repository where the script is located',
-                        'type': ['string', 'null'],
+                    "repository": {
+                        "description": "Name of the repository where the script is located",
+                        "type": ["string", "null"],
                     },
-                    'requirements': {
-                        'description': 'A JSON object containing requirements strings by key',
-                        'type': ['object', 'null'],
+                    "requirements": {
+                        "description": "A JSON object containing requirements strings by key",
+                        "type": ["object", "null"],
                     },
-                    'tag': {
-                        'description': 'Repository tag',
-                        'type': ['string', 'null'],
+                    "tag": {
+                        "description": "Repository tag",
+                        "type": ["string", "null"],
                     },
-                    'version_num': {
-                        'description': 'Version (changeset) number. Optional (default is head version) Unused if tag is provided.',
-                        'type': ['string', 'null'],
+                    "version_num": {
+                        "description": "Version (changeset) number. Optional (default is head version) Unused if tag is provided.",
+                        "type": ["string", "null"],
                     },
-                    'working_dir': {
-                        'description': 'Path to the folder from which to run the script Default - root folder of repository',
-                        'type': ['string', 'null'],
+                    "working_dir": {
+                        "description": "Path to the folder from which to run the script Default - root folder of repository",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'task_type_enum': {
-                'enum': [
-                    'training',
-                    'testing',
-                ],
-                'type': 'string',
-            },
+            "task_type_enum": {"enum": ["training", "testing",], "type": "string",},
         },
-        'properties': {
-            'comment': {'description': 'Free text comment ', 'type': 'string'},
-            'execution': {
-                '$ref': '#/definitions/execution',
-                'description': 'Task execution params',
+        "properties": {
+            "comment": {"description": "Free text comment ", "type": "string"},
+            "execution": {
+                "$ref": "#/definitions/execution",
+                "description": "Task execution params",
             },
-            'input': {
+            "input": {
                 # '$ref': '#/definitions/input',
-                'description': 'Task input params.  (input view must be provided).',
+                "description": "Task input params.  (input view must be provided).",
             },
-            'name': {
-                'description': 'Task name. Unique within the company.',
-                'type': 'string',
+            "name": {
+                "description": "Task name. Unique within the company.",
+                "type": "string",
             },
-            'output_dest': {
-                'description': 'Output storage id Must be a reference to an existing storage.',
-                'type': 'string',
+            "output_dest": {
+                "description": "Output storage id Must be a reference to an existing storage.",
+                "type": "string",
             },
-            'parent': {
-                'description': 'Parent task id Must be a completed task.',
-                'type': 'string',
+            "parent": {
+                "description": "Parent task id Must be a completed task.",
+                "type": "string",
             },
-            'project': {
-                'description': 'Project ID of the project to which this task is assigned Must exist[ab]',
-                'type': 'string',
+            "project": {
+                "description": "Project ID of the project to which this task is assigned Must exist[ab]",
+                "type": "string",
             },
-            'script': {
-                '$ref': '#/definitions/script',
-                'description': 'Script info',
+            "script": {"$ref": "#/definitions/script", "description": "Script info",},
+            "system_tags": {
+                "description": "System tags list. This field is reserved for system use, please don't use it.",
+                "items": {"type": "string"},
+                "type": "array",
             },
-            'system_tags': {
-                'description': "System tags list. This field is reserved for system use, please don't use it.",
-                'items': {'type': 'string'},
-                'type': 'array',
+            "tags": {
+                "description": "User-defined tags list",
+                "items": {"type": "string"},
+                "type": "array",
             },
-            'tags': {
-                'description': 'User-defined tags list',
-                'items': {'type': 'string'},
-                'type': 'array',
-            },
-            'type': {
-                '$ref': '#/definitions/task_type_enum',
-                'description': 'Type of task',
+            "type": {
+                "$ref": "#/definitions/task_type_enum",
+                "description": "Type of task",
             },
         },
-        'required': ['name', 'type'],
-        'type': 'object',
+        "required": ["name", "type"],
+        "type": "object",
     }
+
     def __init__(
-            self, name, type, tags=None, system_tags=None, comment=None, parent=None, project=None, input=None, output_dest=None, execution=None, script=None, **kwargs):
+        self,
+        name,
+        type,
+        tags=None,
+        system_tags=None,
+        comment=None,
+        parent=None,
+        project=None,
+        input=None,
+        output_dest=None,
+        execution=None,
+        script=None,
+        **kwargs
+    ):
         super(CreateRequest, self).__init__(**kwargs)
         self.name = name
         self.tags = tags
@@ -2093,7 +2182,7 @@ class CreateRequest(Request):
         self.execution = execution
         self.script = script
 
-    @schema_property('name')
+    @schema_property("name")
     def name(self):
         return self._property_name
 
@@ -2106,7 +2195,7 @@ class CreateRequest(Request):
         self.assert_isinstance(value, "name", six.string_types)
         self._property_name = value
 
-    @schema_property('tags')
+    @schema_property("tags")
     def tags(self):
         return self._property_tags
 
@@ -2121,7 +2210,7 @@ class CreateRequest(Request):
         self.assert_isinstance(value, "tags", six.string_types, is_array=True)
         self._property_tags = value
 
-    @schema_property('system_tags')
+    @schema_property("system_tags")
     def system_tags(self):
         return self._property_system_tags
 
@@ -2136,7 +2225,7 @@ class CreateRequest(Request):
         self.assert_isinstance(value, "system_tags", six.string_types, is_array=True)
         self._property_system_tags = value
 
-    @schema_property('type')
+    @schema_property("type")
     def type(self):
         return self._property_type
 
@@ -2154,7 +2243,7 @@ class CreateRequest(Request):
             self.assert_isinstance(value, "type", enum.Enum)
         self._property_type = value
 
-    @schema_property('comment')
+    @schema_property("comment")
     def comment(self):
         return self._property_comment
 
@@ -2167,7 +2256,7 @@ class CreateRequest(Request):
         self.assert_isinstance(value, "comment", six.string_types)
         self._property_comment = value
 
-    @schema_property('parent')
+    @schema_property("parent")
     def parent(self):
         return self._property_parent
 
@@ -2180,7 +2269,7 @@ class CreateRequest(Request):
         self.assert_isinstance(value, "parent", six.string_types)
         self._property_parent = value
 
-    @schema_property('project')
+    @schema_property("project")
     def project(self):
         return self._property_project
 
@@ -2193,7 +2282,7 @@ class CreateRequest(Request):
         self.assert_isinstance(value, "project", six.string_types)
         self._property_project = value
 
-    @schema_property('input')
+    @schema_property("input")
     def input(self):
         return self._property_input
 
@@ -2201,7 +2290,7 @@ class CreateRequest(Request):
     def input(self, value):
         self._property_input = value
 
-    @schema_property('output_dest')
+    @schema_property("output_dest")
     def output_dest(self):
         return self._property_output_dest
 
@@ -2214,7 +2303,7 @@ class CreateRequest(Request):
         self.assert_isinstance(value, "output_dest", six.string_types)
         self._property_output_dest = value
 
-    @schema_property('execution')
+    @schema_property("execution")
     def execution(self):
         return self._property_execution
 
@@ -2229,7 +2318,7 @@ class CreateRequest(Request):
             self.assert_isinstance(value, "execution", Execution)
         self._property_execution = value
 
-    @schema_property('script')
+    @schema_property("script")
     def script(self):
         return self._property_script
 
@@ -2252,23 +2341,24 @@ class CreateResponse(Response):
     :param id: ID of the task
     :type id: str
     """
+
     _service = "tasks"
     _action = "create"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'id': {'description': 'ID of the task', 'type': ['string', 'null']},
+        "definitions": {},
+        "properties": {
+            "id": {"description": "ID of the task", "type": ["string", "null"]},
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, id=None, **kwargs):
+
+    def __init__(self, id=None, **kwargs):
         super(CreateResponse, self).__init__(**kwargs)
         self.id = id
 
-    @schema_property('id')
+    @schema_property("id")
     def id(self):
         return self._property_id
 
@@ -2287,7 +2377,7 @@ class DeleteRequest(Request):
     Delete a task along with any information stored for it (statistics, frame updates etc.)
             Unless Force flag is provided, operation will fail if task has objects associated with it - i.e. children tasks, projects or datasets.
             Models that refer to the deleted task will be updated with a task ID indicating a deleted task.
-            
+
 
     :param move_to_trash: Move task to trash instead of deleting it. For internal
         use only, tasks in the trash are not visible from the API and cannot be
@@ -2307,33 +2397,41 @@ class DeleteRequest(Request):
     _action = "delete"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'force': {
-                'default': False,
-                'description': "If not true, call fails if the task status is 'in_progress'",
-                'type': ['boolean', 'null'],
+        "definitions": {},
+        "properties": {
+            "force": {
+                "default": False,
+                "description": "If not true, call fails if the task status is 'in_progress'",
+                "type": ["boolean", "null"],
             },
-            'move_to_trash': {
-                'default': False,
-                'description': 'Move task to trash instead of deleting it. For internal use only, tasks in the trash are not visible from the API and cannot be restored!',
-                'type': ['boolean', 'null'],
+            "move_to_trash": {
+                "default": False,
+                "description": "Move task to trash instead of deleting it. For internal use only, tasks in the trash are not visible from the API and cannot be restored!",
+                "type": ["boolean", "null"],
             },
-            'status_message': {
-                'description': 'Extra information regarding status change',
-                'type': 'string',
+            "status_message": {
+                "description": "Extra information regarding status change",
+                "type": "string",
             },
-            'status_reason': {
-                'description': 'Reason for status change',
-                'type': 'string',
+            "status_reason": {
+                "description": "Reason for status change",
+                "type": "string",
             },
-            'task': {'description': 'Task ID', 'type': 'string'},
+            "task": {"description": "Task ID", "type": "string"},
         },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, move_to_trash=False, force=False, status_reason=None, status_message=None, **kwargs):
+        self,
+        task,
+        move_to_trash=False,
+        force=False,
+        status_reason=None,
+        status_message=None,
+        **kwargs
+    ):
         super(DeleteRequest, self).__init__(**kwargs)
         self.move_to_trash = move_to_trash
         self.force = force
@@ -2341,7 +2439,7 @@ class DeleteRequest(Request):
         self.status_reason = status_reason
         self.status_message = status_message
 
-    @schema_property('move_to_trash')
+    @schema_property("move_to_trash")
     def move_to_trash(self):
         return self._property_move_to_trash
 
@@ -2354,7 +2452,7 @@ class DeleteRequest(Request):
         self.assert_isinstance(value, "move_to_trash", (bool,))
         self._property_move_to_trash = value
 
-    @schema_property('force')
+    @schema_property("force")
     def force(self):
         return self._property_force
 
@@ -2367,7 +2465,7 @@ class DeleteRequest(Request):
         self.assert_isinstance(value, "force", (bool,))
         self._property_force = value
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -2380,7 +2478,7 @@ class DeleteRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('status_reason')
+    @schema_property("status_reason")
     def status_reason(self):
         return self._property_status_reason
 
@@ -2393,7 +2491,7 @@ class DeleteRequest(Request):
         self.assert_isinstance(value, "status_reason", six.string_types)
         self._property_status_reason = value
 
-    @schema_property('status_message')
+    @schema_property("status_message")
     def status_message(self):
         return self._property_status_message
 
@@ -2426,44 +2524,54 @@ class DeleteResponse(Response):
     :param events: Response from events.delete_for_task
     :type events: dict
     """
+
     _service = "tasks"
     _action = "delete"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'deleted': {
-                'description': 'Indicates whether the task was deleted',
-                'type': ['boolean', 'null'],
+        "definitions": {},
+        "properties": {
+            "deleted": {
+                "description": "Indicates whether the task was deleted",
+                "type": ["boolean", "null"],
             },
-            'events': {
-                'additionalProperties': True,
-                'description': 'Response from events.delete_for_task',
-                'type': ['object', 'null'],
+            "events": {
+                "additionalProperties": True,
+                "description": "Response from events.delete_for_task",
+                "type": ["object", "null"],
             },
-            'frames': {
-                'additionalProperties': True,
-                'description': 'Response from frames.rollback',
-                'type': ['object', 'null'],
+            "frames": {
+                "additionalProperties": True,
+                "description": "Response from frames.rollback",
+                "type": ["object", "null"],
             },
-            'updated_children': {
-                'description': 'Number of child tasks whose parent property was updated',
-                'type': ['integer', 'null'],
+            "updated_children": {
+                "description": "Number of child tasks whose parent property was updated",
+                "type": ["integer", "null"],
             },
-            'updated_models': {
-                'description': 'Number of models whose task property was updated',
-                'type': ['integer', 'null'],
+            "updated_models": {
+                "description": "Number of models whose task property was updated",
+                "type": ["integer", "null"],
             },
-            'updated_versions': {
-                'description': 'Number of dataset versions whose task property was updated',
-                'type': ['integer', 'null'],
+            "updated_versions": {
+                "description": "Number of dataset versions whose task property was updated",
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
+
     def __init__(
-            self, deleted=None, updated_children=None, updated_models=None, updated_versions=None, frames=None, events=None, **kwargs):
+        self,
+        deleted=None,
+        updated_children=None,
+        updated_models=None,
+        updated_versions=None,
+        frames=None,
+        events=None,
+        **kwargs
+    ):
         super(DeleteResponse, self).__init__(**kwargs)
         self.deleted = deleted
         self.updated_children = updated_children
@@ -2472,7 +2580,7 @@ class DeleteResponse(Response):
         self.frames = frames
         self.events = events
 
-    @schema_property('deleted')
+    @schema_property("deleted")
     def deleted(self):
         return self._property_deleted
 
@@ -2485,7 +2593,7 @@ class DeleteResponse(Response):
         self.assert_isinstance(value, "deleted", (bool,))
         self._property_deleted = value
 
-    @schema_property('updated_children')
+    @schema_property("updated_children")
     def updated_children(self):
         return self._property_updated_children
 
@@ -2500,7 +2608,7 @@ class DeleteResponse(Response):
         self.assert_isinstance(value, "updated_children", six.integer_types)
         self._property_updated_children = value
 
-    @schema_property('updated_models')
+    @schema_property("updated_models")
     def updated_models(self):
         return self._property_updated_models
 
@@ -2515,7 +2623,7 @@ class DeleteResponse(Response):
         self.assert_isinstance(value, "updated_models", six.integer_types)
         self._property_updated_models = value
 
-    @schema_property('updated_versions')
+    @schema_property("updated_versions")
     def updated_versions(self):
         return self._property_updated_versions
 
@@ -2530,7 +2638,7 @@ class DeleteResponse(Response):
         self.assert_isinstance(value, "updated_versions", six.integer_types)
         self._property_updated_versions = value
 
-    @schema_property('frames')
+    @schema_property("frames")
     def frames(self):
         return self._property_frames
 
@@ -2543,7 +2651,7 @@ class DeleteResponse(Response):
         self.assert_isinstance(value, "frames", (dict,))
         self._property_frames = value
 
-    @schema_property('events')
+    @schema_property("events")
     def events(self):
         return self._property_events
 
@@ -2574,29 +2682,29 @@ class DequeueRequest(Request):
     _action = "dequeue"
     _version = "1.5"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'status_message': {
-                'description': 'Extra information regarding status change',
-                'type': 'string',
+        "definitions": {},
+        "properties": {
+            "status_message": {
+                "description": "Extra information regarding status change",
+                "type": "string",
             },
-            'status_reason': {
-                'description': 'Reason for status change',
-                'type': 'string',
+            "status_reason": {
+                "description": "Reason for status change",
+                "type": "string",
             },
-            'task': {'description': 'Task ID', 'type': 'string'},
+            "task": {"description": "Task ID", "type": "string"},
         },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
-    def __init__(
-            self, task, status_reason=None, status_message=None, **kwargs):
+
+    def __init__(self, task, status_reason=None, status_message=None, **kwargs):
         super(DequeueRequest, self).__init__(**kwargs)
         self.task = task
         self.status_reason = status_reason
         self.status_message = status_message
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -2609,7 +2717,7 @@ class DequeueRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('status_reason')
+    @schema_property("status_reason")
     def status_reason(self):
         return self._property_status_reason
 
@@ -2622,7 +2730,7 @@ class DequeueRequest(Request):
         self.assert_isinstance(value, "status_reason", six.string_types)
         self._property_status_reason = value
 
-    @schema_property('status_message')
+    @schema_property("status_message")
     def status_message(self):
         return self._property_status_message
 
@@ -2647,39 +2755,40 @@ class DequeueResponse(Response):
     :param fields: Updated fields names and values
     :type fields: dict
     """
+
     _service = "tasks"
     _action = "dequeue"
     _version = "1.5"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'dequeued': {
-                'description': 'Number of tasks dequeued (0 or 1)',
-                'enum': [0, 1],
-                'type': ['integer', 'null'],
+        "definitions": {},
+        "properties": {
+            "dequeued": {
+                "description": "Number of tasks dequeued (0 or 1)",
+                "enum": [0, 1],
+                "type": ["integer", "null"],
             },
-            'fields': {
-                'additionalProperties': True,
-                'description': 'Updated fields names and values',
-                'type': ['object', 'null'],
+            "fields": {
+                "additionalProperties": True,
+                "description": "Updated fields names and values",
+                "type": ["object", "null"],
             },
-            'updated': {
-                'description': 'Number of tasks updated (0 or 1)',
-                'enum': [0, 1],
-                'type': ['integer', 'null'],
+            "updated": {
+                "description": "Number of tasks updated (0 or 1)",
+                "enum": [0, 1],
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, dequeued=None, updated=None, fields=None, **kwargs):
+
+    def __init__(self, dequeued=None, updated=None, fields=None, **kwargs):
         super(DequeueResponse, self).__init__(**kwargs)
         self.dequeued = dequeued
         self.updated = updated
         self.fields = fields
 
-    @schema_property('dequeued')
+    @schema_property("dequeued")
     def dequeued(self):
         return self._property_dequeued
 
@@ -2694,7 +2803,7 @@ class DequeueResponse(Response):
         self.assert_isinstance(value, "dequeued", six.integer_types)
         self._property_dequeued = value
 
-    @schema_property('updated')
+    @schema_property("updated")
     def updated(self):
         return self._property_updated
 
@@ -2709,7 +2818,7 @@ class DequeueResponse(Response):
         self.assert_isinstance(value, "updated", six.integer_types)
         self._property_updated = value
 
-    @schema_property('fields')
+    @schema_property("fields")
     def fields(self):
         return self._property_fields
 
@@ -2760,203 +2869,209 @@ class EditRequest(Request):
     _action = "edit"
     _version = "2.1"
     _schema = {
-        'definitions': {
-            'artifact': {
-                'properties': {
-                    'content_size': {
-                        'description': 'Raw data length in bytes',
-                        'type': 'integer',
+        "definitions": {
+            "artifact": {
+                "properties": {
+                    "content_size": {
+                        "description": "Raw data length in bytes",
+                        "type": "integer",
                     },
-                    'display_data': {
-                        'description': 'User-defined list of key/value pairs, sorted',
-                        'items': {'items': {'type': 'string'}, 'type': 'array'},
-                        'type': 'array',
+                    "display_data": {
+                        "description": "User-defined list of key/value pairs, sorted",
+                        "items": {"items": {"type": "string"}, "type": "array"},
+                        "type": "array",
                     },
-                    'hash': {
-                        'description': 'Hash of entire raw data',
-                        'type': 'string',
+                    "hash": {
+                        "description": "Hash of entire raw data",
+                        "type": "string",
                     },
-                    'key': {'description': 'Entry key', 'type': 'string'},
-                    'mode': {
-                        'default': 'output',
-                        'description': 'System defined input/output indication',
-                        'enum': ['input', 'output'],
-                        'type': 'string',
+                    "key": {"description": "Entry key", "type": "string"},
+                    "mode": {
+                        "default": "output",
+                        "description": "System defined input/output indication",
+                        "enum": ["input", "output"],
+                        "type": "string",
                     },
-                    'timestamp': {
-                        'description': 'Epoch time when artifact was created',
-                        'type': 'integer',
+                    "timestamp": {
+                        "description": "Epoch time when artifact was created",
+                        "type": "integer",
                     },
-                    'type': {'description': 'User defined type', 'type': 'string'},
-                    'type_data': {
-                        '$ref': '#/definitions/artifact_type_data',
-                        'description': 'Additional fields defined by the system',
+                    "type": {"description": "User defined type", "type": "string"},
+                    "type_data": {
+                        "$ref": "#/definitions/artifact_type_data",
+                        "description": "Additional fields defined by the system",
                     },
-                    'uri': {'description': 'Raw data location', 'type': 'string'},
+                    "uri": {"description": "Raw data location", "type": "string"},
                 },
-                'required': ['key', 'type'],
-                'type': 'object',
+                "required": ["key", "type"],
+                "type": "object",
             },
-            'artifact_type_data': {
-                'properties': {
-                    'content_type': {
-                        'description': 'System defined raw data content type',
-                        'type': ['string', 'null'],
+            "artifact_type_data": {
+                "properties": {
+                    "content_type": {
+                        "description": "System defined raw data content type",
+                        "type": ["string", "null"],
                     },
-                    'data_hash': {
-                        'description': 'Hash of raw data, without any headers or descriptive parts',
-                        'type': ['string', 'null'],
+                    "data_hash": {
+                        "description": "Hash of raw data, without any headers or descriptive parts",
+                        "type": ["string", "null"],
                     },
-                    'preview': {
-                        'description': 'Description or textual data',
-                        'type': ['string', 'null'],
-                    },
-                },
-                'type': 'object',
-            },
-            'execution': {
-                'properties': {
-                    'artifacts': {
-                        'description': 'Task artifacts',
-                        'items': {'$ref': '#/definitions/artifact'},
-                        'type': ['array', 'null'],
-                    },
-                    'docker_cmd': {
-                        'description': 'Command for running docker script for the execution of the task',
-                        'type': ['string', 'null'],
-                    },
-                    'framework': {
-                        'description': 'Framework related to the task. Case insensitive. Mandatory for Training tasks. ',
-                        'type': ['string', 'null'],
-                    },
-                    'model': {
-                        'description': 'Execution input model ID Not applicable for Register (Import) tasks',
-                        'type': ['string', 'null'],
-                    },
-                    'model_desc': {
-                        'additionalProperties': True,
-                        'description': 'Json object representing the Model descriptors',
-                        'type': ['object', 'null'],
-                    },
-                    'model_labels': {
-                        'additionalProperties': {'type': 'integer'},
-                        'description': "Json object representing the ids of the labels in the model.\n                The keys are the layers' names and the values are the IDs.\n                Not applicable for Register (Import) tasks.\n                Mandatory for Training tasks",
-                        'type': ['object', 'null'],
-                    },
-                    'parameters': {
-                        'additionalProperties': True,
-                        'description': 'Json object containing the Task parameters',
-                        'type': ['object', 'null'],
-                    },
-                    'queue': {
-                        'description': 'Queue ID where task was queued.',
-                        'type': ['string', 'null'],
+                    "preview": {
+                        "description": "Description or textual data",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'script': {
-                'properties': {
-                    'binary': {
-                        'default': 'python',
-                        'description': 'Binary to use when running the script',
-                        'type': ['string', 'null'],
+            "execution": {
+                "properties": {
+                    "artifacts": {
+                        "description": "Task artifacts",
+                        "items": {"$ref": "#/definitions/artifact"},
+                        "type": ["array", "null"],
                     },
-                    'branch': {
-                        'description': 'Repository branch id If not provided and tag not provided, default repository branch is used.',
-                        'type': ['string', 'null'],
+                    "docker_cmd": {
+                        "description": "Command for running docker script for the execution of the task",
+                        "type": ["string", "null"],
                     },
-                    'diff': {
-                        'description': 'Uncommitted changes found in the repository when task was run',
-                        'type': ['string', 'null'],
+                    "framework": {
+                        "description": "Framework related to the task. Case insensitive. Mandatory for Training tasks. ",
+                        "type": ["string", "null"],
                     },
-                    'entry_point': {
-                        'description': 'Path to execute within the repository',
-                        'type': ['string', 'null'],
+                    "model": {
+                        "description": "Execution input model ID Not applicable for Register (Import) tasks",
+                        "type": ["string", "null"],
                     },
-                    'repository': {
-                        'description': 'Name of the repository where the script is located',
-                        'type': ['string', 'null'],
+                    "model_desc": {
+                        "additionalProperties": True,
+                        "description": "Json object representing the Model descriptors",
+                        "type": ["object", "null"],
                     },
-                    'requirements': {
-                        'description': 'A JSON object containing requirements strings by key',
-                        'type': ['object', 'null'],
+                    "model_labels": {
+                        "additionalProperties": {"type": "integer"},
+                        "description": "Json object representing the ids of the labels in the model.\n                The keys are the layers' names and the values are the IDs.\n                Not applicable for Register (Import) tasks.\n                Mandatory for Training tasks",
+                        "type": ["object", "null"],
                     },
-                    'tag': {
-                        'description': 'Repository tag',
-                        'type': ['string', 'null'],
+                    "parameters": {
+                        "additionalProperties": True,
+                        "description": "Json object containing the Task parameters",
+                        "type": ["object", "null"],
                     },
-                    'version_num': {
-                        'description': 'Version (changeset) number. Optional (default is head version) Unused if tag is provided.',
-                        'type': ['string', 'null'],
-                    },
-                    'working_dir': {
-                        'description': 'Path to the folder from which to run the script Default - root folder of repository',
-                        'type': ['string', 'null'],
+                    "queue": {
+                        "description": "Queue ID where task was queued.",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'task_type_enum': {
-                'enum': [
-                    'training',
-                    'testing',
-                ],
-                'type': 'string',
+            "script": {
+                "properties": {
+                    "binary": {
+                        "default": "python",
+                        "description": "Binary to use when running the script",
+                        "type": ["string", "null"],
+                    },
+                    "branch": {
+                        "description": "Repository branch id If not provided and tag not provided, default repository branch is used.",
+                        "type": ["string", "null"],
+                    },
+                    "diff": {
+                        "description": "Uncommitted changes found in the repository when task was run",
+                        "type": ["string", "null"],
+                    },
+                    "entry_point": {
+                        "description": "Path to execute within the repository",
+                        "type": ["string", "null"],
+                    },
+                    "repository": {
+                        "description": "Name of the repository where the script is located",
+                        "type": ["string", "null"],
+                    },
+                    "requirements": {
+                        "description": "A JSON object containing requirements strings by key",
+                        "type": ["object", "null"],
+                    },
+                    "tag": {
+                        "description": "Repository tag",
+                        "type": ["string", "null"],
+                    },
+                    "version_num": {
+                        "description": "Version (changeset) number. Optional (default is head version) Unused if tag is provided.",
+                        "type": ["string", "null"],
+                    },
+                    "working_dir": {
+                        "description": "Path to the folder from which to run the script Default - root folder of repository",
+                        "type": ["string", "null"],
+                    },
+                },
+                "type": "object",
+            },
+            "task_type_enum": {"enum": ["training", "testing",], "type": "string",},
+        },
+        "properties": {
+            "comment": {"description": "Free text comment ", "type": "string"},
+            "execution": {
+                "$ref": "#/definitions/execution",
+                "description": "Task execution params",
+            },
+            "force": {
+                "default": False,
+                "description": "If not true, call fails if the task status is not 'created'",
+                "type": "boolean",
+            },
+            "name": {
+                "description": "Task name Unique within the company.",
+                "type": "string",
+            },
+            "output_dest": {
+                "description": "Output storage id Must be a reference to an existing storage.",
+                "type": "string",
+            },
+            "parent": {
+                "description": "Parent task id Must be a completed task.",
+                "type": "string",
+            },
+            "project": {
+                "description": "Project ID of the project to which this task is assigned Must exist[ab]",
+                "type": "string",
+            },
+            "script": {"$ref": "#/definitions/script", "description": "Script info",},
+            "system_tags": {
+                "description": "System tags list. This field is reserved for system use, please don't use it.",
+                "items": {"type": "string"},
+                "type": "array",
+            },
+            "tags": {
+                "description": "User-defined tags list",
+                "items": {"type": "string"},
+                "type": "array",
+            },
+            "task": {"description": "ID of the task", "type": "string"},
+            "type": {
+                "$ref": "#/definitions/task_type_enum",
+                "description": "Type of task",
             },
         },
-        'properties': {
-            'comment': {'description': 'Free text comment ', 'type': 'string'},
-            'execution': {
-                '$ref': '#/definitions/execution',
-                'description': 'Task execution params',
-            },
-            'force': {
-                'default': False,
-                'description': "If not true, call fails if the task status is not 'created'",
-                'type': 'boolean',
-            },
-            'name': {
-                'description': 'Task name Unique within the company.',
-                'type': 'string',
-            },
-            'output_dest': {
-                'description': 'Output storage id Must be a reference to an existing storage.',
-                'type': 'string',
-            },
-            'parent': {
-                'description': 'Parent task id Must be a completed task.',
-                'type': 'string',
-            },
-            'project': {
-                'description': 'Project ID of the project to which this task is assigned Must exist[ab]',
-                'type': 'string',
-            },
-            'script': {
-                '$ref': '#/definitions/script',
-                'description': 'Script info',
-            },
-            'system_tags': {
-                'description': "System tags list. This field is reserved for system use, please don't use it.",
-                'items': {'type': 'string'},
-                'type': 'array',
-            },
-            'tags': {
-                'description': 'User-defined tags list',
-                'items': {'type': 'string'},
-                'type': 'array',
-            },
-            'task': {'description': 'ID of the task', 'type': 'string'},
-            'type': {
-                '$ref': '#/definitions/task_type_enum',
-                'description': 'Type of task',
-            },
-        },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, force=False, name=None, tags=None, system_tags=None, type=None, comment=None, parent=None, project=None, output_dest=None, execution=None, script=None, **kwargs):
+        self,
+        task,
+        force=False,
+        name=None,
+        tags=None,
+        system_tags=None,
+        type=None,
+        comment=None,
+        parent=None,
+        project=None,
+        output_dest=None,
+        execution=None,
+        script=None,
+        **kwargs
+    ):
         super(EditRequest, self).__init__(**kwargs)
         self.task = task
         self.force = force
@@ -2971,7 +3086,7 @@ class EditRequest(Request):
         self.execution = execution
         self.script = script
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -2984,7 +3099,7 @@ class EditRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('force')
+    @schema_property("force")
     def force(self):
         return self._property_force
 
@@ -2997,7 +3112,7 @@ class EditRequest(Request):
         self.assert_isinstance(value, "force", (bool,))
         self._property_force = value
 
-    @schema_property('name')
+    @schema_property("name")
     def name(self):
         return self._property_name
 
@@ -3010,7 +3125,7 @@ class EditRequest(Request):
         self.assert_isinstance(value, "name", six.string_types)
         self._property_name = value
 
-    @schema_property('tags')
+    @schema_property("tags")
     def tags(self):
         return self._property_tags
 
@@ -3025,7 +3140,7 @@ class EditRequest(Request):
         self.assert_isinstance(value, "tags", six.string_types, is_array=True)
         self._property_tags = value
 
-    @schema_property('system_tags')
+    @schema_property("system_tags")
     def system_tags(self):
         return self._property_system_tags
 
@@ -3040,7 +3155,7 @@ class EditRequest(Request):
         self.assert_isinstance(value, "system_tags", six.string_types, is_array=True)
         self._property_system_tags = value
 
-    @schema_property('type')
+    @schema_property("type")
     def type(self):
         return self._property_type
 
@@ -3058,7 +3173,7 @@ class EditRequest(Request):
             self.assert_isinstance(value, "type", enum.Enum)
         self._property_type = value
 
-    @schema_property('comment')
+    @schema_property("comment")
     def comment(self):
         return self._property_comment
 
@@ -3071,7 +3186,7 @@ class EditRequest(Request):
         self.assert_isinstance(value, "comment", six.string_types)
         self._property_comment = value
 
-    @schema_property('parent')
+    @schema_property("parent")
     def parent(self):
         return self._property_parent
 
@@ -3084,7 +3199,7 @@ class EditRequest(Request):
         self.assert_isinstance(value, "parent", six.string_types)
         self._property_parent = value
 
-    @schema_property('project')
+    @schema_property("project")
     def project(self):
         return self._property_project
 
@@ -3097,7 +3212,7 @@ class EditRequest(Request):
         self.assert_isinstance(value, "project", six.string_types)
         self._property_project = value
 
-    @schema_property('output_dest')
+    @schema_property("output_dest")
     def output_dest(self):
         return self._property_output_dest
 
@@ -3110,7 +3225,7 @@ class EditRequest(Request):
         self.assert_isinstance(value, "output_dest", six.string_types)
         self._property_output_dest = value
 
-    @schema_property('execution')
+    @schema_property("execution")
     def execution(self):
         return self._property_execution
 
@@ -3125,7 +3240,7 @@ class EditRequest(Request):
             self.assert_isinstance(value, "execution", Execution)
         self._property_execution = value
 
-    @schema_property('script')
+    @schema_property("script")
     def script(self):
         return self._property_script
 
@@ -3150,33 +3265,34 @@ class EditResponse(Response):
     :param fields: Updated fields names and values
     :type fields: dict
     """
+
     _service = "tasks"
     _action = "edit"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'fields': {
-                'additionalProperties': True,
-                'description': 'Updated fields names and values',
-                'type': ['object', 'null'],
+        "definitions": {},
+        "properties": {
+            "fields": {
+                "additionalProperties": True,
+                "description": "Updated fields names and values",
+                "type": ["object", "null"],
             },
-            'updated': {
-                'description': 'Number of tasks updated (0 or 1)',
-                'enum': [0, 1],
-                'type': ['integer', 'null'],
+            "updated": {
+                "description": "Number of tasks updated (0 or 1)",
+                "enum": [0, 1],
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, updated=None, fields=None, **kwargs):
+
+    def __init__(self, updated=None, fields=None, **kwargs):
         super(EditResponse, self).__init__(**kwargs)
         self.updated = updated
         self.fields = fields
 
-    @schema_property('updated')
+    @schema_property("updated")
     def updated(self):
         return self._property_updated
 
@@ -3191,7 +3307,7 @@ class EditResponse(Response):
         self.assert_isinstance(value, "updated", six.integer_types)
         self._property_updated = value
 
-    @schema_property('fields')
+    @schema_property("fields")
     def fields(self):
         return self._property_fields
 
@@ -3232,34 +3348,36 @@ class EnqueueRequest(Request):
     _action = "enqueue"
     _version = "1.5"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'queue': {
-                'description': 'Queue id. If not provided, task is added to the default queue.',
-                'type': ['string', 'null'],
+        "definitions": {},
+        "properties": {
+            "queue": {
+                "description": "Queue id. If not provided, task is added to the default queue.",
+                "type": ["string", "null"],
             },
-            'status_message': {
-                'description': 'Extra information regarding status change',
-                'type': 'string',
+            "status_message": {
+                "description": "Extra information regarding status change",
+                "type": "string",
             },
-            'status_reason': {
-                'description': 'Reason for status change',
-                'type': 'string',
+            "status_reason": {
+                "description": "Reason for status change",
+                "type": "string",
             },
-            'task': {'description': 'Task ID', 'type': 'string'},
+            "task": {"description": "Task ID", "type": "string"},
         },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, queue=None, status_reason=None, status_message=None, **kwargs):
+        self, task, queue=None, status_reason=None, status_message=None, **kwargs
+    ):
         super(EnqueueRequest, self).__init__(**kwargs)
         self.queue = queue
         self.task = task
         self.status_reason = status_reason
         self.status_message = status_message
 
-    @schema_property('queue')
+    @schema_property("queue")
     def queue(self):
         return self._property_queue
 
@@ -3272,7 +3390,7 @@ class EnqueueRequest(Request):
         self.assert_isinstance(value, "queue", six.string_types)
         self._property_queue = value
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -3285,7 +3403,7 @@ class EnqueueRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('status_reason')
+    @schema_property("status_reason")
     def status_reason(self):
         return self._property_status_reason
 
@@ -3298,7 +3416,7 @@ class EnqueueRequest(Request):
         self.assert_isinstance(value, "status_reason", six.string_types)
         self._property_status_reason = value
 
-    @schema_property('status_message')
+    @schema_property("status_message")
     def status_message(self):
         return self._property_status_message
 
@@ -3323,39 +3441,40 @@ class EnqueueResponse(Response):
     :param fields: Updated fields names and values
     :type fields: dict
     """
+
     _service = "tasks"
     _action = "enqueue"
     _version = "1.5"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'fields': {
-                'additionalProperties': True,
-                'description': 'Updated fields names and values',
-                'type': ['object', 'null'],
+        "definitions": {},
+        "properties": {
+            "fields": {
+                "additionalProperties": True,
+                "description": "Updated fields names and values",
+                "type": ["object", "null"],
             },
-            'queued': {
-                'description': 'Number of tasks queued (0 or 1)',
-                'enum': [0, 1],
-                'type': ['integer', 'null'],
+            "queued": {
+                "description": "Number of tasks queued (0 or 1)",
+                "enum": [0, 1],
+                "type": ["integer", "null"],
             },
-            'updated': {
-                'description': 'Number of tasks updated (0 or 1)',
-                'enum': [0, 1],
-                'type': ['integer', 'null'],
+            "updated": {
+                "description": "Number of tasks updated (0 or 1)",
+                "enum": [0, 1],
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, queued=None, updated=None, fields=None, **kwargs):
+
+    def __init__(self, queued=None, updated=None, fields=None, **kwargs):
         super(EnqueueResponse, self).__init__(**kwargs)
         self.queued = queued
         self.updated = updated
         self.fields = fields
 
-    @schema_property('queued')
+    @schema_property("queued")
     def queued(self):
         return self._property_queued
 
@@ -3370,7 +3489,7 @@ class EnqueueResponse(Response):
         self.assert_isinstance(value, "queued", six.integer_types)
         self._property_queued = value
 
-    @schema_property('updated')
+    @schema_property("updated")
     def updated(self):
         return self._property_updated
 
@@ -3385,7 +3504,7 @@ class EnqueueResponse(Response):
         self.assert_isinstance(value, "updated", six.integer_types)
         self._property_updated = value
 
-    @schema_property('fields')
+    @schema_property("fields")
     def fields(self):
         return self._property_fields
 
@@ -3417,35 +3536,37 @@ class FailedRequest(Request):
     _action = "failed"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'force': {
-                'default': False,
-                'description': 'Allows forcing state change even if transition is not supported',
-                'type': ['boolean', 'null'],
+        "definitions": {},
+        "properties": {
+            "force": {
+                "default": False,
+                "description": "Allows forcing state change even if transition is not supported",
+                "type": ["boolean", "null"],
             },
-            'status_message': {
-                'description': 'Extra information regarding status change',
-                'type': 'string',
+            "status_message": {
+                "description": "Extra information regarding status change",
+                "type": "string",
             },
-            'status_reason': {
-                'description': 'Reason for status change',
-                'type': 'string',
+            "status_reason": {
+                "description": "Reason for status change",
+                "type": "string",
             },
-            'task': {'description': 'Task ID', 'type': 'string'},
+            "task": {"description": "Task ID", "type": "string"},
         },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, force=False, status_reason=None, status_message=None, **kwargs):
+        self, task, force=False, status_reason=None, status_message=None, **kwargs
+    ):
         super(FailedRequest, self).__init__(**kwargs)
         self.force = force
         self.task = task
         self.status_reason = status_reason
         self.status_message = status_message
 
-    @schema_property('force')
+    @schema_property("force")
     def force(self):
         return self._property_force
 
@@ -3458,7 +3579,7 @@ class FailedRequest(Request):
         self.assert_isinstance(value, "force", (bool,))
         self._property_force = value
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -3471,7 +3592,7 @@ class FailedRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('status_reason')
+    @schema_property("status_reason")
     def status_reason(self):
         return self._property_status_reason
 
@@ -3484,7 +3605,7 @@ class FailedRequest(Request):
         self.assert_isinstance(value, "status_reason", six.string_types)
         self._property_status_reason = value
 
-    @schema_property('status_message')
+    @schema_property("status_message")
     def status_message(self):
         return self._property_status_message
 
@@ -3507,33 +3628,34 @@ class FailedResponse(Response):
     :param fields: Updated fields names and values
     :type fields: dict
     """
+
     _service = "tasks"
     _action = "failed"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'fields': {
-                'additionalProperties': True,
-                'description': 'Updated fields names and values',
-                'type': ['object', 'null'],
+        "definitions": {},
+        "properties": {
+            "fields": {
+                "additionalProperties": True,
+                "description": "Updated fields names and values",
+                "type": ["object", "null"],
             },
-            'updated': {
-                'description': 'Number of tasks updated (0 or 1)',
-                'enum': [0, 1],
-                'type': ['integer', 'null'],
+            "updated": {
+                "description": "Number of tasks updated (0 or 1)",
+                "enum": [0, 1],
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, updated=None, fields=None, **kwargs):
+
+    def __init__(self, updated=None, fields=None, **kwargs):
         super(FailedResponse, self).__init__(**kwargs)
         self.updated = updated
         self.fields = fields
 
-    @schema_property('updated')
+    @schema_property("updated")
     def updated(self):
         return self._property_updated
 
@@ -3548,7 +3670,7 @@ class FailedResponse(Response):
         self.assert_isinstance(value, "updated", six.integer_types)
         self._property_updated = value
 
-    @schema_property('fields')
+    @schema_property("fields")
     def fields(self):
         return self._property_fields
 
@@ -3618,127 +3740,147 @@ class GetAllRequest(Request):
     _action = "get_all"
     _version = "2.1"
     _schema = {
-        'definitions': {
-            'multi_field_pattern_data': {
-                'properties': {
-                    'fields': {
-                        'description': 'List of field names',
-                        'items': {'type': 'string'},
-                        'type': ['array', 'null'],
+        "definitions": {
+            "multi_field_pattern_data": {
+                "properties": {
+                    "fields": {
+                        "description": "List of field names",
+                        "items": {"type": "string"},
+                        "type": ["array", "null"],
                     },
-                    'pattern': {
-                        'description': 'Pattern string (regex)',
-                        'type': ['string', 'null'],
+                    "pattern": {
+                        "description": "Pattern string (regex)",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'task_status_enum': {
-                'enum': [
-                    'created',
-                    'queued',
-                    'in_progress',
-                    'stopped',
-                    'published',
-                    'publishing',
-                    'closed',
-                    'failed',
-                    'completed',
-                    'unknown',
+            "task_status_enum": {
+                "enum": [
+                    "created",
+                    "queued",
+                    "in_progress",
+                    "stopped",
+                    "published",
+                    "publishing",
+                    "closed",
+                    "failed",
+                    "completed",
+                    "unknown",
                 ],
-                'type': 'string',
+                "type": "string",
             },
         },
-        'dependencies': {'page': ['page_size']},
-        'properties': {
-            '_all_': {
-                'description': 'Multi-field pattern condition (all fields match pattern)',
-                'oneOf': [
-                    {'$ref': '#/definitions/multi_field_pattern_data'},
-                    {'type': 'null'},
+        "dependencies": {"page": ["page_size"]},
+        "properties": {
+            "_all_": {
+                "description": "Multi-field pattern condition (all fields match pattern)",
+                "oneOf": [
+                    {"$ref": "#/definitions/multi_field_pattern_data"},
+                    {"type": "null"},
                 ],
             },
-            '_any_': {
-                'description': 'Multi-field pattern condition (any field matches pattern)',
-                'oneOf': [
-                    {'$ref': '#/definitions/multi_field_pattern_data'},
-                    {'type': 'null'},
+            "_any_": {
+                "description": "Multi-field pattern condition (any field matches pattern)",
+                "oneOf": [
+                    {"$ref": "#/definitions/multi_field_pattern_data"},
+                    {"type": "null"},
                 ],
             },
-            'id': {
-                'description': 'List of IDs to filter by',
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "id": {
+                "description": "List of IDs to filter by",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'name': {
-                'description': 'Get only tasks whose name matches this pattern (python regular expression syntax)',
-                'type': ['string', 'null'],
+            "name": {
+                "description": "Get only tasks whose name matches this pattern (python regular expression syntax)",
+                "type": ["string", "null"],
             },
-            'only_fields': {
-                'description': "List of task field names (nesting is supported using '.', e.g. execution.model_labels). If provided, this list defines the query's projection (only these fields will be returned for each result entry)",
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "only_fields": {
+                "description": "List of task field names (nesting is supported using '.', e.g. execution.model_labels). If provided, this list defines the query's projection (only these fields will be returned for each result entry)",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'order_by': {
-                'description': "List of field names to order by. When search_text is used, '@text_score' can be used as a field representing the text score of returned documents. Use '-' prefix to specify descending order. Optional, recommended when using page",
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "order_by": {
+                "description": "List of field names to order by. When search_text is used, '@text_score' can be used as a field representing the text score of returned documents. Use '-' prefix to specify descending order. Optional, recommended when using page",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'page': {
-                'description': 'Page number, returns a specific page out of the resulting list of tasks',
-                'minimum': 0,
-                'type': ['integer', 'null'],
+            "page": {
+                "description": "Page number, returns a specific page out of the resulting list of tasks",
+                "minimum": 0,
+                "type": ["integer", "null"],
             },
-            'page_size': {
-                'description': 'Page size, specifies the number of results returned in each page (last page may contain fewer results)',
-                'minimum': 1,
-                'type': ['integer', 'null'],
+            "page_size": {
+                "description": "Page size, specifies the number of results returned in each page (last page may contain fewer results)",
+                "minimum": 1,
+                "type": ["integer", "null"],
             },
-            'parent': {'description': 'Parent ID', 'type': ['string', 'null']},
-            'project': {
-                'description': 'List of project IDs',
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "parent": {"description": "Parent ID", "type": ["string", "null"]},
+            "project": {
+                "description": "List of project IDs",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'search_text': {
-                'description': 'Free text search query',
-                'type': ['string', 'null'],
+            "search_text": {
+                "description": "Free text search query",
+                "type": ["string", "null"],
             },
-            'status': {
-                'description': 'List of task status.',
-                'items': {'$ref': '#/definitions/task_status_enum'},
-                'type': ['array', 'null'],
+            "status": {
+                "description": "List of task status.",
+                "items": {"$ref": "#/definitions/task_status_enum"},
+                "type": ["array", "null"],
             },
-            'status_changed': {
-                'description': 'List of status changed constraint strings (utcformat, epoch) with an optional prefix modifier (>, >=, <, <=)',
-                'items': {'pattern': '^(>=|>|<=|<)?.*$', 'type': 'string'},
-                'type': ['array', 'null'],
+            "status_changed": {
+                "description": "List of status changed constraint strings (utcformat, epoch) with an optional prefix modifier (>, >=, <, <=)",
+                "items": {"pattern": "^(>=|>|<=|<)?.*$", "type": "string"},
+                "type": ["array", "null"],
             },
-            'system_tags': {
-                'description': "List of task system tags. Use '-' prefix to exclude system tags",
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "system_tags": {
+                "description": "List of task system tags. Use '-' prefix to exclude system tags",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'tags': {
-                'description': "List of task user-defined tags. Use '-' prefix to exclude tags",
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "tags": {
+                "description": "List of task user-defined tags. Use '-' prefix to exclude tags",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'type': {
-                'description': "List of task types. One or more of: 'import', 'annotation', 'training' or 'testing' (case insensitive)",
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "type": {
+                "description": "List of task types. One or more of: 'import', 'annotation', 'training' or 'testing' (case insensitive)",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'user': {
-                'description': "List of user IDs used to filter results by the task's creating user",
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+            "user": {
+                "description": "List of user IDs used to filter results by the task's creating user",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
+
     def __init__(
-            self, id=None, name=None, user=None, project=None, page=None, page_size=None, order_by=None, type=None, tags=None, system_tags=None, status=None, only_fields=None, parent=None, status_changed=None, search_text=None, _all_=None, _any_=None, **kwargs):
+        self,
+        id=None,
+        name=None,
+        user=None,
+        project=None,
+        page=None,
+        page_size=None,
+        order_by=None,
+        type=None,
+        tags=None,
+        system_tags=None,
+        status=None,
+        only_fields=None,
+        parent=None,
+        status_changed=None,
+        search_text=None,
+        _all_=None,
+        _any_=None,
+        **kwargs
+    ):
         super(GetAllRequest, self).__init__(**kwargs)
         self.id = id
         self.name = name
@@ -3758,7 +3900,7 @@ class GetAllRequest(Request):
         self._all_ = _all_
         self._any_ = _any_
 
-    @schema_property('id')
+    @schema_property("id")
     def id(self):
         return self._property_id
 
@@ -3773,7 +3915,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "id", six.string_types, is_array=True)
         self._property_id = value
 
-    @schema_property('name')
+    @schema_property("name")
     def name(self):
         return self._property_name
 
@@ -3786,7 +3928,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "name", six.string_types)
         self._property_name = value
 
-    @schema_property('user')
+    @schema_property("user")
     def user(self):
         return self._property_user
 
@@ -3801,7 +3943,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "user", six.string_types, is_array=True)
         self._property_user = value
 
-    @schema_property('project')
+    @schema_property("project")
     def project(self):
         return self._property_project
 
@@ -3816,7 +3958,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "project", six.string_types, is_array=True)
         self._property_project = value
 
-    @schema_property('page')
+    @schema_property("page")
     def page(self):
         return self._property_page
 
@@ -3831,7 +3973,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "page", six.integer_types)
         self._property_page = value
 
-    @schema_property('page_size')
+    @schema_property("page_size")
     def page_size(self):
         return self._property_page_size
 
@@ -3846,7 +3988,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "page_size", six.integer_types)
         self._property_page_size = value
 
-    @schema_property('order_by')
+    @schema_property("order_by")
     def order_by(self):
         return self._property_order_by
 
@@ -3861,7 +4003,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "order_by", six.string_types, is_array=True)
         self._property_order_by = value
 
-    @schema_property('type')
+    @schema_property("type")
     def type(self):
         return self._property_type
 
@@ -3876,7 +4018,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "type", six.string_types, is_array=True)
         self._property_type = value
 
-    @schema_property('tags')
+    @schema_property("tags")
     def tags(self):
         return self._property_tags
 
@@ -3891,7 +4033,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "tags", six.string_types, is_array=True)
         self._property_tags = value
 
-    @schema_property('system_tags')
+    @schema_property("system_tags")
     def system_tags(self):
         return self._property_system_tags
 
@@ -3906,7 +4048,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "system_tags", six.string_types, is_array=True)
         self._property_system_tags = value
 
-    @schema_property('status')
+    @schema_property("status")
     def status(self):
         return self._property_status
 
@@ -3918,12 +4060,15 @@ class GetAllRequest(Request):
 
         self.assert_isinstance(value, "status", (list, tuple))
         if any(isinstance(v, six.string_types) for v in value):
-            value = [TaskStatusEnum(v) if isinstance(v, six.string_types) else v for v in value]
+            value = [
+                TaskStatusEnum(v) if isinstance(v, six.string_types) else v
+                for v in value
+            ]
         else:
             self.assert_isinstance(value, "status", TaskStatusEnum, is_array=True)
         self._property_status = value
 
-    @schema_property('only_fields')
+    @schema_property("only_fields")
     def only_fields(self):
         return self._property_only_fields
 
@@ -3938,7 +4083,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "only_fields", six.string_types, is_array=True)
         self._property_only_fields = value
 
-    @schema_property('parent')
+    @schema_property("parent")
     def parent(self):
         return self._property_parent
 
@@ -3951,7 +4096,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "parent", six.string_types)
         self._property_parent = value
 
-    @schema_property('status_changed')
+    @schema_property("status_changed")
     def status_changed(self):
         return self._property_status_changed
 
@@ -3966,7 +4111,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "status_changed", six.string_types, is_array=True)
         self._property_status_changed = value
 
-    @schema_property('search_text')
+    @schema_property("search_text")
     def search_text(self):
         return self._property_search_text
 
@@ -3979,7 +4124,7 @@ class GetAllRequest(Request):
         self.assert_isinstance(value, "search_text", six.string_types)
         self._property_search_text = value
 
-    @schema_property('_all_')
+    @schema_property("_all_")
     def _all_(self):
         return self._property__all_
 
@@ -3994,7 +4139,7 @@ class GetAllRequest(Request):
             self.assert_isinstance(value, "_all_", MultiFieldPatternData)
         self._property__all_ = value
 
-    @schema_property('_any_')
+    @schema_property("_any_")
     def _any_(self):
         return self._property__any_
 
@@ -4010,7 +4155,6 @@ class GetAllRequest(Request):
         self._property__any_ = value
 
 
-
 class GetAllResponse(Response):
     """
     Response of tasks.get_all endpoint.
@@ -4018,375 +4162,353 @@ class GetAllResponse(Response):
     :param tasks: List of tasks
     :type tasks: Sequence[Task]
     """
+
     _service = "tasks"
     _action = "get_all"
     _version = "2.1"
 
     _schema = {
-        'definitions': {
-            'artifact': {
-                'properties': {
-                    'content_size': {
-                        'description': 'Raw data length in bytes',
-                        'type': 'integer',
+        "definitions": {
+            "artifact": {
+                "properties": {
+                    "content_size": {
+                        "description": "Raw data length in bytes",
+                        "type": "integer",
                     },
-                    'display_data': {
-                        'description': 'User-defined list of key/value pairs, sorted',
-                        'items': {'items': {'type': 'string'}, 'type': 'array'},
-                        'type': 'array',
+                    "display_data": {
+                        "description": "User-defined list of key/value pairs, sorted",
+                        "items": {"items": {"type": "string"}, "type": "array"},
+                        "type": "array",
                     },
-                    'hash': {
-                        'description': 'Hash of entire raw data',
-                        'type': 'string',
+                    "hash": {
+                        "description": "Hash of entire raw data",
+                        "type": "string",
                     },
-                    'key': {'description': 'Entry key', 'type': 'string'},
-                    'mode': {
-                        'default': 'output',
-                        'description': 'System defined input/output indication',
-                        'enum': ['input', 'output'],
-                        'type': 'string',
+                    "key": {"description": "Entry key", "type": "string"},
+                    "mode": {
+                        "default": "output",
+                        "description": "System defined input/output indication",
+                        "enum": ["input", "output"],
+                        "type": "string",
                     },
-                    'timestamp': {
-                        'description': 'Epoch time when artifact was created',
-                        'type': 'integer',
+                    "timestamp": {
+                        "description": "Epoch time when artifact was created",
+                        "type": "integer",
                     },
-                    'type': {
-                        'description': 'System defined type',
-                        'type': 'string',
+                    "type": {"description": "System defined type", "type": "string",},
+                    "type_data": {
+                        "$ref": "#/definitions/artifact_type_data",
+                        "description": "Additional fields defined by the system",
                     },
-                    'type_data': {
-                        '$ref': '#/definitions/artifact_type_data',
-                        'description': 'Additional fields defined by the system',
-                    },
-                    'uri': {'description': 'Raw data location', 'type': 'string'},
+                    "uri": {"description": "Raw data location", "type": "string"},
                 },
-                'required': ['key', 'type'],
-                'type': 'object',
+                "required": ["key", "type"],
+                "type": "object",
             },
-            'artifact_type_data': {
-                'properties': {
-                    'content_type': {
-                        'description': 'System defined raw data content type',
-                        'type': ['string', 'null'],
+            "artifact_type_data": {
+                "properties": {
+                    "content_type": {
+                        "description": "System defined raw data content type",
+                        "type": ["string", "null"],
                     },
-                    'data_hash': {
-                        'description': 'Hash of raw data, without any headers or descriptive parts',
-                        'type': ['string', 'null'],
+                    "data_hash": {
+                        "description": "Hash of raw data, without any headers or descriptive parts",
+                        "type": ["string", "null"],
                     },
-                    'preview': {
-                        'description': 'Description or textual data',
-                        'type': ['string', 'null'],
+                    "preview": {
+                        "description": "Description or textual data",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'execution': {
-                'properties': {
-                    'artifacts': {
-                        'description': 'Task artifacts',
-                        'items': {'$ref': '#/definitions/artifact'},
-                        'type': ['array', 'null'],
+            "execution": {
+                "properties": {
+                    "artifacts": {
+                        "description": "Task artifacts",
+                        "items": {"$ref": "#/definitions/artifact"},
+                        "type": ["array", "null"],
                     },
-                    'docker_cmd': {
-                        'description': 'Command for running docker script for the execution of the task',
-                        'type': ['string', 'null'],
+                    "docker_cmd": {
+                        "description": "Command for running docker script for the execution of the task",
+                        "type": ["string", "null"],
                     },
-                    'framework': {
-                        'description': 'Framework related to the task. Case insensitive. Mandatory for Training tasks. ',
-                        'type': ['string', 'null'],
+                    "framework": {
+                        "description": "Framework related to the task. Case insensitive. Mandatory for Training tasks. ",
+                        "type": ["string", "null"],
                     },
-                    'model': {
-                        'description': 'Execution input model ID Not applicable for Register (Import) tasks',
-                        'type': ['string', 'null'],
+                    "model": {
+                        "description": "Execution input model ID Not applicable for Register (Import) tasks",
+                        "type": ["string", "null"],
                     },
-                    'model_desc': {
-                        'additionalProperties': True,
-                        'description': 'Json object representing the Model descriptors',
-                        'type': ['object', 'null'],
+                    "model_desc": {
+                        "additionalProperties": True,
+                        "description": "Json object representing the Model descriptors",
+                        "type": ["object", "null"],
                     },
-                    'model_labels': {
-                        'additionalProperties': {'type': 'integer'},
-                        'description': "Json object representing the ids of the labels in the model.\n                The keys are the layers' names and the values are the IDs.\n                Not applicable for Register (Import) tasks.\n                Mandatory for Training tasks",
-                        'type': ['object', 'null'],
+                    "model_labels": {
+                        "additionalProperties": {"type": "integer"},
+                        "description": "Json object representing the ids of the labels in the model.\n                The keys are the layers' names and the values are the IDs.\n                Not applicable for Register (Import) tasks.\n                Mandatory for Training tasks",
+                        "type": ["object", "null"],
                     },
-                    'parameters': {
-                        'additionalProperties': True,
-                        'description': 'Json object containing the Task parameters',
-                        'type': ['object', 'null'],
+                    "parameters": {
+                        "additionalProperties": True,
+                        "description": "Json object containing the Task parameters",
+                        "type": ["object", "null"],
                     },
-                    'queue': {
-                        'description': 'Queue ID where task was queued.',
-                        'type': ['string', 'null'],
+                    "queue": {
+                        "description": "Queue ID where task was queued.",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'last_metrics_event': {
-                'properties': {
-                    'max_value': {
-                        'description': 'Maximum value reported',
-                        'type': ['number', 'null'],
+            "last_metrics_event": {
+                "properties": {
+                    "max_value": {
+                        "description": "Maximum value reported",
+                        "type": ["number", "null"],
                     },
-                    'metric': {
-                        'description': 'Metric name',
-                        'type': ['string', 'null'],
+                    "metric": {
+                        "description": "Metric name",
+                        "type": ["string", "null"],
                     },
-                    'min_value': {
-                        'description': 'Minimum value reported',
-                        'type': ['number', 'null'],
+                    "min_value": {
+                        "description": "Minimum value reported",
+                        "type": ["number", "null"],
                     },
-                    'value': {
-                        'description': 'Last value reported',
-                        'type': ['number', 'null'],
+                    "value": {
+                        "description": "Last value reported",
+                        "type": ["number", "null"],
                     },
-                    'variant': {
-                        'description': 'Variant name',
-                        'type': ['string', 'null'],
+                    "variant": {
+                        "description": "Variant name",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'last_metrics_variants': {
-                'additionalProperties': {
-                    '$ref': '#/definitions/last_metrics_event',
-                },
-                'description': 'Last metric events, one for each variant hash',
-                'type': 'object',
+            "last_metrics_variants": {
+                "additionalProperties": {"$ref": "#/definitions/last_metrics_event",},
+                "description": "Last metric events, one for each variant hash",
+                "type": "object",
             },
-            'output': {
-                'properties': {
-                    'destination': {
-                        'description': 'Storage id. This is where output files will be stored.',
-                        'type': ['string', 'null'],
+            "output": {
+                "properties": {
+                    "destination": {
+                        "description": "Storage id. This is where output files will be stored.",
+                        "type": ["string", "null"],
                     },
-                    'error': {
-                        'description': 'Last error text',
-                        'type': ['string', 'null'],
+                    "error": {
+                        "description": "Last error text",
+                        "type": ["string", "null"],
                     },
-                    'model': {
-                        'description': 'Model id.',
-                        'type': ['string', 'null'],
-                    },
-                    'result': {
-                        'description': "Task result. Values: 'success', 'failure'",
-                        'type': ['string', 'null'],
+                    "model": {"description": "Model id.", "type": ["string", "null"],},
+                    "result": {
+                        "description": "Task result. Values: 'success', 'failure'",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'script': {
-                'properties': {
-                    'binary': {
-                        'default': 'python',
-                        'description': 'Binary to use when running the script',
-                        'type': ['string', 'null'],
+            "script": {
+                "properties": {
+                    "binary": {
+                        "default": "python",
+                        "description": "Binary to use when running the script",
+                        "type": ["string", "null"],
                     },
-                    'branch': {
-                        'description': 'Repository branch id If not provided and tag not provided, default repository branch is used.',
-                        'type': ['string', 'null'],
+                    "branch": {
+                        "description": "Repository branch id If not provided and tag not provided, default repository branch is used.",
+                        "type": ["string", "null"],
                     },
-                    'diff': {
-                        'description': 'Uncommitted changes found in the repository when task was run',
-                        'type': ['string', 'null'],
+                    "diff": {
+                        "description": "Uncommitted changes found in the repository when task was run",
+                        "type": ["string", "null"],
                     },
-                    'entry_point': {
-                        'description': 'Path to execute within the repository',
-                        'type': ['string', 'null'],
+                    "entry_point": {
+                        "description": "Path to execute within the repository",
+                        "type": ["string", "null"],
                     },
-                    'repository': {
-                        'description': 'Name of the repository where the script is located',
-                        'type': ['string', 'null'],
+                    "repository": {
+                        "description": "Name of the repository where the script is located",
+                        "type": ["string", "null"],
                     },
-                    'requirements': {
-                        'description': 'A JSON object containing requirements strings by key',
-                        'type': ['object', 'null'],
+                    "requirements": {
+                        "description": "A JSON object containing requirements strings by key",
+                        "type": ["object", "null"],
                     },
-                    'tag': {
-                        'description': 'Repository tag',
-                        'type': ['string', 'null'],
+                    "tag": {
+                        "description": "Repository tag",
+                        "type": ["string", "null"],
                     },
-                    'version_num': {
-                        'description': 'Version (changeset) number. Optional (default is head version) Unused if tag is provided.',
-                        'type': ['string', 'null'],
+                    "version_num": {
+                        "description": "Version (changeset) number. Optional (default is head version) Unused if tag is provided.",
+                        "type": ["string", "null"],
                     },
-                    'working_dir': {
-                        'description': 'Path to the folder from which to run the script Default - root folder of repository',
-                        'type': ['string', 'null'],
+                    "working_dir": {
+                        "description": "Path to the folder from which to run the script Default - root folder of repository",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'task': {
-                'properties': {
-                    'comment': {
-                        'description': 'Free text comment',
-                        'type': ['string', 'null'],
+            "task": {
+                "properties": {
+                    "comment": {
+                        "description": "Free text comment",
+                        "type": ["string", "null"],
                     },
-                    'company': {
-                        'description': 'Company ID',
-                        'type': ['string', 'null'],
+                    "company": {
+                        "description": "Company ID",
+                        "type": ["string", "null"],
                     },
-                    'completed': {
-                        'description': 'Task end time (UTC)',
-                        'format': 'date-time',
-                        'type': ['string', 'null'],
+                    "completed": {
+                        "description": "Task end time (UTC)",
+                        "format": "date-time",
+                        "type": ["string", "null"],
                     },
-                    'created': {
-                        'description': 'Task creation time (UTC) ',
-                        'format': 'date-time',
-                        'type': ['string', 'null'],
+                    "created": {
+                        "description": "Task creation time (UTC) ",
+                        "format": "date-time",
+                        "type": ["string", "null"],
                     },
-                    'execution': {
-                        'description': 'Task execution params',
-                        'oneOf': [
-                            {'$ref': '#/definitions/execution'},
-                            {'type': 'null'},
+                    "execution": {
+                        "description": "Task execution params",
+                        "oneOf": [
+                            {"$ref": "#/definitions/execution"},
+                            {"type": "null"},
                         ],
                     },
-                    'id': {'description': 'Task id', 'type': ['string', 'null']},
-                    'last_iteration': {
-                        'description': 'Last iteration reported for this task',
-                        'type': ['integer', 'null'],
+                    "id": {"description": "Task id", "type": ["string", "null"]},
+                    "last_iteration": {
+                        "description": "Last iteration reported for this task",
+                        "type": ["integer", "null"],
                     },
-                    'last_metrics': {
-                        'additionalProperties': {
-                            '$ref': '#/definitions/last_metrics_variants',
+                    "last_metrics": {
+                        "additionalProperties": {
+                            "$ref": "#/definitions/last_metrics_variants",
                         },
-                        'description': 'Last metric variants (hash to events), one for each metric hash',
-                        'type': ['object', 'null'],
+                        "description": "Last metric variants (hash to events), one for each metric hash",
+                        "type": ["object", "null"],
                     },
-                    'last_update': {
-                        'description': 'Last time this task was created, updated, changed or events for this task were reported',
-                        'format': 'date-time',
-                        'type': ['string', 'null'],
+                    "last_update": {
+                        "description": "Last time this task was created, updated, changed or events for this task were reported",
+                        "format": "date-time",
+                        "type": ["string", "null"],
                     },
-                    'last_worker': {
-                        'description': 'ID of last worker that handled the task',
-                        'type': ['string', 'null'],
+                    "last_worker": {
+                        "description": "ID of last worker that handled the task",
+                        "type": ["string", "null"],
                     },
-                    'last_worker_report': {
-                        'description': 'Last time a worker reported while working on this task',
-                        'format': 'date-time',
-                        'type': ['string', 'null'],
+                    "last_worker_report": {
+                        "description": "Last time a worker reported while working on this task",
+                        "format": "date-time",
+                        "type": ["string", "null"],
                     },
-                    'name': {
-                        'description': 'Task Name',
-                        'type': ['string', 'null'],
+                    "name": {"description": "Task Name", "type": ["string", "null"],},
+                    "output": {
+                        "description": "Task output params",
+                        "oneOf": [{"$ref": "#/definitions/output"}, {"type": "null"},],
                     },
-                    'output': {
-                        'description': 'Task output params',
-                        'oneOf': [
-                            {'$ref': '#/definitions/output'},
-                            {'type': 'null'},
+                    "parent": {
+                        "description": "Parent task id",
+                        "type": ["string", "null"],
+                    },
+                    "project": {
+                        "description": "Project ID of the project to which this task is assigned",
+                        "type": ["string", "null"],
+                    },
+                    "published": {
+                        "description": "Last status change time",
+                        "format": "date-time",
+                        "type": ["string", "null"],
+                    },
+                    "script": {
+                        "description": "Script info",
+                        "oneOf": [{"$ref": "#/definitions/script"}, {"type": "null"},],
+                    },
+                    "started": {
+                        "description": "Task start time (UTC)",
+                        "format": "date-time",
+                        "type": ["string", "null"],
+                    },
+                    "status": {
+                        "description": "",
+                        "oneOf": [
+                            {"$ref": "#/definitions/task_status_enum"},
+                            {"type": "null"},
                         ],
                     },
-                    'parent': {
-                        'description': 'Parent task id',
-                        'type': ['string', 'null'],
+                    "status_changed": {
+                        "description": "Last status change time",
+                        "format": "date-time",
+                        "type": ["string", "null"],
                     },
-                    'project': {
-                        'description': 'Project ID of the project to which this task is assigned',
-                        'type': ['string', 'null'],
+                    "status_message": {
+                        "description": "free text string representing info about the status",
+                        "type": ["string", "null"],
                     },
-                    'published': {
-                        'description': 'Last status change time',
-                        'format': 'date-time',
-                        'type': ['string', 'null'],
+                    "status_reason": {
+                        "description": "Reason for last status change",
+                        "type": ["string", "null"],
                     },
-                    'script': {
-                        'description': 'Script info',
-                        'oneOf': [
-                            {'$ref': '#/definitions/script'},
-                            {'type': 'null'},
+                    "system_tags": {
+                        "description": "System tags list. This field is reserved for system use, please don't use it.",
+                        "items": {"type": "string"},
+                        "type": ["array", "null"],
+                    },
+                    "tags": {
+                        "description": "User-defined tags list",
+                        "items": {"type": "string"},
+                        "type": ["array", "null"],
+                    },
+                    "type": {
+                        "description": "Type of task. Values: 'training', 'testing'",
+                        "oneOf": [
+                            {"$ref": "#/definitions/task_type_enum"},
+                            {"type": "null"},
                         ],
                     },
-                    'started': {
-                        'description': 'Task start time (UTC)',
-                        'format': 'date-time',
-                        'type': ['string', 'null'],
-                    },
-                    'status': {
-                        'description': '',
-                        'oneOf': [
-                            {'$ref': '#/definitions/task_status_enum'},
-                            {'type': 'null'},
-                        ],
-                    },
-                    'status_changed': {
-                        'description': 'Last status change time',
-                        'format': 'date-time',
-                        'type': ['string', 'null'],
-                    },
-                    'status_message': {
-                        'description': 'free text string representing info about the status',
-                        'type': ['string', 'null'],
-                    },
-                    'status_reason': {
-                        'description': 'Reason for last status change',
-                        'type': ['string', 'null'],
-                    },
-                    'system_tags': {
-                        'description': "System tags list. This field is reserved for system use, please don't use it.",
-                        'items': {'type': 'string'},
-                        'type': ['array', 'null'],
-                    },
-                    'tags': {
-                        'description': 'User-defined tags list',
-                        'items': {'type': 'string'},
-                        'type': ['array', 'null'],
-                    },
-                    'type': {
-                        'description': "Type of task. Values: 'training', 'testing'",
-                        'oneOf': [
-                            {'$ref': '#/definitions/task_type_enum'},
-                            {'type': 'null'},
-                        ],
-                    },
-                    'user': {
-                        'description': 'Associated user id',
-                        'type': ['string', 'null'],
+                    "user": {
+                        "description": "Associated user id",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'task_status_enum': {
-                'enum': [
-                    'created',
-                    'queued',
-                    'in_progress',
-                    'stopped',
-                    'published',
-                    'publishing',
-                    'closed',
-                    'failed',
-                    'completed',
-                    'unknown',
+            "task_status_enum": {
+                "enum": [
+                    "created",
+                    "queued",
+                    "in_progress",
+                    "stopped",
+                    "published",
+                    "publishing",
+                    "closed",
+                    "failed",
+                    "completed",
+                    "unknown",
                 ],
-                'type': 'string',
+                "type": "string",
             },
-            'task_type_enum': {
-                'enum': [
-                    'training',
-                    'testing',
-                ],
-                'type': 'string',
+            "task_type_enum": {"enum": ["training", "testing",], "type": "string",},
+        },
+        "properties": {
+            "tasks": {
+                "description": "List of tasks",
+                "items": {"$ref": "#/definitions/task"},
+                "type": ["array", "null"],
             },
         },
-        'properties': {
-            'tasks': {
-                'description': 'List of tasks',
-                'items': {'$ref': '#/definitions/task'},
-                'type': ['array', 'null'],
-            },
-        },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, tasks=None, **kwargs):
+
+    def __init__(self, tasks=None, **kwargs):
         super(GetAllResponse, self).__init__(**kwargs)
         self.tasks = tasks
 
-    @schema_property('tasks')
+    @schema_property("tasks")
     def tasks(self):
         return self._property_tasks
 
@@ -4416,17 +4538,17 @@ class GetByIdRequest(Request):
     _action = "get_by_id"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {'task': {'description': 'Task ID', 'type': 'string'}},
-        'required': ['task'],
-        'type': 'object',
+        "definitions": {},
+        "properties": {"task": {"description": "Task ID", "type": "string"}},
+        "required": ["task"],
+        "type": "object",
     }
-    def __init__(
-            self, task, **kwargs):
+
+    def __init__(self, task, **kwargs):
         super(GetByIdRequest, self).__init__(**kwargs)
         self.task = task
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -4447,374 +4569,352 @@ class GetByIdResponse(Response):
     :param task: Task info
     :type task: Task
     """
+
     _service = "tasks"
     _action = "get_by_id"
     _version = "2.1"
 
     _schema = {
-        'definitions': {
-            'artifact': {
-                'properties': {
-                    'content_size': {
-                        'description': 'Raw data length in bytes',
-                        'type': 'integer',
+        "definitions": {
+            "artifact": {
+                "properties": {
+                    "content_size": {
+                        "description": "Raw data length in bytes",
+                        "type": "integer",
                     },
-                    'display_data': {
-                        'description': 'User-defined list of key/value pairs, sorted',
-                        'items': {'items': {'type': 'string'}, 'type': 'array'},
-                        'type': 'array',
+                    "display_data": {
+                        "description": "User-defined list of key/value pairs, sorted",
+                        "items": {"items": {"type": "string"}, "type": "array"},
+                        "type": "array",
                     },
-                    'hash': {
-                        'description': 'Hash of entire raw data',
-                        'type': 'string',
+                    "hash": {
+                        "description": "Hash of entire raw data",
+                        "type": "string",
                     },
-                    'key': {'description': 'Entry key', 'type': 'string'},
-                    'mode': {
-                        'default': 'output',
-                        'description': 'System defined input/output indication',
-                        'enum': ['input', 'output'],
-                        'type': 'string',
+                    "key": {"description": "Entry key", "type": "string"},
+                    "mode": {
+                        "default": "output",
+                        "description": "System defined input/output indication",
+                        "enum": ["input", "output"],
+                        "type": "string",
                     },
-                    'timestamp': {
-                        'description': 'Epoch time when artifact was created',
-                        'type': 'integer',
+                    "timestamp": {
+                        "description": "Epoch time when artifact was created",
+                        "type": "integer",
                     },
-                    'type': {
-                        'description': 'System defined type',
-                        'type': 'string',
+                    "type": {"description": "System defined type", "type": "string",},
+                    "type_data": {
+                        "$ref": "#/definitions/artifact_type_data",
+                        "description": "Additional fields defined by the system",
                     },
-                    'type_data': {
-                        '$ref': '#/definitions/artifact_type_data',
-                        'description': 'Additional fields defined by the system',
-                    },
-                    'uri': {'description': 'Raw data location', 'type': 'string'},
+                    "uri": {"description": "Raw data location", "type": "string"},
                 },
-                'required': ['key', 'type'],
-                'type': 'object',
+                "required": ["key", "type"],
+                "type": "object",
             },
-            'artifact_type_data': {
-                'properties': {
-                    'content_type': {
-                        'description': 'System defined raw data content type',
-                        'type': ['string', 'null'],
+            "artifact_type_data": {
+                "properties": {
+                    "content_type": {
+                        "description": "System defined raw data content type",
+                        "type": ["string", "null"],
                     },
-                    'data_hash': {
-                        'description': 'Hash of raw data, without any headers or descriptive parts',
-                        'type': ['string', 'null'],
+                    "data_hash": {
+                        "description": "Hash of raw data, without any headers or descriptive parts",
+                        "type": ["string", "null"],
                     },
-                    'preview': {
-                        'description': 'Description or textual data',
-                        'type': ['string', 'null'],
+                    "preview": {
+                        "description": "Description or textual data",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'execution': {
-                'properties': {
-                    'artifacts': {
-                        'description': 'Task artifacts',
-                        'items': {'$ref': '#/definitions/artifact'},
-                        'type': ['array', 'null'],
+            "execution": {
+                "properties": {
+                    "artifacts": {
+                        "description": "Task artifacts",
+                        "items": {"$ref": "#/definitions/artifact"},
+                        "type": ["array", "null"],
                     },
-                    'docker_cmd': {
-                        'description': 'Command for running docker script for the execution of the task',
-                        'type': ['string', 'null'],
+                    "docker_cmd": {
+                        "description": "Command for running docker script for the execution of the task",
+                        "type": ["string", "null"],
                     },
-                    'framework': {
-                        'description': 'Framework related to the task. Case insensitive. Mandatory for Training tasks. ',
-                        'type': ['string', 'null'],
+                    "framework": {
+                        "description": "Framework related to the task. Case insensitive. Mandatory for Training tasks. ",
+                        "type": ["string", "null"],
                     },
-                    'model': {
-                        'description': 'Execution input model ID Not applicable for Register (Import) tasks',
-                        'type': ['string', 'null'],
+                    "model": {
+                        "description": "Execution input model ID Not applicable for Register (Import) tasks",
+                        "type": ["string", "null"],
                     },
-                    'model_desc': {
-                        'additionalProperties': True,
-                        'description': 'Json object representing the Model descriptors',
-                        'type': ['object', 'null'],
+                    "model_desc": {
+                        "additionalProperties": True,
+                        "description": "Json object representing the Model descriptors",
+                        "type": ["object", "null"],
                     },
-                    'model_labels': {
-                        'additionalProperties': {'type': 'integer'},
-                        'description': "Json object representing the ids of the labels in the model.\n                The keys are the layers' names and the values are the IDs.\n                Not applicable for Register (Import) tasks.\n                Mandatory for Training tasks",
-                        'type': ['object', 'null'],
+                    "model_labels": {
+                        "additionalProperties": {"type": "integer"},
+                        "description": "Json object representing the ids of the labels in the model.\n                The keys are the layers' names and the values are the IDs.\n                Not applicable for Register (Import) tasks.\n                Mandatory for Training tasks",
+                        "type": ["object", "null"],
                     },
-                    'parameters': {
-                        'additionalProperties': True,
-                        'description': 'Json object containing the Task parameters',
-                        'type': ['object', 'null'],
+                    "parameters": {
+                        "additionalProperties": True,
+                        "description": "Json object containing the Task parameters",
+                        "type": ["object", "null"],
                     },
-                    'queue': {
-                        'description': 'Queue ID where task was queued.',
-                        'type': ['string', 'null'],
+                    "queue": {
+                        "description": "Queue ID where task was queued.",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'last_metrics_event': {
-                'properties': {
-                    'max_value': {
-                        'description': 'Maximum value reported',
-                        'type': ['number', 'null'],
+            "last_metrics_event": {
+                "properties": {
+                    "max_value": {
+                        "description": "Maximum value reported",
+                        "type": ["number", "null"],
                     },
-                    'metric': {
-                        'description': 'Metric name',
-                        'type': ['string', 'null'],
+                    "metric": {
+                        "description": "Metric name",
+                        "type": ["string", "null"],
                     },
-                    'min_value': {
-                        'description': 'Minimum value reported',
-                        'type': ['number', 'null'],
+                    "min_value": {
+                        "description": "Minimum value reported",
+                        "type": ["number", "null"],
                     },
-                    'value': {
-                        'description': 'Last value reported',
-                        'type': ['number', 'null'],
+                    "value": {
+                        "description": "Last value reported",
+                        "type": ["number", "null"],
                     },
-                    'variant': {
-                        'description': 'Variant name',
-                        'type': ['string', 'null'],
+                    "variant": {
+                        "description": "Variant name",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'last_metrics_variants': {
-                'additionalProperties': {
-                    '$ref': '#/definitions/last_metrics_event',
-                },
-                'description': 'Last metric events, one for each variant hash',
-                'type': 'object',
+            "last_metrics_variants": {
+                "additionalProperties": {"$ref": "#/definitions/last_metrics_event",},
+                "description": "Last metric events, one for each variant hash",
+                "type": "object",
             },
-            'output': {
-                'properties': {
-                    'destination': {
-                        'description': 'Storage id. This is where output files will be stored.',
-                        'type': ['string', 'null'],
+            "output": {
+                "properties": {
+                    "destination": {
+                        "description": "Storage id. This is where output files will be stored.",
+                        "type": ["string", "null"],
                     },
-                    'error': {
-                        'description': 'Last error text',
-                        'type': ['string', 'null'],
+                    "error": {
+                        "description": "Last error text",
+                        "type": ["string", "null"],
                     },
-                    'model': {
-                        'description': 'Model id.',
-                        'type': ['string', 'null'],
-                    },
-                    'result': {
-                        'description': "Task result. Values: 'success', 'failure'",
-                        'type': ['string', 'null'],
+                    "model": {"description": "Model id.", "type": ["string", "null"],},
+                    "result": {
+                        "description": "Task result. Values: 'success', 'failure'",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'script': {
-                'properties': {
-                    'binary': {
-                        'default': 'python',
-                        'description': 'Binary to use when running the script',
-                        'type': ['string', 'null'],
+            "script": {
+                "properties": {
+                    "binary": {
+                        "default": "python",
+                        "description": "Binary to use when running the script",
+                        "type": ["string", "null"],
                     },
-                    'branch': {
-                        'description': 'Repository branch id If not provided and tag not provided, default repository branch is used.',
-                        'type': ['string', 'null'],
+                    "branch": {
+                        "description": "Repository branch id If not provided and tag not provided, default repository branch is used.",
+                        "type": ["string", "null"],
                     },
-                    'diff': {
-                        'description': 'Uncommitted changes found in the repository when task was run',
-                        'type': ['string', 'null'],
+                    "diff": {
+                        "description": "Uncommitted changes found in the repository when task was run",
+                        "type": ["string", "null"],
                     },
-                    'entry_point': {
-                        'description': 'Path to execute within the repository',
-                        'type': ['string', 'null'],
+                    "entry_point": {
+                        "description": "Path to execute within the repository",
+                        "type": ["string", "null"],
                     },
-                    'repository': {
-                        'description': 'Name of the repository where the script is located',
-                        'type': ['string', 'null'],
+                    "repository": {
+                        "description": "Name of the repository where the script is located",
+                        "type": ["string", "null"],
                     },
-                    'requirements': {
-                        'description': 'A JSON object containing requirements strings by key',
-                        'type': ['object', 'null'],
+                    "requirements": {
+                        "description": "A JSON object containing requirements strings by key",
+                        "type": ["object", "null"],
                     },
-                    'tag': {
-                        'description': 'Repository tag',
-                        'type': ['string', 'null'],
+                    "tag": {
+                        "description": "Repository tag",
+                        "type": ["string", "null"],
                     },
-                    'version_num': {
-                        'description': 'Version (changeset) number. Optional (default is head version) Unused if tag is provided.',
-                        'type': ['string', 'null'],
+                    "version_num": {
+                        "description": "Version (changeset) number. Optional (default is head version) Unused if tag is provided.",
+                        "type": ["string", "null"],
                     },
-                    'working_dir': {
-                        'description': 'Path to the folder from which to run the script Default - root folder of repository',
-                        'type': ['string', 'null'],
+                    "working_dir": {
+                        "description": "Path to the folder from which to run the script Default - root folder of repository",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'task': {
-                'properties': {
-                    'comment': {
-                        'description': 'Free text comment',
-                        'type': ['string', 'null'],
+            "task": {
+                "properties": {
+                    "comment": {
+                        "description": "Free text comment",
+                        "type": ["string", "null"],
                     },
-                    'company': {
-                        'description': 'Company ID',
-                        'type': ['string', 'null'],
+                    "company": {
+                        "description": "Company ID",
+                        "type": ["string", "null"],
                     },
-                    'completed': {
-                        'description': 'Task end time (UTC)',
-                        'format': 'date-time',
-                        'type': ['string', 'null'],
+                    "completed": {
+                        "description": "Task end time (UTC)",
+                        "format": "date-time",
+                        "type": ["string", "null"],
                     },
-                    'created': {
-                        'description': 'Task creation time (UTC) ',
-                        'format': 'date-time',
-                        'type': ['string', 'null'],
+                    "created": {
+                        "description": "Task creation time (UTC) ",
+                        "format": "date-time",
+                        "type": ["string", "null"],
                     },
-                    'execution': {
-                        'description': 'Task execution params',
-                        'oneOf': [
-                            {'$ref': '#/definitions/execution'},
-                            {'type': 'null'},
+                    "execution": {
+                        "description": "Task execution params",
+                        "oneOf": [
+                            {"$ref": "#/definitions/execution"},
+                            {"type": "null"},
                         ],
                     },
-                    'id': {'description': 'Task id', 'type': ['string', 'null']},
-                    'last_iteration': {
-                        'description': 'Last iteration reported for this task',
-                        'type': ['integer', 'null'],
+                    "id": {"description": "Task id", "type": ["string", "null"]},
+                    "last_iteration": {
+                        "description": "Last iteration reported for this task",
+                        "type": ["integer", "null"],
                     },
-                    'last_metrics': {
-                        'additionalProperties': {
-                            '$ref': '#/definitions/last_metrics_variants',
+                    "last_metrics": {
+                        "additionalProperties": {
+                            "$ref": "#/definitions/last_metrics_variants",
                         },
-                        'description': 'Last metric variants (hash to events), one for each metric hash',
-                        'type': ['object', 'null'],
+                        "description": "Last metric variants (hash to events), one for each metric hash",
+                        "type": ["object", "null"],
                     },
-                    'last_update': {
-                        'description': 'Last time this task was created, updated, changed or events for this task were reported',
-                        'format': 'date-time',
-                        'type': ['string', 'null'],
+                    "last_update": {
+                        "description": "Last time this task was created, updated, changed or events for this task were reported",
+                        "format": "date-time",
+                        "type": ["string", "null"],
                     },
-                    'last_worker': {
-                        'description': 'ID of last worker that handled the task',
-                        'type': ['string', 'null'],
+                    "last_worker": {
+                        "description": "ID of last worker that handled the task",
+                        "type": ["string", "null"],
                     },
-                    'last_worker_report': {
-                        'description': 'Last time a worker reported while working on this task',
-                        'format': 'date-time',
-                        'type': ['string', 'null'],
+                    "last_worker_report": {
+                        "description": "Last time a worker reported while working on this task",
+                        "format": "date-time",
+                        "type": ["string", "null"],
                     },
-                    'name': {
-                        'description': 'Task Name',
-                        'type': ['string', 'null'],
+                    "name": {"description": "Task Name", "type": ["string", "null"],},
+                    "output": {
+                        "description": "Task output params",
+                        "oneOf": [{"$ref": "#/definitions/output"}, {"type": "null"},],
                     },
-                    'output': {
-                        'description': 'Task output params',
-                        'oneOf': [
-                            {'$ref': '#/definitions/output'},
-                            {'type': 'null'},
+                    "parent": {
+                        "description": "Parent task id",
+                        "type": ["string", "null"],
+                    },
+                    "project": {
+                        "description": "Project ID of the project to which this task is assigned",
+                        "type": ["string", "null"],
+                    },
+                    "published": {
+                        "description": "Last status change time",
+                        "format": "date-time",
+                        "type": ["string", "null"],
+                    },
+                    "script": {
+                        "description": "Script info",
+                        "oneOf": [{"$ref": "#/definitions/script"}, {"type": "null"},],
+                    },
+                    "started": {
+                        "description": "Task start time (UTC)",
+                        "format": "date-time",
+                        "type": ["string", "null"],
+                    },
+                    "status": {
+                        "description": "",
+                        "oneOf": [
+                            {"$ref": "#/definitions/task_status_enum"},
+                            {"type": "null"},
                         ],
                     },
-                    'parent': {
-                        'description': 'Parent task id',
-                        'type': ['string', 'null'],
+                    "status_changed": {
+                        "description": "Last status change time",
+                        "format": "date-time",
+                        "type": ["string", "null"],
                     },
-                    'project': {
-                        'description': 'Project ID of the project to which this task is assigned',
-                        'type': ['string', 'null'],
+                    "status_message": {
+                        "description": "free text string representing info about the status",
+                        "type": ["string", "null"],
                     },
-                    'published': {
-                        'description': 'Last status change time',
-                        'format': 'date-time',
-                        'type': ['string', 'null'],
+                    "status_reason": {
+                        "description": "Reason for last status change",
+                        "type": ["string", "null"],
                     },
-                    'script': {
-                        'description': 'Script info',
-                        'oneOf': [
-                            {'$ref': '#/definitions/script'},
-                            {'type': 'null'},
+                    "system_tags": {
+                        "description": "System tags list. This field is reserved for system use, please don't use it.",
+                        "items": {"type": "string"},
+                        "type": ["array", "null"],
+                    },
+                    "tags": {
+                        "description": "User-defined tags list",
+                        "items": {"type": "string"},
+                        "type": ["array", "null"],
+                    },
+                    "type": {
+                        "description": "Type of task. Values: 'training', 'testing'",
+                        "oneOf": [
+                            {"$ref": "#/definitions/task_type_enum"},
+                            {"type": "null"},
                         ],
                     },
-                    'started': {
-                        'description': 'Task start time (UTC)',
-                        'format': 'date-time',
-                        'type': ['string', 'null'],
-                    },
-                    'status': {
-                        'description': '',
-                        'oneOf': [
-                            {'$ref': '#/definitions/task_status_enum'},
-                            {'type': 'null'},
-                        ],
-                    },
-                    'status_changed': {
-                        'description': 'Last status change time',
-                        'format': 'date-time',
-                        'type': ['string', 'null'],
-                    },
-                    'status_message': {
-                        'description': 'free text string representing info about the status',
-                        'type': ['string', 'null'],
-                    },
-                    'status_reason': {
-                        'description': 'Reason for last status change',
-                        'type': ['string', 'null'],
-                    },
-                    'system_tags': {
-                        'description': "System tags list. This field is reserved for system use, please don't use it.",
-                        'items': {'type': 'string'},
-                        'type': ['array', 'null'],
-                    },
-                    'tags': {
-                        'description': 'User-defined tags list',
-                        'items': {'type': 'string'},
-                        'type': ['array', 'null'],
-                    },
-                    'type': {
-                        'description': "Type of task. Values: 'training', 'testing'",
-                        'oneOf': [
-                            {'$ref': '#/definitions/task_type_enum'},
-                            {'type': 'null'},
-                        ],
-                    },
-                    'user': {
-                        'description': 'Associated user id',
-                        'type': ['string', 'null'],
+                    "user": {
+                        "description": "Associated user id",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'task_status_enum': {
-                'enum': [
-                    'created',
-                    'queued',
-                    'in_progress',
-                    'stopped',
-                    'published',
-                    'publishing',
-                    'closed',
-                    'failed',
-                    'completed',
-                    'unknown',
+            "task_status_enum": {
+                "enum": [
+                    "created",
+                    "queued",
+                    "in_progress",
+                    "stopped",
+                    "published",
+                    "publishing",
+                    "closed",
+                    "failed",
+                    "completed",
+                    "unknown",
                 ],
-                'type': 'string',
+                "type": "string",
             },
-            'task_type_enum': {
-                'enum': [
-                    'training',
-                    'testing',
-                ],
-                'type': 'string',
+            "task_type_enum": {"enum": ["training", "testing",], "type": "string",},
+        },
+        "properties": {
+            "task": {
+                "description": "Task info",
+                "oneOf": [{"$ref": "#/definitions/task"}, {"type": "null"}],
             },
         },
-        'properties': {
-            'task': {
-                'description': 'Task info',
-                'oneOf': [{'$ref': '#/definitions/task'}, {'type': 'null'}],
-            },
-        },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, task=None, **kwargs):
+
+    def __init__(self, task=None, **kwargs):
         super(GetByIdResponse, self).__init__(**kwargs)
         self.task = task
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -4842,17 +4942,17 @@ class PingRequest(Request):
     _action = "ping"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {'task': {'description': 'Task ID', 'type': 'string'}},
-        'required': ['task'],
-        'type': 'object',
+        "definitions": {},
+        "properties": {"task": {"description": "Task ID", "type": "string"}},
+        "required": ["task"],
+        "type": "object",
     }
-    def __init__(
-            self, task, **kwargs):
+
+    def __init__(self, task, **kwargs):
         super(PingRequest, self).__init__(**kwargs)
         self.task = task
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -4871,11 +4971,12 @@ class PingResponse(Response):
     Response of tasks.ping endpoint.
 
     """
+
     _service = "tasks"
     _action = "ping"
     _version = "2.1"
 
-    _schema = {'additionalProperties': False, 'definitions': {}, 'type': 'object'}
+    _schema = {"additionalProperties": False, "definitions": {}, "type": "object"}
 
 
 class PublishRequest(Request):
@@ -4903,32 +5004,40 @@ class PublishRequest(Request):
     _action = "publish"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'force': {
-                'default': False,
-                'description': "If not true, call fails if the task status is not 'stopped'",
-                'type': ['boolean', 'null'],
+        "definitions": {},
+        "properties": {
+            "force": {
+                "default": False,
+                "description": "If not true, call fails if the task status is not 'stopped'",
+                "type": ["boolean", "null"],
             },
-            'publish_model': {
-                'description': 'Indicates that the task output model (if exists) should be published. Optional, the default value is True.',
-                'type': ['boolean', 'null'],
+            "publish_model": {
+                "description": "Indicates that the task output model (if exists) should be published. Optional, the default value is True.",
+                "type": ["boolean", "null"],
             },
-            'status_message': {
-                'description': 'Extra information regarding status change',
-                'type': 'string',
+            "status_message": {
+                "description": "Extra information regarding status change",
+                "type": "string",
             },
-            'status_reason': {
-                'description': 'Reason for status change',
-                'type': 'string',
+            "status_reason": {
+                "description": "Reason for status change",
+                "type": "string",
             },
-            'task': {'description': 'Task ID', 'type': 'string'},
+            "task": {"description": "Task ID", "type": "string"},
         },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, force=False, publish_model=None, status_reason=None, status_message=None, **kwargs):
+        self,
+        task,
+        force=False,
+        publish_model=None,
+        status_reason=None,
+        status_message=None,
+        **kwargs
+    ):
         super(PublishRequest, self).__init__(**kwargs)
         self.force = force
         self.publish_model = publish_model
@@ -4936,7 +5045,7 @@ class PublishRequest(Request):
         self.status_reason = status_reason
         self.status_message = status_message
 
-    @schema_property('force')
+    @schema_property("force")
     def force(self):
         return self._property_force
 
@@ -4949,7 +5058,7 @@ class PublishRequest(Request):
         self.assert_isinstance(value, "force", (bool,))
         self._property_force = value
 
-    @schema_property('publish_model')
+    @schema_property("publish_model")
     def publish_model(self):
         return self._property_publish_model
 
@@ -4962,7 +5071,7 @@ class PublishRequest(Request):
         self.assert_isinstance(value, "publish_model", (bool,))
         self._property_publish_model = value
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -4975,7 +5084,7 @@ class PublishRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('status_reason')
+    @schema_property("status_reason")
     def status_reason(self):
         return self._property_status_reason
 
@@ -4988,7 +5097,7 @@ class PublishRequest(Request):
         self.assert_isinstance(value, "status_reason", six.string_types)
         self._property_status_reason = value
 
-    @schema_property('status_message')
+    @schema_property("status_message")
     def status_message(self):
         return self._property_status_message
 
@@ -5013,39 +5122,42 @@ class PublishResponse(Response):
     :param fields: Updated fields names and values
     :type fields: dict
     """
+
     _service = "tasks"
     _action = "publish"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'committed_versions_results': {
-                'description': 'Committed versions results',
-                'items': {'additionalProperties': True, 'type': 'object'},
-                'type': ['array', 'null'],
+        "definitions": {},
+        "properties": {
+            "committed_versions_results": {
+                "description": "Committed versions results",
+                "items": {"additionalProperties": True, "type": "object"},
+                "type": ["array", "null"],
             },
-            'fields': {
-                'additionalProperties': True,
-                'description': 'Updated fields names and values',
-                'type': ['object', 'null'],
+            "fields": {
+                "additionalProperties": True,
+                "description": "Updated fields names and values",
+                "type": ["object", "null"],
             },
-            'updated': {
-                'description': 'Number of tasks updated (0 or 1)',
-                'enum': [0, 1],
-                'type': ['integer', 'null'],
+            "updated": {
+                "description": "Number of tasks updated (0 or 1)",
+                "enum": [0, 1],
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
+
     def __init__(
-            self, committed_versions_results=None, updated=None, fields=None, **kwargs):
+        self, committed_versions_results=None, updated=None, fields=None, **kwargs
+    ):
         super(PublishResponse, self).__init__(**kwargs)
         self.committed_versions_results = committed_versions_results
         self.updated = updated
         self.fields = fields
 
-    @schema_property('committed_versions_results')
+    @schema_property("committed_versions_results")
     def committed_versions_results(self):
         return self._property_committed_versions_results
 
@@ -5057,10 +5169,12 @@ class PublishResponse(Response):
 
         self.assert_isinstance(value, "committed_versions_results", (list, tuple))
 
-        self.assert_isinstance(value, "committed_versions_results", (dict,), is_array=True)
+        self.assert_isinstance(
+            value, "committed_versions_results", (dict,), is_array=True
+        )
         self._property_committed_versions_results = value
 
-    @schema_property('updated')
+    @schema_property("updated")
     def updated(self):
         return self._property_updated
 
@@ -5075,7 +5189,7 @@ class PublishResponse(Response):
         self.assert_isinstance(value, "updated", six.integer_types)
         self._property_updated = value
 
-    @schema_property('fields')
+    @schema_property("fields")
     def fields(self):
         return self._property_fields
 
@@ -5107,35 +5221,37 @@ class ResetRequest(Request):
     _action = "reset"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'force': {
-                'default': False,
-                'description': "If not true, call fails if the task status is 'completed'",
-                'type': ['boolean', 'null'],
+        "definitions": {},
+        "properties": {
+            "force": {
+                "default": False,
+                "description": "If not true, call fails if the task status is 'completed'",
+                "type": ["boolean", "null"],
             },
-            'status_message': {
-                'description': 'Extra information regarding status change',
-                'type': 'string',
+            "status_message": {
+                "description": "Extra information regarding status change",
+                "type": "string",
             },
-            'status_reason': {
-                'description': 'Reason for status change',
-                'type': 'string',
+            "status_reason": {
+                "description": "Reason for status change",
+                "type": "string",
             },
-            'task': {'description': 'Task ID', 'type': 'string'},
+            "task": {"description": "Task ID", "type": "string"},
         },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, force=False, status_reason=None, status_message=None, **kwargs):
+        self, task, force=False, status_reason=None, status_message=None, **kwargs
+    ):
         super(ResetRequest, self).__init__(**kwargs)
         self.force = force
         self.task = task
         self.status_reason = status_reason
         self.status_message = status_message
 
-    @schema_property('force')
+    @schema_property("force")
     def force(self):
         return self._property_force
 
@@ -5148,7 +5264,7 @@ class ResetRequest(Request):
         self.assert_isinstance(value, "force", (bool,))
         self._property_force = value
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -5161,7 +5277,7 @@ class ResetRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('status_reason')
+    @schema_property("status_reason")
     def status_reason(self):
         return self._property_status_reason
 
@@ -5174,7 +5290,7 @@ class ResetRequest(Request):
         self.assert_isinstance(value, "status_reason", six.string_types)
         self._property_status_reason = value
 
-    @schema_property('status_message')
+    @schema_property("status_message")
     def status_message(self):
         return self._property_status_message
 
@@ -5208,52 +5324,63 @@ class ResetResponse(Response):
     :param fields: Updated fields names and values
     :type fields: dict
     """
+
     _service = "tasks"
     _action = "reset"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'deleted_indices': {
-                'description': 'List of deleted ES indices that were removed as part of the reset process',
-                'items': {'type': 'string'},
-                'type': ['array', 'null'],
+        "definitions": {},
+        "properties": {
+            "deleted_indices": {
+                "description": "List of deleted ES indices that were removed as part of the reset process",
+                "items": {"type": "string"},
+                "type": ["array", "null"],
             },
-            'deleted_models': {
-                'description': 'Number of output models deleted by the reset',
-                'type': ['integer', 'null'],
+            "deleted_models": {
+                "description": "Number of output models deleted by the reset",
+                "type": ["integer", "null"],
             },
-            'dequeued': {
-                'additionalProperties': True,
-                'description': 'Response from queues.remove_task',
-                'type': ['object', 'null'],
+            "dequeued": {
+                "additionalProperties": True,
+                "description": "Response from queues.remove_task",
+                "type": ["object", "null"],
             },
-            'events': {
-                'additionalProperties': True,
-                'description': 'Response from events.delete_for_task',
-                'type': ['object', 'null'],
+            "events": {
+                "additionalProperties": True,
+                "description": "Response from events.delete_for_task",
+                "type": ["object", "null"],
             },
-            'fields': {
-                'additionalProperties': True,
-                'description': 'Updated fields names and values',
-                'type': ['object', 'null'],
+            "fields": {
+                "additionalProperties": True,
+                "description": "Updated fields names and values",
+                "type": ["object", "null"],
             },
-            'frames': {
-                'additionalProperties': True,
-                'description': 'Response from frames.rollback',
-                'type': ['object', 'null'],
+            "frames": {
+                "additionalProperties": True,
+                "description": "Response from frames.rollback",
+                "type": ["object", "null"],
             },
-            'updated': {
-                'description': 'Number of tasks updated (0 or 1)',
-                'enum': [0, 1],
-                'type': ['integer', 'null'],
+            "updated": {
+                "description": "Number of tasks updated (0 or 1)",
+                "enum": [0, 1],
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
+
     def __init__(
-            self, deleted_indices=None, dequeued=None, frames=None, events=None, deleted_models=None, updated=None, fields=None, **kwargs):
+        self,
+        deleted_indices=None,
+        dequeued=None,
+        frames=None,
+        events=None,
+        deleted_models=None,
+        updated=None,
+        fields=None,
+        **kwargs
+    ):
         super(ResetResponse, self).__init__(**kwargs)
         self.deleted_indices = deleted_indices
         self.dequeued = dequeued
@@ -5263,7 +5390,7 @@ class ResetResponse(Response):
         self.updated = updated
         self.fields = fields
 
-    @schema_property('deleted_indices')
+    @schema_property("deleted_indices")
     def deleted_indices(self):
         return self._property_deleted_indices
 
@@ -5275,10 +5402,12 @@ class ResetResponse(Response):
 
         self.assert_isinstance(value, "deleted_indices", (list, tuple))
 
-        self.assert_isinstance(value, "deleted_indices", six.string_types, is_array=True)
+        self.assert_isinstance(
+            value, "deleted_indices", six.string_types, is_array=True
+        )
         self._property_deleted_indices = value
 
-    @schema_property('dequeued')
+    @schema_property("dequeued")
     def dequeued(self):
         return self._property_dequeued
 
@@ -5291,7 +5420,7 @@ class ResetResponse(Response):
         self.assert_isinstance(value, "dequeued", (dict,))
         self._property_dequeued = value
 
-    @schema_property('frames')
+    @schema_property("frames")
     def frames(self):
         return self._property_frames
 
@@ -5304,7 +5433,7 @@ class ResetResponse(Response):
         self.assert_isinstance(value, "frames", (dict,))
         self._property_frames = value
 
-    @schema_property('events')
+    @schema_property("events")
     def events(self):
         return self._property_events
 
@@ -5317,7 +5446,7 @@ class ResetResponse(Response):
         self.assert_isinstance(value, "events", (dict,))
         self._property_events = value
 
-    @schema_property('deleted_models')
+    @schema_property("deleted_models")
     def deleted_models(self):
         return self._property_deleted_models
 
@@ -5332,7 +5461,7 @@ class ResetResponse(Response):
         self.assert_isinstance(value, "deleted_models", six.integer_types)
         self._property_deleted_models = value
 
-    @schema_property('updated')
+    @schema_property("updated")
     def updated(self):
         return self._property_updated
 
@@ -5347,7 +5476,7 @@ class ResetResponse(Response):
         self.assert_isinstance(value, "updated", six.integer_types)
         self._property_updated = value
 
-    @schema_property('fields')
+    @schema_property("fields")
     def fields(self):
         return self._property_fields
 
@@ -5375,24 +5504,24 @@ class SetRequirementsRequest(Request):
     _action = "set_requirements"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'requirements': {
-                'description': 'A JSON object containing requirements strings by key',
-                'type': 'object',
+        "definitions": {},
+        "properties": {
+            "requirements": {
+                "description": "A JSON object containing requirements strings by key",
+                "type": "object",
             },
-            'task': {'description': 'Task ID', 'type': 'string'},
+            "task": {"description": "Task ID", "type": "string"},
         },
-        'required': ['task', 'requirements'],
-        'type': 'object',
+        "required": ["task", "requirements"],
+        "type": "object",
     }
-    def __init__(
-            self, task, requirements, **kwargs):
+
+    def __init__(self, task, requirements, **kwargs):
         super(SetRequirementsRequest, self).__init__(**kwargs)
         self.task = task
         self.requirements = requirements
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -5405,7 +5534,7 @@ class SetRequirementsRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('requirements')
+    @schema_property("requirements")
     def requirements(self):
         return self._property_requirements
 
@@ -5428,33 +5557,34 @@ class SetRequirementsResponse(Response):
     :param fields: Updated fields names and values
     :type fields: dict
     """
+
     _service = "tasks"
     _action = "set_requirements"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'fields': {
-                'additionalProperties': True,
-                'description': 'Updated fields names and values',
-                'type': ['object', 'null'],
+        "definitions": {},
+        "properties": {
+            "fields": {
+                "additionalProperties": True,
+                "description": "Updated fields names and values",
+                "type": ["object", "null"],
             },
-            'updated': {
-                'description': 'Number of tasks updated (0 or 1)',
-                'enum': [0, 1],
-                'type': ['integer', 'null'],
+            "updated": {
+                "description": "Number of tasks updated (0 or 1)",
+                "enum": [0, 1],
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, updated=None, fields=None, **kwargs):
+
+    def __init__(self, updated=None, fields=None, **kwargs):
         super(SetRequirementsResponse, self).__init__(**kwargs)
         self.updated = updated
         self.fields = fields
 
-    @schema_property('updated')
+    @schema_property("updated")
     def updated(self):
         return self._property_updated
 
@@ -5469,7 +5599,7 @@ class SetRequirementsResponse(Response):
         self.assert_isinstance(value, "updated", six.integer_types)
         self._property_updated = value
 
-    @schema_property('fields')
+    @schema_property("fields")
     def fields(self):
         return self._property_fields
 
@@ -5501,35 +5631,37 @@ class StartedRequest(Request):
     _action = "started"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'force': {
-                'default': False,
-                'description': "If not true, call fails if the task status is not 'not_started'",
-                'type': ['boolean', 'null'],
+        "definitions": {},
+        "properties": {
+            "force": {
+                "default": False,
+                "description": "If not true, call fails if the task status is not 'not_started'",
+                "type": ["boolean", "null"],
             },
-            'status_message': {
-                'description': 'Extra information regarding status change',
-                'type': 'string',
+            "status_message": {
+                "description": "Extra information regarding status change",
+                "type": "string",
             },
-            'status_reason': {
-                'description': 'Reason for status change',
-                'type': 'string',
+            "status_reason": {
+                "description": "Reason for status change",
+                "type": "string",
             },
-            'task': {'description': 'Task ID', 'type': 'string'},
+            "task": {"description": "Task ID", "type": "string"},
         },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, force=False, status_reason=None, status_message=None, **kwargs):
+        self, task, force=False, status_reason=None, status_message=None, **kwargs
+    ):
         super(StartedRequest, self).__init__(**kwargs)
         self.force = force
         self.task = task
         self.status_reason = status_reason
         self.status_message = status_message
 
-    @schema_property('force')
+    @schema_property("force")
     def force(self):
         return self._property_force
 
@@ -5542,7 +5674,7 @@ class StartedRequest(Request):
         self.assert_isinstance(value, "force", (bool,))
         self._property_force = value
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -5555,7 +5687,7 @@ class StartedRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('status_reason')
+    @schema_property("status_reason")
     def status_reason(self):
         return self._property_status_reason
 
@@ -5568,7 +5700,7 @@ class StartedRequest(Request):
         self.assert_isinstance(value, "status_reason", six.string_types)
         self._property_status_reason = value
 
-    @schema_property('status_message')
+    @schema_property("status_message")
     def status_message(self):
         return self._property_status_message
 
@@ -5593,39 +5725,40 @@ class StartedResponse(Response):
     :param fields: Updated fields names and values
     :type fields: dict
     """
+
     _service = "tasks"
     _action = "started"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'fields': {
-                'additionalProperties': True,
-                'description': 'Updated fields names and values',
-                'type': ['object', 'null'],
+        "definitions": {},
+        "properties": {
+            "fields": {
+                "additionalProperties": True,
+                "description": "Updated fields names and values",
+                "type": ["object", "null"],
             },
-            'started': {
-                'description': 'Number of tasks started (0 or 1)',
-                'enum': [0, 1],
-                'type': ['integer', 'null'],
+            "started": {
+                "description": "Number of tasks started (0 or 1)",
+                "enum": [0, 1],
+                "type": ["integer", "null"],
             },
-            'updated': {
-                'description': 'Number of tasks updated (0 or 1)',
-                'enum': [0, 1],
-                'type': ['integer', 'null'],
+            "updated": {
+                "description": "Number of tasks updated (0 or 1)",
+                "enum": [0, 1],
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, started=None, updated=None, fields=None, **kwargs):
+
+    def __init__(self, started=None, updated=None, fields=None, **kwargs):
         super(StartedResponse, self).__init__(**kwargs)
         self.started = started
         self.updated = updated
         self.fields = fields
 
-    @schema_property('started')
+    @schema_property("started")
     def started(self):
         return self._property_started
 
@@ -5640,7 +5773,7 @@ class StartedResponse(Response):
         self.assert_isinstance(value, "started", six.integer_types)
         self._property_started = value
 
-    @schema_property('updated')
+    @schema_property("updated")
     def updated(self):
         return self._property_updated
 
@@ -5655,7 +5788,7 @@ class StartedResponse(Response):
         self.assert_isinstance(value, "updated", six.integer_types)
         self._property_updated = value
 
-    @schema_property('fields')
+    @schema_property("fields")
     def fields(self):
         return self._property_fields
 
@@ -5687,35 +5820,37 @@ class StopRequest(Request):
     _action = "stop"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'force': {
-                'default': False,
-                'description': "If not true, call fails if the task status is not 'in_progress'",
-                'type': ['boolean', 'null'],
+        "definitions": {},
+        "properties": {
+            "force": {
+                "default": False,
+                "description": "If not true, call fails if the task status is not 'in_progress'",
+                "type": ["boolean", "null"],
             },
-            'status_message': {
-                'description': 'Extra information regarding status change',
-                'type': 'string',
+            "status_message": {
+                "description": "Extra information regarding status change",
+                "type": "string",
             },
-            'status_reason': {
-                'description': 'Reason for status change',
-                'type': 'string',
+            "status_reason": {
+                "description": "Reason for status change",
+                "type": "string",
             },
-            'task': {'description': 'Task ID', 'type': 'string'},
+            "task": {"description": "Task ID", "type": "string"},
         },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, force=False, status_reason=None, status_message=None, **kwargs):
+        self, task, force=False, status_reason=None, status_message=None, **kwargs
+    ):
         super(StopRequest, self).__init__(**kwargs)
         self.force = force
         self.task = task
         self.status_reason = status_reason
         self.status_message = status_message
 
-    @schema_property('force')
+    @schema_property("force")
     def force(self):
         return self._property_force
 
@@ -5728,7 +5863,7 @@ class StopRequest(Request):
         self.assert_isinstance(value, "force", (bool,))
         self._property_force = value
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -5741,7 +5876,7 @@ class StopRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('status_reason')
+    @schema_property("status_reason")
     def status_reason(self):
         return self._property_status_reason
 
@@ -5754,7 +5889,7 @@ class StopRequest(Request):
         self.assert_isinstance(value, "status_reason", six.string_types)
         self._property_status_reason = value
 
-    @schema_property('status_message')
+    @schema_property("status_message")
     def status_message(self):
         return self._property_status_message
 
@@ -5777,33 +5912,34 @@ class StopResponse(Response):
     :param fields: Updated fields names and values
     :type fields: dict
     """
+
     _service = "tasks"
     _action = "stop"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'fields': {
-                'additionalProperties': True,
-                'description': 'Updated fields names and values',
-                'type': ['object', 'null'],
+        "definitions": {},
+        "properties": {
+            "fields": {
+                "additionalProperties": True,
+                "description": "Updated fields names and values",
+                "type": ["object", "null"],
             },
-            'updated': {
-                'description': 'Number of tasks updated (0 or 1)',
-                'enum': [0, 1],
-                'type': ['integer', 'null'],
+            "updated": {
+                "description": "Number of tasks updated (0 or 1)",
+                "enum": [0, 1],
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, updated=None, fields=None, **kwargs):
+
+    def __init__(self, updated=None, fields=None, **kwargs):
         super(StopResponse, self).__init__(**kwargs)
         self.updated = updated
         self.fields = fields
 
-    @schema_property('updated')
+    @schema_property("updated")
     def updated(self):
         return self._property_updated
 
@@ -5818,7 +5954,7 @@ class StopResponse(Response):
         self.assert_isinstance(value, "updated", six.integer_types)
         self._property_updated = value
 
-    @schema_property('fields')
+    @schema_property("fields")
     def fields(self):
         return self._property_fields
 
@@ -5850,35 +5986,37 @@ class StoppedRequest(Request):
     _action = "stopped"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'force': {
-                'default': False,
-                'description': "If not true, call fails if the task status is not 'stopped'",
-                'type': ['boolean', 'null'],
+        "definitions": {},
+        "properties": {
+            "force": {
+                "default": False,
+                "description": "If not true, call fails if the task status is not 'stopped'",
+                "type": ["boolean", "null"],
             },
-            'status_message': {
-                'description': 'Extra information regarding status change',
-                'type': 'string',
+            "status_message": {
+                "description": "Extra information regarding status change",
+                "type": "string",
             },
-            'status_reason': {
-                'description': 'Reason for status change',
-                'type': 'string',
+            "status_reason": {
+                "description": "Reason for status change",
+                "type": "string",
             },
-            'task': {'description': 'Task ID', 'type': 'string'},
+            "task": {"description": "Task ID", "type": "string"},
         },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, force=False, status_reason=None, status_message=None, **kwargs):
+        self, task, force=False, status_reason=None, status_message=None, **kwargs
+    ):
         super(StoppedRequest, self).__init__(**kwargs)
         self.force = force
         self.task = task
         self.status_reason = status_reason
         self.status_message = status_message
 
-    @schema_property('force')
+    @schema_property("force")
     def force(self):
         return self._property_force
 
@@ -5891,7 +6029,7 @@ class StoppedRequest(Request):
         self.assert_isinstance(value, "force", (bool,))
         self._property_force = value
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -5904,7 +6042,7 @@ class StoppedRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('status_reason')
+    @schema_property("status_reason")
     def status_reason(self):
         return self._property_status_reason
 
@@ -5917,7 +6055,7 @@ class StoppedRequest(Request):
         self.assert_isinstance(value, "status_reason", six.string_types)
         self._property_status_reason = value
 
-    @schema_property('status_message')
+    @schema_property("status_message")
     def status_message(self):
         return self._property_status_message
 
@@ -5940,33 +6078,34 @@ class StoppedResponse(Response):
     :param fields: Updated fields names and values
     :type fields: dict
     """
+
     _service = "tasks"
     _action = "stopped"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'fields': {
-                'additionalProperties': True,
-                'description': 'Updated fields names and values',
-                'type': ['object', 'null'],
+        "definitions": {},
+        "properties": {
+            "fields": {
+                "additionalProperties": True,
+                "description": "Updated fields names and values",
+                "type": ["object", "null"],
             },
-            'updated': {
-                'description': 'Number of tasks updated (0 or 1)',
-                'enum': [0, 1],
-                'type': ['integer', 'null'],
+            "updated": {
+                "description": "Number of tasks updated (0 or 1)",
+                "enum": [0, 1],
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, updated=None, fields=None, **kwargs):
+
+    def __init__(self, updated=None, fields=None, **kwargs):
         super(StoppedResponse, self).__init__(**kwargs)
         self.updated = updated
         self.fields = fields
 
-    @schema_property('updated')
+    @schema_property("updated")
     def updated(self):
         return self._property_updated
 
@@ -5981,7 +6120,7 @@ class StoppedResponse(Response):
         self.assert_isinstance(value, "updated", six.integer_types)
         self._property_updated = value
 
-    @schema_property('fields')
+    @schema_property("fields")
     def fields(self):
         return self._property_fields
 
@@ -6022,40 +6161,51 @@ class UpdateRequest(Request):
     _action = "update"
     _version = "2.1"
     _schema = {
-        'definitions': {},
-        'properties': {
-            'comment': {'description': 'Free text comment ', 'type': 'string'},
-            'created': {
-                'description': 'Task creation time (UTC) ',
-                'format': 'date-time',
-                'type': 'string',
+        "definitions": {},
+        "properties": {
+            "comment": {"description": "Free text comment ", "type": "string"},
+            "created": {
+                "description": "Task creation time (UTC) ",
+                "format": "date-time",
+                "type": "string",
             },
-            'name': {
-                'description': 'Task name Unique within the company.',
-                'type': 'string',
+            "name": {
+                "description": "Task name Unique within the company.",
+                "type": "string",
             },
-            'output__error': {'description': 'Free text error', 'type': 'string'},
-            'project': {
-                'description': 'Project ID of the project to which this task is assigned',
-                'type': 'string',
+            "output__error": {"description": "Free text error", "type": "string"},
+            "project": {
+                "description": "Project ID of the project to which this task is assigned",
+                "type": "string",
             },
-            'system_tags': {
-                'description': "System tags list. This field is reserved for system use, please don't use it.",
-                'items': {'type': 'string'},
-                'type': 'array',
+            "system_tags": {
+                "description": "System tags list. This field is reserved for system use, please don't use it.",
+                "items": {"type": "string"},
+                "type": "array",
             },
-            'tags': {
-                'description': 'User-defined tags list',
-                'items': {'type': 'string'},
-                'type': 'array',
+            "tags": {
+                "description": "User-defined tags list",
+                "items": {"type": "string"},
+                "type": "array",
             },
-            'task': {'description': 'ID of the task', 'type': 'string'},
+            "task": {"description": "ID of the task", "type": "string"},
         },
-        'required': ['task'],
-        'type': 'object',
+        "required": ["task"],
+        "type": "object",
     }
+
     def __init__(
-            self, task, name=None, tags=None, system_tags=None, comment=None, project=None, output__error=None, created=None, **kwargs):
+        self,
+        task,
+        name=None,
+        tags=None,
+        system_tags=None,
+        comment=None,
+        project=None,
+        output__error=None,
+        created=None,
+        **kwargs
+    ):
         super(UpdateRequest, self).__init__(**kwargs)
         self.task = task
         self.name = name
@@ -6066,7 +6216,7 @@ class UpdateRequest(Request):
         self.output__error = output__error
         self.created = created
 
-    @schema_property('task')
+    @schema_property("task")
     def task(self):
         return self._property_task
 
@@ -6079,7 +6229,7 @@ class UpdateRequest(Request):
         self.assert_isinstance(value, "task", six.string_types)
         self._property_task = value
 
-    @schema_property('name')
+    @schema_property("name")
     def name(self):
         return self._property_name
 
@@ -6092,7 +6242,7 @@ class UpdateRequest(Request):
         self.assert_isinstance(value, "name", six.string_types)
         self._property_name = value
 
-    @schema_property('tags')
+    @schema_property("tags")
     def tags(self):
         return self._property_tags
 
@@ -6107,7 +6257,7 @@ class UpdateRequest(Request):
         self.assert_isinstance(value, "tags", six.string_types, is_array=True)
         self._property_tags = value
 
-    @schema_property('system_tags')
+    @schema_property("system_tags")
     def system_tags(self):
         return self._property_system_tags
 
@@ -6122,7 +6272,7 @@ class UpdateRequest(Request):
         self.assert_isinstance(value, "system_tags", six.string_types, is_array=True)
         self._property_system_tags = value
 
-    @schema_property('comment')
+    @schema_property("comment")
     def comment(self):
         return self._property_comment
 
@@ -6135,7 +6285,7 @@ class UpdateRequest(Request):
         self.assert_isinstance(value, "comment", six.string_types)
         self._property_comment = value
 
-    @schema_property('project')
+    @schema_property("project")
     def project(self):
         return self._property_project
 
@@ -6148,7 +6298,7 @@ class UpdateRequest(Request):
         self.assert_isinstance(value, "project", six.string_types)
         self._property_project = value
 
-    @schema_property('output__error')
+    @schema_property("output__error")
     def output__error(self):
         return self._property_output__error
 
@@ -6161,7 +6311,7 @@ class UpdateRequest(Request):
         self.assert_isinstance(value, "output__error", six.string_types)
         self._property_output__error = value
 
-    @schema_property('created')
+    @schema_property("created")
     def created(self):
         return self._property_created
 
@@ -6186,33 +6336,34 @@ class UpdateResponse(Response):
     :param fields: Updated fields names and values
     :type fields: dict
     """
+
     _service = "tasks"
     _action = "update"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'fields': {
-                'additionalProperties': True,
-                'description': 'Updated fields names and values',
-                'type': ['object', 'null'],
+        "definitions": {},
+        "properties": {
+            "fields": {
+                "additionalProperties": True,
+                "description": "Updated fields names and values",
+                "type": ["object", "null"],
             },
-            'updated': {
-                'description': 'Number of tasks updated (0 or 1)',
-                'enum': [0, 1],
-                'type': ['integer', 'null'],
+            "updated": {
+                "description": "Number of tasks updated (0 or 1)",
+                "enum": [0, 1],
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, updated=None, fields=None, **kwargs):
+
+    def __init__(self, updated=None, fields=None, **kwargs):
         super(UpdateResponse, self).__init__(**kwargs)
         self.updated = updated
         self.fields = fields
 
-    @schema_property('updated')
+    @schema_property("updated")
     def updated(self):
         return self._property_updated
 
@@ -6227,7 +6378,7 @@ class UpdateResponse(Response):
         self.assert_isinstance(value, "updated", six.integer_types)
         self._property_updated = value
 
-    @schema_property('fields')
+    @schema_property("fields")
     def fields(self):
         return self._property_fields
 
@@ -6262,27 +6413,28 @@ class UpdateBatchResponse(Response):
     :param updated: Number of tasks updated (0 or 1)
     :type updated: int
     """
+
     _service = "tasks"
     _action = "update_batch"
     _version = "2.1"
 
     _schema = {
-        'definitions': {},
-        'properties': {
-            'updated': {
-                'description': 'Number of tasks updated (0 or 1)',
-                'enum': [0, 1],
-                'type': ['integer', 'null'],
+        "definitions": {},
+        "properties": {
+            "updated": {
+                "description": "Number of tasks updated (0 or 1)",
+                "enum": [0, 1],
+                "type": ["integer", "null"],
             },
         },
-        'type': 'object',
+        "type": "object",
     }
-    def __init__(
-            self, updated=None, **kwargs):
+
+    def __init__(self, updated=None, **kwargs):
         super(UpdateBatchResponse, self).__init__(**kwargs)
         self.updated = updated
 
-    @schema_property('updated')
+    @schema_property("updated")
     def updated(self):
         return self._property_updated
 
@@ -6331,200 +6483,201 @@ class ValidateRequest(Request):
     _action = "validate"
     _version = "2.1"
     _schema = {
-        'definitions': {
-            'artifact': {
-                'properties': {
-                    'content_size': {
-                        'description': 'Raw data length in bytes',
-                        'type': 'integer',
+        "definitions": {
+            "artifact": {
+                "properties": {
+                    "content_size": {
+                        "description": "Raw data length in bytes",
+                        "type": "integer",
                     },
-                    'display_data': {
-                        'description': 'User-defined list of key/value pairs, sorted',
-                        'items': {'items': {'type': 'string'}, 'type': 'array'},
-                        'type': 'array',
+                    "display_data": {
+                        "description": "User-defined list of key/value pairs, sorted",
+                        "items": {"items": {"type": "string"}, "type": "array"},
+                        "type": "array",
                     },
-                    'hash': {
-                        'description': 'Hash of entire raw data',
-                        'type': 'string',
+                    "hash": {
+                        "description": "Hash of entire raw data",
+                        "type": "string",
                     },
-                    'key': {'description': 'Entry key', 'type': 'string'},
-                    'mode': {
-                        'default': 'output',
-                        'description': 'System defined input/output indication',
-                        'enum': ['input', 'output'],
-                        'type': 'string',
+                    "key": {"description": "Entry key", "type": "string"},
+                    "mode": {
+                        "default": "output",
+                        "description": "System defined input/output indication",
+                        "enum": ["input", "output"],
+                        "type": "string",
                     },
-                    'timestamp': {
-                        'description': 'Epoch time when artifact was created',
-                        'type': 'integer',
+                    "timestamp": {
+                        "description": "Epoch time when artifact was created",
+                        "type": "integer",
                     },
-                    'type': {
-                        'description': 'System defined type',
-                        'type': 'string',
+                    "type": {"description": "System defined type", "type": "string",},
+                    "type_data": {
+                        "$ref": "#/definitions/artifact_type_data",
+                        "description": "Additional fields defined by the system",
                     },
-                    'type_data': {
-                        '$ref': '#/definitions/artifact_type_data',
-                        'description': 'Additional fields defined by the system',
-                    },
-                    'uri': {'description': 'Raw data location', 'type': 'string'},
+                    "uri": {"description": "Raw data location", "type": "string"},
                 },
-                'required': ['key', 'type'],
-                'type': 'object',
+                "required": ["key", "type"],
+                "type": "object",
             },
-            'artifact_type_data': {
-                'properties': {
-                    'content_type': {
-                        'description': 'System defined raw data content type',
-                        'type': ['string', 'null'],
+            "artifact_type_data": {
+                "properties": {
+                    "content_type": {
+                        "description": "System defined raw data content type",
+                        "type": ["string", "null"],
                     },
-                    'data_hash': {
-                        'description': 'Hash of raw data, without any headers or descriptive parts',
-                        'type': ['string', 'null'],
+                    "data_hash": {
+                        "description": "Hash of raw data, without any headers or descriptive parts",
+                        "type": ["string", "null"],
                     },
-                    'preview': {
-                        'description': 'Description or textual data',
-                        'type': ['string', 'null'],
+                    "preview": {
+                        "description": "Description or textual data",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'execution': {
-                'properties': {
-                    'artifacts': {
-                        'description': 'Task artifacts',
-                        'items': {'$ref': '#/definitions/artifact'},
-                        'type': ['array', 'null'],
+            "execution": {
+                "properties": {
+                    "artifacts": {
+                        "description": "Task artifacts",
+                        "items": {"$ref": "#/definitions/artifact"},
+                        "type": ["array", "null"],
                     },
-                    'docker_cmd': {
-                        'description': 'Command for running docker script for the execution of the task',
-                        'type': ['string', 'null'],
+                    "docker_cmd": {
+                        "description": "Command for running docker script for the execution of the task",
+                        "type": ["string", "null"],
                     },
-                    'framework': {
-                        'description': 'Framework related to the task. Case insensitive. Mandatory for Training tasks. ',
-                        'type': ['string', 'null'],
+                    "framework": {
+                        "description": "Framework related to the task. Case insensitive. Mandatory for Training tasks. ",
+                        "type": ["string", "null"],
                     },
-                    'model': {
-                        'description': 'Execution input model ID Not applicable for Register (Import) tasks',
-                        'type': ['string', 'null'],
+                    "model": {
+                        "description": "Execution input model ID Not applicable for Register (Import) tasks",
+                        "type": ["string", "null"],
                     },
-                    'model_desc': {
-                        'additionalProperties': True,
-                        'description': 'Json object representing the Model descriptors',
-                        'type': ['object', 'null'],
+                    "model_desc": {
+                        "additionalProperties": True,
+                        "description": "Json object representing the Model descriptors",
+                        "type": ["object", "null"],
                     },
-                    'model_labels': {
-                        'additionalProperties': {'type': 'integer'},
-                        'description': "Json object representing the ids of the labels in the model.\n                The keys are the layers' names and the values are the IDs.\n                Not applicable for Register (Import) tasks.\n                Mandatory for Training tasks",
-                        'type': ['object', 'null'],
+                    "model_labels": {
+                        "additionalProperties": {"type": "integer"},
+                        "description": "Json object representing the ids of the labels in the model.\n                The keys are the layers' names and the values are the IDs.\n                Not applicable for Register (Import) tasks.\n                Mandatory for Training tasks",
+                        "type": ["object", "null"],
                     },
-                    'parameters': {
-                        'additionalProperties': True,
-                        'description': 'Json object containing the Task parameters',
-                        'type': ['object', 'null'],
+                    "parameters": {
+                        "additionalProperties": True,
+                        "description": "Json object containing the Task parameters",
+                        "type": ["object", "null"],
                     },
-                    'queue': {
-                        'description': 'Queue ID where task was queued.',
-                        'type': ['string', 'null'],
+                    "queue": {
+                        "description": "Queue ID where task was queued.",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'script': {
-                'properties': {
-                    'binary': {
-                        'default': 'python',
-                        'description': 'Binary to use when running the script',
-                        'type': ['string', 'null'],
+            "script": {
+                "properties": {
+                    "binary": {
+                        "default": "python",
+                        "description": "Binary to use when running the script",
+                        "type": ["string", "null"],
                     },
-                    'branch': {
-                        'description': 'Repository branch id If not provided and tag not provided, default repository branch is used.',
-                        'type': ['string', 'null'],
+                    "branch": {
+                        "description": "Repository branch id If not provided and tag not provided, default repository branch is used.",
+                        "type": ["string", "null"],
                     },
-                    'diff': {
-                        'description': 'Uncommitted changes found in the repository when task was run',
-                        'type': ['string', 'null'],
+                    "diff": {
+                        "description": "Uncommitted changes found in the repository when task was run",
+                        "type": ["string", "null"],
                     },
-                    'entry_point': {
-                        'description': 'Path to execute within the repository',
-                        'type': ['string', 'null'],
+                    "entry_point": {
+                        "description": "Path to execute within the repository",
+                        "type": ["string", "null"],
                     },
-                    'repository': {
-                        'description': 'Name of the repository where the script is located',
-                        'type': ['string', 'null'],
+                    "repository": {
+                        "description": "Name of the repository where the script is located",
+                        "type": ["string", "null"],
                     },
-                    'requirements': {
-                        'description': 'A JSON object containing requirements strings by key',
-                        'type': ['object', 'null'],
+                    "requirements": {
+                        "description": "A JSON object containing requirements strings by key",
+                        "type": ["object", "null"],
                     },
-                    'tag': {
-                        'description': 'Repository tag',
-                        'type': ['string', 'null'],
+                    "tag": {
+                        "description": "Repository tag",
+                        "type": ["string", "null"],
                     },
-                    'version_num': {
-                        'description': 'Version (changeset) number. Optional (default is head version) Unused if tag is provided.',
-                        'type': ['string', 'null'],
+                    "version_num": {
+                        "description": "Version (changeset) number. Optional (default is head version) Unused if tag is provided.",
+                        "type": ["string", "null"],
                     },
-                    'working_dir': {
-                        'description': 'Path to the folder from which to run the script Default - root folder of repository',
-                        'type': ['string', 'null'],
+                    "working_dir": {
+                        "description": "Path to the folder from which to run the script Default - root folder of repository",
+                        "type": ["string", "null"],
                     },
                 },
-                'type': 'object',
+                "type": "object",
             },
-            'task_type_enum': {
-                'enum': [
-                    'training',
-                    'testing',
-                ],
-                'type': 'string',
+            "task_type_enum": {"enum": ["training", "testing",], "type": "string",},
+        },
+        "properties": {
+            "comment": {"description": "Free text comment ", "type": "string"},
+            "execution": {
+                "$ref": "#/definitions/execution",
+                "description": "Task execution params",
+            },
+            "name": {
+                "description": "Task name. Unique within the company.",
+                "type": "string",
+            },
+            "output_dest": {
+                "description": "Output storage id Must be a reference to an existing storage.",
+                "type": "string",
+            },
+            "parent": {
+                "description": "Parent task id Must be a completed task.",
+                "type": "string",
+            },
+            "project": {
+                "description": "Project ID of the project to which this task is assigned Must exist[ab]",
+                "type": "string",
+            },
+            "script": {"$ref": "#/definitions/script", "description": "Script info",},
+            "system_tags": {
+                "description": "System tags list. This field is reserved for system use, please don't use it.",
+                "items": {"type": "string"},
+                "type": "array",
+            },
+            "tags": {
+                "description": "User-defined tags list",
+                "items": {"type": "string"},
+                "type": "array",
+            },
+            "type": {
+                "$ref": "#/definitions/task_type_enum",
+                "description": "Type of task",
             },
         },
-        'properties': {
-            'comment': {'description': 'Free text comment ', 'type': 'string'},
-            'execution': {
-                '$ref': '#/definitions/execution',
-                'description': 'Task execution params',
-            },
-            'name': {
-                'description': 'Task name. Unique within the company.',
-                'type': 'string',
-            },
-            'output_dest': {
-                'description': 'Output storage id Must be a reference to an existing storage.',
-                'type': 'string',
-            },
-            'parent': {
-                'description': 'Parent task id Must be a completed task.',
-                'type': 'string',
-            },
-            'project': {
-                'description': 'Project ID of the project to which this task is assigned Must exist[ab]',
-                'type': 'string',
-            },
-            'script': {
-                '$ref': '#/definitions/script',
-                'description': 'Script info',
-            },
-            'system_tags': {
-                'description': "System tags list. This field is reserved for system use, please don't use it.",
-                'items': {'type': 'string'},
-                'type': 'array',
-            },
-            'tags': {
-                'description': 'User-defined tags list',
-                'items': {'type': 'string'},
-                'type': 'array',
-            },
-            'type': {
-                '$ref': '#/definitions/task_type_enum',
-                'description': 'Type of task',
-            },
-        },
-        'required': ['name', 'type'],
-        'type': 'object',
+        "required": ["name", "type"],
+        "type": "object",
     }
+
     def __init__(
-            self, name, type, tags=None, system_tags=None, comment=None, parent=None, project=None, output_dest=None, execution=None, script=None, **kwargs):
+        self,
+        name,
+        type,
+        tags=None,
+        system_tags=None,
+        comment=None,
+        parent=None,
+        project=None,
+        output_dest=None,
+        execution=None,
+        script=None,
+        **kwargs
+    ):
         super(ValidateRequest, self).__init__(**kwargs)
         self.name = name
         self.tags = tags
@@ -6537,7 +6690,7 @@ class ValidateRequest(Request):
         self.execution = execution
         self.script = script
 
-    @schema_property('name')
+    @schema_property("name")
     def name(self):
         return self._property_name
 
@@ -6550,7 +6703,7 @@ class ValidateRequest(Request):
         self.assert_isinstance(value, "name", six.string_types)
         self._property_name = value
 
-    @schema_property('tags')
+    @schema_property("tags")
     def tags(self):
         return self._property_tags
 
@@ -6565,7 +6718,7 @@ class ValidateRequest(Request):
         self.assert_isinstance(value, "tags", six.string_types, is_array=True)
         self._property_tags = value
 
-    @schema_property('system_tags')
+    @schema_property("system_tags")
     def system_tags(self):
         return self._property_system_tags
 
@@ -6580,7 +6733,7 @@ class ValidateRequest(Request):
         self.assert_isinstance(value, "system_tags", six.string_types, is_array=True)
         self._property_system_tags = value
 
-    @schema_property('type')
+    @schema_property("type")
     def type(self):
         return self._property_type
 
@@ -6598,7 +6751,7 @@ class ValidateRequest(Request):
             self.assert_isinstance(value, "type", enum.Enum)
         self._property_type = value
 
-    @schema_property('comment')
+    @schema_property("comment")
     def comment(self):
         return self._property_comment
 
@@ -6611,7 +6764,7 @@ class ValidateRequest(Request):
         self.assert_isinstance(value, "comment", six.string_types)
         self._property_comment = value
 
-    @schema_property('parent')
+    @schema_property("parent")
     def parent(self):
         return self._property_parent
 
@@ -6624,7 +6777,7 @@ class ValidateRequest(Request):
         self.assert_isinstance(value, "parent", six.string_types)
         self._property_parent = value
 
-    @schema_property('project')
+    @schema_property("project")
     def project(self):
         return self._property_project
 
@@ -6637,8 +6790,7 @@ class ValidateRequest(Request):
         self.assert_isinstance(value, "project", six.string_types)
         self._property_project = value
 
-
-    @schema_property('output_dest')
+    @schema_property("output_dest")
     def output_dest(self):
         return self._property_output_dest
 
@@ -6651,7 +6803,7 @@ class ValidateRequest(Request):
         self.assert_isinstance(value, "output_dest", six.string_types)
         self._property_output_dest = value
 
-    @schema_property('execution')
+    @schema_property("execution")
     def execution(self):
         return self._property_execution
 
@@ -6666,7 +6818,7 @@ class ValidateRequest(Request):
             self.assert_isinstance(value, "execution", Execution)
         self._property_execution = value
 
-    @schema_property('script')
+    @schema_property("script")
     def script(self):
         return self._property_script
 
@@ -6687,11 +6839,12 @@ class ValidateResponse(Response):
     Response of tasks.validate endpoint.
 
     """
+
     _service = "tasks"
     _action = "validate"
     _version = "2.1"
 
-    _schema = {'additionalProperties': False, 'definitions': {}, 'type': 'object'}
+    _schema = {"additionalProperties": False, "definitions": {}, "type": "object"}
 
 
 response_mapping = {

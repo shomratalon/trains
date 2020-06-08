@@ -1,25 +1,43 @@
 import json
+from threading import Event, Thread
+
+import numpy as np
+import six
+
+from ...utilities.async_manager import AsyncManagerMixin
+from ...utilities.plotly_reporter import (
+    create_2d_histogram_plot,
+    create_2d_scatter_series,
+    create_3d_scatter_series,
+    create_3d_surface,
+    create_image_plot,
+    create_line_plot,
+    create_plotly_table,
+    create_value_matrix,
+    plotly_scatter3d_layout_dict,
+)
+from ...utilities.py3_interop import AbstractContextManager
+from ..base import InterfaceBase
+from ..setupuploadmixin import SetupUploadMixin
+from .events import (
+    ImageEvent,
+    ImageEventNoUpload,
+    MediaEvent,
+    PlotEvent,
+    ScalarEvent,
+    UploadEvent,
+    VectorEvent,
+)
 
 try:
     from collections.abc import Iterable
 except ImportError:
     from collections import Iterable
 
-import six
-import numpy as np
-from threading import Thread, Event
 
-from ..base import InterfaceBase
-from ..setupuploadmixin import SetupUploadMixin
-from ...utilities.async_manager import AsyncManagerMixin
-from ...utilities.plotly_reporter import create_2d_histogram_plot, create_value_matrix, create_3d_surface, \
-    create_2d_scatter_series, create_3d_scatter_series, create_line_plot, plotly_scatter3d_layout_dict, \
-    create_image_plot, create_plotly_table
-from ...utilities.py3_interop import AbstractContextManager
-from .events import ScalarEvent, VectorEvent, ImageEvent, PlotEvent, ImageEventNoUpload, UploadEvent, MediaEvent
-
-
-class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncManagerMixin):
+class Reporter(
+    InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncManagerMixin
+):
     """
     A simple metrics reporter class.
     This class caches reports and supports both a explicit flushing and context-based flushing. To ensure reports are
@@ -43,7 +61,7 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
             are flushed and sent to the backend.
         :type flush_threshold: int
         """
-        log = metrics.log.getChild('reporter')
+        log = metrics.log.getChild("reporter")
         log.setLevel(log.level)
         super(Reporter, self).__init__(session=metrics.session, log=log)
         self._metrics = metrics
@@ -62,7 +80,9 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
         self._max_iteration = 0
 
     def _set_storage_uri(self, value):
-        value = '/'.join(x for x in (value.rstrip('/'), self._metrics.storage_key_prefix) if x)
+        value = "/".join(
+            x for x in (value.rstrip("/"), self._metrics.storage_key_prefix) if x
+        )
         self._storage_uri = value
 
     storage_uri = property(None, _set_storage_uri)
@@ -104,8 +124,11 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
     def _report(self, ev):
         ev_iteration = ev.get_iteration()
         if ev_iteration is not None:
-            # we have to manually add get_iteration_offset() because event hasn't reached the Metric manager
-            self._max_iteration = max(self._max_iteration, ev_iteration + self._metrics.get_iteration_offset())
+            # we have to manually add get_iteration_offset() because event
+            # hasn't reached the Metric manager
+            self._max_iteration = max(
+                self._max_iteration, ev_iteration + self._metrics.get_iteration_offset()
+            )
         self._events.append(ev)
         if len(self._events) >= self._flush_threshold:
             self.flush()
@@ -114,7 +137,9 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
         if not self._events:
             return
         # print('reporting %d events' % len(self._events))
-        res = self._metrics.write_events(self._events, async_enable=self._async_enable, storage_uri=self._storage_uri)
+        res = self._metrics.write_events(
+            self._events, async_enable=self._async_enable, storage_uri=self._storage_uri
+        )
         if self._async_enable:
             self._add_async_result(res)
         self._events = []
@@ -142,8 +167,12 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
         :param iter: Iteration number
         :type value: int
         """
-        ev = ScalarEvent(metric=self._normalize_name(title), variant=self._normalize_name(series), value=value,
-                         iter=iter)
+        ev = ScalarEvent(
+            metric=self._normalize_name(title),
+            variant=self._normalize_name(series),
+            value=value,
+            iter=iter,
+        )
         self._report(ev)
 
     def report_vector(self, title, series, values, iter):
@@ -159,9 +188,13 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
         :type value: int
         """
         if not isinstance(values, Iterable):
-            raise ValueError('values: expected an iterable')
-        ev = VectorEvent(metric=self._normalize_name(title), variant=self._normalize_name(series), values=values,
-                         iter=iter)
+            raise ValueError("values: expected an iterable")
+        ev = VectorEvent(
+            metric=self._normalize_name(title),
+            variant=self._normalize_name(series),
+            values=values,
+            iter=iter,
+        )
         self._report(ev)
 
     def report_plot(self, title, series, plot, iter):
@@ -177,18 +210,24 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
         :type value: int
         """
         try:
+
             def default(o):
                 if isinstance(o, np.int64):
                     return int(o)
+
         except Exception:
             default = None
 
         if isinstance(plot, dict):
             plot = json.dumps(plot, default=default)
         elif not isinstance(plot, six.string_types):
-            raise ValueError('Plot should be a string or a dict')
-        ev = PlotEvent(metric=self._normalize_name(title), variant=self._normalize_name(series), plot_str=plot,
-                       iter=iter)
+            raise ValueError("Plot should be a string or a dict")
+        ev = PlotEvent(
+            metric=self._normalize_name(title),
+            variant=self._normalize_name(series),
+            plot_str=plot,
+            iter=iter,
+        )
         self._report(ev)
 
     def report_image(self, title, series, src, iter):
@@ -204,8 +243,12 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
         :param iter: Iteration number
         :type value: int
         """
-        ev = ImageEventNoUpload(metric=self._normalize_name(title), variant=self._normalize_name(series), iter=iter,
-                                src=src)
+        ev = ImageEventNoUpload(
+            metric=self._normalize_name(title),
+            variant=self._normalize_name(series),
+            iter=iter,
+            src=src,
+        )
         self._report(ev)
 
     def report_media(self, title, series, src, iter):
@@ -221,12 +264,25 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
         :param iter: Iteration number
         :type value: int
         """
-        ev = ImageEventNoUpload(metric=self._normalize_name(title), variant=self._normalize_name(series), iter=iter,
-                                src=src)
+        ev = ImageEventNoUpload(
+            metric=self._normalize_name(title),
+            variant=self._normalize_name(series),
+            iter=iter,
+            src=src,
+        )
         self._report(ev)
 
-    def report_image_and_upload(self, title, series, iter, path=None, image=None, upload_uri=None,
-                                max_image_history=None, delete_after_upload=False):
+    def report_image_and_upload(
+        self,
+        title,
+        series,
+        iter,
+        path=None,
+        image=None,
+        upload_uri=None,
+        max_image_history=None,
+        delete_after_upload=False,
+    ):
         """
         Report an image and upload its contents. Image is uploaded to a preconfigured bucket (see setup_upload()) with
          a key (filename) describing the task ID, title, series and iteration.
@@ -247,17 +303,36 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
         :type delete_after_upload: boolean
         """
         if not self._storage_uri and not upload_uri:
-            raise ValueError('Upload configuration is required (use setup_upload())')
+            raise ValueError("Upload configuration is required (use setup_upload())")
         if len([x for x in (path, image) if x is not None]) != 1:
-            raise ValueError('Expected only one of [filename, image]')
-        kwargs = dict(metric=self._normalize_name(title), variant=self._normalize_name(series), iter=iter,
-                      file_history_size=max_image_history)
-        ev = ImageEvent(image_data=image, upload_uri=upload_uri, local_image_path=path,
-                        delete_after_upload=delete_after_upload, **kwargs)
+            raise ValueError("Expected only one of [filename, image]")
+        kwargs = dict(
+            metric=self._normalize_name(title),
+            variant=self._normalize_name(series),
+            iter=iter,
+            file_history_size=max_image_history,
+        )
+        ev = ImageEvent(
+            image_data=image,
+            upload_uri=upload_uri,
+            local_image_path=path,
+            delete_after_upload=delete_after_upload,
+            **kwargs
+        )
         self._report(ev)
 
-    def report_media_and_upload(self, title, series, iter, path=None, stream=None, upload_uri=None,
-                                file_extension=None, max_history=None, delete_after_upload=False):
+    def report_media_and_upload(
+        self,
+        title,
+        series,
+        iter,
+        path=None,
+        stream=None,
+        upload_uri=None,
+        file_extension=None,
+        max_history=None,
+        delete_after_upload=False,
+    ):
         """
         Report a media file/stream and upload its contents.
         Media is uploaded to a preconfigured bucket
@@ -279,18 +354,39 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
         :type delete_after_upload: boolean
         """
         if not self._storage_uri and not upload_uri:
-            raise ValueError('Upload configuration is required (use setup_upload())')
+            raise ValueError("Upload configuration is required (use setup_upload())")
         if len([x for x in (path, stream) if x is not None]) != 1:
-            raise ValueError('Expected only one of [filename, stream]')
-        kwargs = dict(metric=self._normalize_name(title), variant=self._normalize_name(series), iter=iter,
-                      file_history_size=max_history)
-        ev = MediaEvent(stream=stream, upload_uri=upload_uri, local_image_path=path,
-                        override_filename_ext=file_extension,
-                        delete_after_upload=delete_after_upload, **kwargs)
+            raise ValueError("Expected only one of [filename, stream]")
+        kwargs = dict(
+            metric=self._normalize_name(title),
+            variant=self._normalize_name(series),
+            iter=iter,
+            file_history_size=max_history,
+        )
+        ev = MediaEvent(
+            stream=stream,
+            upload_uri=upload_uri,
+            local_image_path=path,
+            override_filename_ext=file_extension,
+            delete_after_upload=delete_after_upload,
+            **kwargs
+        )
         self._report(ev)
 
-    def report_histogram(self, title, series, histogram, iter, labels=None, xlabels=None,
-                         xtitle=None, ytitle=None, comment=None, mode='group', layout_config=None):
+    def report_histogram(
+        self,
+        title,
+        series,
+        histogram,
+        iter,
+        labels=None,
+        xlabels=None,
+        xtitle=None,
+        ytitle=None,
+        comment=None,
+        mode="group",
+        layout_config=None,
+    ):
         """
         Report an histogram bar plot
         :param title: Title (AKA metric)
@@ -315,7 +411,7 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
         :param layout_config: optional dictionary for layout configuration, passed directly to plotly
         :type layout_config: dict or None
         """
-        assert mode in ('stack', 'group', 'relative')
+        assert mode in ("stack", "group", "relative")
 
         plotly_dict = create_2d_histogram_plot(
             np_row_wise=histogram,
@@ -352,7 +448,9 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
         :param layout_config: optional dictionary for layout configuration, passed directly to plotly
         :type layout_config: dict or None
         """
-        table_output = create_plotly_table(table, title, series, layout_config=layout_config)
+        table_output = create_plotly_table(
+            table, title, series, layout_config=layout_config
+        )
         return self.report_plot(
             title=self._normalize_name(title),
             series=self._normalize_name(series),
@@ -360,8 +458,18 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
             iter=iteration,
         )
 
-    def report_line_plot(self, title, series, iter, xtitle, ytitle, mode='lines', reverse_xaxis=False,
-                         comment=None, layout_config=None):
+    def report_line_plot(
+        self,
+        title,
+        series,
+        iter,
+        xtitle,
+        ytitle,
+        mode="lines",
+        reverse_xaxis=False,
+        comment=None,
+        layout_config=None,
+    ):
         """
         Report a (possibly multiple) line plot.
 
@@ -397,14 +505,22 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
         )
 
         return self.report_plot(
-            title=self._normalize_name(title),
-            series='',
-            plot=plotly_dict,
-            iter=iter,
+            title=self._normalize_name(title), series="", plot=plotly_dict, iter=iter,
         )
 
-    def report_2d_scatter(self, title, series, data, iter, mode='lines', xtitle=None, ytitle=None, labels=None,
-                          comment=None, layout_config=None):
+    def report_2d_scatter(
+        self,
+        title,
+        series,
+        data,
+        iter,
+        mode="lines",
+        xtitle=None,
+        ytitle=None,
+        labels=None,
+        comment=None,
+        layout_config=None,
+    ):
         """
         Report a 2d scatter graph (with lines)
 
@@ -444,9 +560,24 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
             iter=iter,
         )
 
-    def report_3d_scatter(self, title, series, data, iter, labels=None, mode='lines', color=((217, 217, 217, 0.14),),
-                          marker_size=5, line_width=0.8, xtitle=None, ytitle=None, ztitle=None, fill=None,
-                          comment=None, layout_config=None):
+    def report_3d_scatter(
+        self,
+        title,
+        series,
+        data,
+        iter,
+        labels=None,
+        mode="lines",
+        color=((217, 217, 217, 0.14),),
+        marker_size=5,
+        line_width=0.8,
+        xtitle=None,
+        ytitle=None,
+        ztitle=None,
+        fill=None,
+        comment=None,
+        layout_config=None,
+    ):
         """
         Report a 3d scatter graph (with markers)
 
@@ -508,13 +639,26 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
 
         return self.report_plot(
             title=self._normalize_name(title),
-            series=self._normalize_name(series) if not isinstance(series, list) else None,
+            series=self._normalize_name(series)
+            if not isinstance(series, list)
+            else None,
             plot=plotly_obj,
             iter=iter,
         )
 
-    def report_value_matrix(self, title, series, data, iter, xtitle=None, ytitle=None, xlabels=None, ylabels=None,
-                            comment=None, layout_config=None):
+    def report_value_matrix(
+        self,
+        title,
+        series,
+        data,
+        iter,
+        xtitle=None,
+        ytitle=None,
+        xlabels=None,
+        ylabels=None,
+        comment=None,
+        layout_config=None,
+    ):
         """
         Report a heat-map matrix
 
@@ -554,8 +698,21 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
             iter=iter,
         )
 
-    def report_value_surface(self, title, series, data, iter, xlabels=None, ylabels=None,
-                             xtitle=None, ytitle=None, ztitle=None, camera=None, comment=None, layout_config=None):
+    def report_value_surface(
+        self,
+        title,
+        series,
+        data,
+        iter,
+        xlabels=None,
+        ylabels=None,
+        xtitle=None,
+        ytitle=None,
+        ztitle=None,
+        camera=None,
+        comment=None,
+        layout_config=None,
+    ):
         """
         Report a 3d surface (same data as heat-map matrix, only presented differently)
 
@@ -580,7 +737,7 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
 
         plotly_dict = create_3d_surface(
             np_value_matrix=data,
-            title=title + '/' + series,
+            title=title + "/" + series,
             xlabels=xlabels,
             ylabels=ylabels,
             series=series,
@@ -599,8 +756,17 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
             iter=iter,
         )
 
-    def report_image_plot_and_upload(self, title, series, iter, path=None, matrix=None,
-                                     upload_uri=None, max_image_history=None, delete_after_upload=False):
+    def report_image_plot_and_upload(
+        self,
+        title,
+        series,
+        iter,
+        path=None,
+        matrix=None,
+        upload_uri=None,
+        max_image_history=None,
+        delete_after_upload=False,
+    ):
         """
         Report an image as plot and upload its contents.
         Image is uploaded to a preconfigured bucket (see setup_upload()) with a key (filename)
@@ -624,25 +790,43 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
         :type delete_after_upload: boolean
         """
         if not upload_uri and not self._storage_uri:
-            raise ValueError('Upload configuration is required (use setup_upload())')
+            raise ValueError("Upload configuration is required (use setup_upload())")
         if len([x for x in (path, matrix) if x is not None]) != 1:
-            raise ValueError('Expected only one of [filename, matrix]')
-        kwargs = dict(metric=self._normalize_name(title), variant=self._normalize_name(series), iter=iter,
-                      file_history_size=max_image_history)
-        ev = UploadEvent(image_data=matrix, upload_uri=upload_uri, local_image_path=path,
-                         delete_after_upload=delete_after_upload, **kwargs)
-        _, url = ev.get_target_full_upload_uri(upload_uri or self._storage_uri, self._metrics.storage_key_prefix)
+            raise ValueError("Expected only one of [filename, matrix]")
+        kwargs = dict(
+            metric=self._normalize_name(title),
+            variant=self._normalize_name(series),
+            iter=iter,
+            file_history_size=max_image_history,
+        )
+        ev = UploadEvent(
+            image_data=matrix,
+            upload_uri=upload_uri,
+            local_image_path=path,
+            delete_after_upload=delete_after_upload,
+            **kwargs
+        )
+        _, url = ev.get_target_full_upload_uri(
+            upload_uri or self._storage_uri, self._metrics.storage_key_prefix
+        )
 
         # Hack: if the url doesn't start with http/s then the plotly will not be able to show it,
         # then we put the link under images not plots
-        if not url.startswith('http'):
-            return self.report_image_and_upload(title=title, series=series, iter=iter, path=path, image=matrix,
-                                                upload_uri=upload_uri, max_image_history=max_image_history)
+        if not url.startswith("http"):
+            return self.report_image_and_upload(
+                title=title,
+                series=series,
+                iter=iter,
+                path=path,
+                image=matrix,
+                upload_uri=upload_uri,
+                max_image_history=max_image_history,
+            )
 
         self._report(ev)
         plotly_dict = create_image_plot(
             image_src=url,
-            title=title + '/' + series,
+            title=title + "/" + series,
             width=matrix.shape[1] if matrix is not None else 640,
             height=matrix.shape[0] if matrix is not None else 480,
         )

@@ -12,10 +12,11 @@ class SessionCache(object):
     TODO: Improve error handling to something like "except (FileNotFoundError, PermissionError, JSONDecodeError)"
     TODO: that's both six-compatible and tested
     """
+
     @classmethod
     def _load_cache(cls):
         try:
-            flag = 'rb' if six.PY2 else 'rt'
+            flag = "rb" if six.PY2 else "rt"
             with (get_cache_dir() / SESSION_CACHE_FILE).open(flag) as fp:
                 return json.load(fp)
         except Exception:
@@ -25,7 +26,7 @@ class SessionCache(object):
     def _store_cache(cls, cache):
         try:
             get_cache_dir().mkdir(parents=True, exist_ok=True)
-            flag = 'wb' if six.PY2 else 'wt'
+            flag = "wb" if six.PY2 else "wt"
             with (get_cache_dir() / SESSION_CACHE_FILE).open(flag) as fp:
                 json.dump(cache, fp)
         except Exception:
