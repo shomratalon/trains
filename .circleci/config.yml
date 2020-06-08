@@ -105,11 +105,16 @@ jobs:
               command: |
                 python3 -m venv venv
                 . venv/bin/activate
+                python_files_changed=$(git diff --name-only | grep -E '\.py$' || true)
                 pip install black isort
                 pip install autopep8==1.4
-                isort -rc --skip venv/** .
-                autopep8 --recursive --in-place --aggressive --aggressive --exclude venv/** .
-                black --exclude venv/** .
+
+                if [ -n "$python_files_changed" ]; then
+
+                  isort -rc "${python_files_changed[@]}"
+                  autopep8 --recursive --in-place --aggressive --aggressive "${python_files_changed[@]}"
+                  black "${python_files_changed[@]}"
+                fi
           - run:
               name: Commit and push changes
               command: |
