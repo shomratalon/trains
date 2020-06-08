@@ -105,7 +105,8 @@ jobs:
               command: |
                 python3 -m venv venv
                 . venv/bin/activate
-                pip install autopep8 black isort
+                pip install black isort
+                pip install autopep8==1.4
                 isort -rc .
                 autopep8 --recursive --in-place --aggressive --aggressive .
                 black .
