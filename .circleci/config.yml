@@ -90,6 +90,33 @@ jobs:
           - store_artifacts:
               path: examples/logs.txt
 
+    code-style:
+      docker:
+        - image: python:3.6.9-stretch
+      working_directory: ~/repo
+      steps:
+         - add_ssh_keys:
+            fingerprints:
+              - "c5:eb:a3:aa:4b:cf:fb:52:9d:05:62:86:7d:73:9c:78"
+            # Step 1 : checkout source code to working directory
+          - checkout
+          - run:
+              name: Run code style changes
+              command: |
+                . venv/bin/activate
+                pip install autopep8 black isort
+                isort -rc .
+                autopep8 --recursive --in-place --aggressive --aggressive .
+                black .
+          - run:
+              name: Commit and push changes
+              command: |
+                git config user.email "AutoPEP8@allegro.ai"
+                git config user.name "AutoPEP8"
+                git add .
+                git commit -m "AutoPEP8 changes via CircleCI"
+                git push
+
 #    code_style:
 #      docker:
 #        - image: circleci/python:3.6.7
@@ -119,7 +146,7 @@ jobs:
 workflows:
   main:
     jobs:
-      - "python3_5"
-      - "python3_6"
-      - "python3_7"
-#      - "code_style"
+#      - "python3_5"
+#      - "python3_6"
+#      - "python3_7"
+      - "code_style"
