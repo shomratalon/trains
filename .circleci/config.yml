@@ -118,7 +118,7 @@ jobs:
                 git config user.email "AutoPEP8@allegro.ai"
                 git config user.name "AutoPEP8"
                 git add .
-                git commit -m "AutoPEP8 changes via CircleCI"
+                git commit -m "[ci skip] AutoPEP8 changes via CircleCI"
                 git push --set-upstream origin ${CIRCLE_BRANCH}
 
 #    code_style:
