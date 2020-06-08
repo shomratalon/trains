@@ -676,9 +676,9 @@ class ConfigParser(object):
                             if value is not None:
                                 cls._do_substitute(substitution, value)
                                 continue
-                            if (
-                                substitution.optional
-                            ):  # special case, when self optional referencing without existing
+                            # special case, when self optional referencing
+                            # without existing
+                            if substitution.optional:
                                 cls._do_substitute(substitution, None)
 
     # traverse config to find all the substitutions
