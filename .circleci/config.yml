@@ -95,11 +95,11 @@ jobs:
         - image: python:3.6.9-stretch
       working_directory: ~/repo
       steps:
-          - add_ssh_keys:
-            fingerprints:
-              - "c5:eb:a3:aa:4b:cf:fb:52:9d:05:62:86:7d:73:9c:78"
-            # Step 1 : checkout source code to working directory
           - checkout
+          - add_ssh_keys:
+              fingerprints:
+                - "c5:eb:a3:aa:4b:cf:fb:52:9d:05:62:86:7d:73:9c:78"
+            # Step 1 : checkout source code to working directory
           - run:
               name: Run code style changes
               command: |
