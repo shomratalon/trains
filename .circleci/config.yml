@@ -107,9 +107,9 @@ jobs:
                 . venv/bin/activate
                 pip install black isort
                 pip install autopep8==1.4
-                isort -rc .
-                autopep8 --recursive --in-place --aggressive --aggressive .
-                black .
+                isort -rc --skip venv/** .
+                autopep8 --recursive --in-place --aggressive --aggressive --exclude venv/** .
+                black --exclude venv/** .
           - run:
               name: Commit and push changes
               command: |
