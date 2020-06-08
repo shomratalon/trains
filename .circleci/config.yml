@@ -103,18 +103,15 @@ jobs:
           - run:
               name: Run code style changes
               command: |
+                cd ..
                 python3 -m venv venv
                 . venv/bin/activate
-                python_files_changed=$(git diff --name-only | grep -E '\.py$' || true)
+                cd repo
                 pip install black isort
                 pip install autopep8==1.4
-
-                if [ -n "$python_files_changed" ]; then
-
-                  isort -rc "${python_files_changed[@]}"
-                  autopep8 --recursive --in-place --aggressive --aggressive "${python_files_changed[@]}"
-                  black "${python_files_changed[@]}"
-                fi
+                isort -rc .
+                autopep8 --recursive --in-place --aggressive --aggressive .
+                black .
           - run:
               name: Commit and push changes
               command: |
@@ -122,7 +119,7 @@ jobs:
                 git config user.name "AutoPEP8"
                 git add .
                 git commit -m "AutoPEP8 changes via CircleCI"
-                git push
+                git push --set-upstream origin ${CIRCLE_BRANCH}
 
 #    code_style:
 #      docker:
