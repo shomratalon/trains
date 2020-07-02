@@ -162,7 +162,8 @@ class Session(TokenManager):
             if not api_version:
                 api_version = '2.2' if token_dict.get('env', '') == 'prod' else Session.api_version
             if token_dict.get('server_version'):
-                Session._client.append(('trains-server', token_dict.get('server_version'), ))
+                if not any(True for c in Session._client if c[0] == 'trains-server'):
+                    Session._client.append(('trains-server', token_dict.get('server_version'), ))
 
             Session.api_version = str(api_version)
         except (jwt.DecodeError, ValueError):
@@ -536,6 +537,10 @@ class Session(TokenManager):
     def get_worker_host_name(cls):
         from ...config import dev_worker_name
         return dev_worker_name() or gethostname()
+
+    @classmethod
+    def get_clients(cls):
+        return cls._client
 
     def _do_refresh_token(self, old_token, exp=None):
         """ TokenManager abstract method implementation.

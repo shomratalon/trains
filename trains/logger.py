@@ -1,7 +1,7 @@
 import logging
 import math
 import warnings
-from typing import Any, Sequence, Union, List, Optional, Tuple
+from typing import Any, Sequence, Union, List, Optional, Tuple, Dict
 
 import numpy as np
 import six
@@ -38,7 +38,7 @@ class Logger(object):
     diagrams, text logging, tables, and image uploading and reporting.
 
     In the **Trains Web-App (UI)**, ``Logger`` output appears in the **RESULTS** tab, **LOG**, **SCALARS**,
-    **PLOTS**, and **DEBUG IMAGES** sub-tabs. When you compare experiments, ``Logger`` output appears in the
+    **PLOTS**, and **DEBUG SAMPLES** sub-tabs. When you compare experiments, ``Logger`` output appears in the
     comparisons.
 
     .. warning::
@@ -69,8 +69,10 @@ class Logger(object):
         self._report_worker = None
         self._task_handler = None
         self._graph_titles = {}
+        self._tensorboard_series_force_prefix = None
 
-        StdStreamPatch.patch_std_streams(self)
+        if self._task.is_main_task():
+            StdStreamPatch.patch_std_streams(self)
 
     @classmethod
     def current_logger(cls):
@@ -111,7 +113,7 @@ class Logger(object):
 
             The values are:
 
-            - ``True`` - Print to the console. (Default)
+            - ``True`` - Print to the console. (default)
             - ``False`` - Do not print to the console.
         """
         return self._console(msg, level, not print_console, *args, **_)
@@ -130,9 +132,9 @@ class Logger(object):
 
         You can view the scalar plots in the **Trains Web-App (UI)**, **RESULTS** tab, **SCALARS** sub-tab.
 
-        :param str title: The title of the plot. Plot more than one scalar series on the same plot by using
+        :param str title: The title (metric) of the plot. Plot more than one scalar series on the same plot by using
             the same ``title`` for each call to this method.
-        :param str series: The title of the series.
+        :param str series: The series name (variant) of the reported scalar.
         :param float value: The value to plot per iteration.
         :param int iteration: The iteration number. Iterations are on the x-axis.
         """
@@ -168,8 +170,8 @@ class Logger(object):
 
         You can view the vectors plots in the **Trains Web-App (UI)**, **RESULTS** tab, **PLOTS** sub-tab.
 
-        :param str title: The title of the plot.
-        :param str series: The title of the series.
+        :param str title: The title (metric) of the plot.
+        :param str series: The series name (variant) of the reported histogram.
         :param list(float) values: The series values. A list of floats, or an N-dimensional Numpy array containing
             data for each histogram bar.
         :type values: list(float), numpy.ndarray
@@ -215,8 +217,8 @@ class Logger(object):
 
         You can view the reported histograms in the **Trains Web-App (UI)**, **RESULTS** tab, **PLOTS** sub-tab.
 
-        :param str title: The title of the plot.
-        :param str series: The title of the series.
+        :param str title: The title (metric) of the plot.
+        :param str series: The series name (variant) of the reported histogram.
         :param list(float) values: The series values. A list of floats, or an N-dimensional Numpy array containing
             data for each histogram bar.
         :type values: list(float), numpy.ndarray
@@ -282,8 +284,8 @@ class Logger(object):
 
         You can view the reported tables in the **Trains Web-App (UI)**, **RESULTS** tab, **PLOTS** sub-tab.
 
-        :param str title: The title of the table.
-        :param str series: The title of the series.
+        :param str title: The title (metric) of the table.
+        :param str series: The series name (variant) of the reported table.
         :param int iteration: The iteration number.
         :param table_plot: The output table plot object
         :type table_plot: pandas.DataFrame
@@ -331,7 +333,7 @@ class Logger(object):
     def report_line_plot(
             self,
             title,  # type: str
-            series,  # type: str
+            series,  # type: Sequence[SeriesInfo]
             iteration,  # type: int
             xaxis,  # type: str
             yaxis,  # type: str
@@ -343,9 +345,8 @@ class Logger(object):
         """
         For explicit reporting, plot one or more series as lines.
 
-        :param str title: The title of the plot.
-        :param list(LineSeriesInfo) series: All the series data, one list element for each line
-            in the plot.
+        :param str title: The title (metric) of the plot.
+        :param list series: All the series data, one list element for each line in the plot.
         :param int iteration: The iteration number.
         :param str xaxis: The x-axis title. (Optional)
         :param str yaxis: The y-axis title. (Optional)
@@ -362,7 +363,7 @@ class Logger(object):
             The values are:
 
             - ``True`` - The x-axis is high to low  (reversed).
-            - ``False`` - The x-axis is low to high  (not reversed). (Default)
+            - ``False`` - The x-axis is low to high  (not reversed). (default)
 
         :param str comment: A comment displayed with the plot, underneath the title.
         :param dict extra_layout: optional dictionary for layout configuration, passed directly to plotly
@@ -423,8 +424,8 @@ class Logger(object):
            logger.report_scatter2d("example_scatter", "series_2", iteration=1, scatter=scatter2d_2,
                 xaxis="title x", yaxis="title y")
 
-        :param str title: The title of the plot.
-        :param str series: The title of the series.
+        :param str title: The title (metric) of the plot.
+        :param str series: The series name (variant) of the reported scatter plot.
         :param list scatter: The scatter data. numpy.ndarray or list of (pairs of x,y) scatter:
         :param int iteration: The iteration number. To set an initial iteration, for example to continue a previously
         :param str xaxis: The x-axis title. (Optional)
@@ -483,8 +484,8 @@ class Logger(object):
         """
         For explicit reporting, plot a 3d scatter graph (with markers).
 
-        :param str title: The title of the plot.
-        :param str series: The title of the series.
+        :param str title: The title (metric) of the plot.
+        :param str series: The series name (variant) of the reported scatter plot.
         :param Union[numpy.ndarray, list] scatter: The scatter data.
             list of (pairs of x,y,z), list of series [[(x1,y1,z1)...]], or numpy.ndarray
         :param int iteration: The iteration number.
@@ -514,7 +515,7 @@ class Logger(object):
             The values are:
 
             - ``True`` - Fill
-            - ``False`` - Do not fill (Default)
+            - ``False`` - Do not fill (default)
 
         :param str comment: A comment displayed with the plot, underneath the title.
         :param dict extra_layout: optional dictionary for layout configuration, passed directly to plotly
@@ -585,8 +586,8 @@ class Logger(object):
            logger.report_confusion_matrix("example confusion matrix", "ignored", iteration=1, matrix=confusion,
                 xaxis="title X", yaxis="title Y")
 
-        :param str title: The title of the plot.
-        :param str series: The title of the series.
+        :param str title: The title (metric) of the plot.
+        :param str series: The series name (variant) of the reported confusion matrix.
         :param numpy.ndarray matrix: A heat-map matrix (example: confusion matrix)
         :param int iteration: The iteration number.
         :param str xaxis: The x-axis title. (Optional)
@@ -635,8 +636,8 @@ class Logger(object):
         .. note::
             This method is the same as :meth:`Logger.report_confusion_matrix`.
 
-        :param str title: The title of the plot.
-        :param str series: The title of the series.
+        :param str title: The title (metric) of the plot.
+        :param str series: The series name (variant) of the reported confusion matrix.
         :param numpy.ndarray matrix: A heat-map matrix (example: confusion matrix)
         :param int iteration: The iteration number.
         :param str xaxis: The x-axis title. (Optional)
@@ -679,8 +680,8 @@ class Logger(object):
            logger.report_surface("example surface", "series", iteration=0, matrix=surface_matrix,
                 xaxis="title X", yaxis="title Y", zaxis="title Z")
 
-        :param str title: The title of the plot.
-        :param str series: The title of the series.
+        :param str title: The title (metric) of the plot.
+        :param str series: The series name (variant) of the reported surface.
         :param numpy.ndarray matrix: A heat-map matrix (example: confusion matrix)
         :param int iteration: The iteration number.
         :param str xaxis: The x-axis title. (Optional)
@@ -746,13 +747,13 @@ class Logger(object):
 
         One and only one of the following parameters must be provided.
 
-        - :paramref:`~.Logger.report_image.local_path`
-        - :paramref:`~.Logger.report_image.url`
-        - :paramref:`~.Logger.report_image.image`
-        - :paramref:`~.Logger.report_image.matrix`
+        - ``local_path``
+        - ``url``
+        - ``image``
+        - ``matrix``
 
-        :param str title: The title of the image.
-        :param str series: The title of the series of this image.
+        :param str title: The title (metric) of the image.
+        :param str series: The series name (variant) of the reported image.
         :param int iteration: The iteration number.
         :param str local_path: A path to an image file.
         :param str url: A URL for the location of a pre-uploaded image.
@@ -771,7 +772,7 @@ class Logger(object):
             The values are:
 
             - ``True`` - Delete after upload.
-            - ``False`` - Do not delete after upload. (Default)
+            - ``False`` - Do not delete after upload. (default)
         """
         mutually_exclusive(
             UsageError, _check_none=True,
@@ -834,26 +835,33 @@ class Logger(object):
             url=None  # type: Optional[str]
     ):
         """
-        Report an image and upload its contents.
+        Report media upload its contents, including images, audio, and video.
 
-        Image is uploaded to a preconfigured bucket (see setup_upload()) with a key (filename)
+        Media is uploaded to a preconfigured bucket (see setup_upload()) with a key (filename)
         describing the task ID, title, series and iteration.
 
-        .. note::
-            :paramref:`~.Logger.report_image.local_path`, :paramref:`~.Logger.report_image.url`,
-            :paramref:`~.Logger.report_image.image` and :paramref:`~.Logger.report_image.matrix`
-            are mutually exclusive, and at least one must be provided.
+        One and only one of the following parameters must be provided
 
-        :param str title: Title (AKA metric)
-        :param str series: Series (AKA variant)
-        :param int iteration: Iteration number
-        :param str local_path: A path to an image file.
-        :param stream: BytesIO stream to upload (must provide file extension if used)
-        :param str url: A URL to the location of a pre-uploaded image.
-        :param file_extension: file extension to use when stream is passed
-        :param int max_history: maximum number of media files to store per metric/variant combination
+        - ``local_path``
+        - ``stream``
+        - ``url``
+
+        If you use ``stream`` for a BytesIO stream to upload, ``file_extension`` must be provided.
+
+        :param str title: The title (metric) of the media.
+        :param str series: The series name (variant) of the reported media.
+        :param int iteration: The iteration number.
+        :param str local_path: A path to an media file.
+        :param stream: BytesIO stream to upload. If provided, ``file_extension`` must also be provided.
+        :param str url: A URL to the location of a pre-uploaded media.
+        :param file_extension: A file extension to use when ``stream`` is passed.
+        :param int max_history: The maximum number of media files to store per metric/variant combination
             use negative value for unlimited. default is set in global configuration (default=5)
-        :param bool delete_after_upload: if True, one the file was uploaded the local copy will be deleted
+        :param bool delete_after_upload: After the file is uploaded, delete the local copyu?
+
+            - ``True`` - Delete
+            - ``False`` - Do not delete
+
         """
         mutually_exclusive(
             UsageError, _check_none=True,
@@ -897,6 +905,41 @@ class Logger(object):
                 file_extension=file_extension,
             )
 
+    def report_plotly(
+            self,
+            title,  # type: str
+            series,  # type: str
+            iteration,  # type: int
+            figure,  # type: Union[Dict, "Figure"]
+    ):
+        """
+        Report a ``Plotly`` figure (plot) directly
+
+        ``Plotly`` figure can be a ``plotly.graph_objs._figure.Figure`` or a dictionary as defined by ``plotly.js``
+
+        :param str title: The title (metric) of the plot.
+        :param str series: The series name (variant) of the reported plot.
+        :param int iteration: The iteration number.
+        :param dict figure: A ``plotly`` Figure object or a ``poltly`` dictionary
+        """
+        # if task was not started, we have to start it
+        self._start_task_if_needed()
+
+        self._touch_title_series(title, series)
+
+        plot = figure if isinstance(figure, dict) else figure.to_plotly_json()
+        # noinspection PyBroadException
+        try:
+            plot['layout']['title'] = series
+        except Exception:
+            pass
+        self._task.reporter.report_plot(
+            title=title,
+            series=series,
+            plot=plot,
+            iter=iteration,
+        )
+
     def set_default_upload_destination(self, uri):
         # type: (str) -> None
         """
@@ -910,12 +953,9 @@ class Logger(object):
 
         :param str uri: example: 's3://bucket/directory/' or 'file:///tmp/debug/'
 
-        :return: bool
+        :return: True, if the destination scheme is supported (for example, ``s3://``, ``file://``, or ``gc://``).
+            False, if not supported.
 
-            The values are:
-
-            - ``True`` - The destination scheme is supported (for example, ``s3://``, ``file://``, or ``gc://``).
-            - ``False`` - The destination scheme is not supported.
         """
 
         # Create the storage helper
@@ -934,7 +974,7 @@ class Logger(object):
 
         :return: The default upload destination URI.
 
-            For example, ``s3://bucket/directory/`` or ``file:///tmp/debug/``.
+            For example: ``s3://bucket/directory/``, or ``file:///tmp/debug/``.
         """
         return self._default_upload_destination or self._task._get_default_report_storage_uri()
 
@@ -943,12 +983,7 @@ class Logger(object):
         """
         Flush cached reports and console outputs to backend.
 
-        :return: bool
-
-            The values are:
-
-            - ``True`` - Successfully flushed the cache.
-            - ``False`` - Failed.
+        :return: True, if successfully flushed the cache. False, if failed.
         """
         self._flush_stdout_handler()
         if self._task:
@@ -1017,7 +1052,7 @@ class Logger(object):
 
             - ``True`` - Scalars without specific titles are grouped together in the "Scalars" plot, preserving
               backward compatibility with Trains automagical behavior.
-            - ``False`` - TensorBoard scalars without titles get a title/series with the same tag. (Default)
+            - ``False`` - TensorBoard scalars without titles get a title/series with the same tag. (default)
         :type group_scalars: bool
         """
         cls._tensorboard_logging_auto_group_scalars = group_scalars
@@ -1033,11 +1068,11 @@ class Logger(object):
             The values are:
 
             - ``True`` - Generate a separate plot for each TensorBoard scalar series.
-            - ``False`` - Group the TensorBoard scalar series together in the same plot. (Default)
+            - ``False`` - Group the TensorBoard scalar series together in the same plot. (default)
 
         :type single_series: bool
         """
-        cls._tensorboard_logging_single_series_per_graphs = single_series
+        cls._tensorboard_single_series_per_graph = single_series
 
     @classmethod
     def _remove_std_logger(cls):
@@ -1054,7 +1089,7 @@ class Logger(object):
         :param bool omit_console: Omit the console output, and only send the ``msg`` value to the log?
 
             - ``True`` - Omit the console output.
-            - ``False`` - Print the console output. (Default)
+            - ``False`` - Print the console output. (default)
 
         """
         try:
@@ -1230,21 +1265,38 @@ class Logger(object):
         self._graph_titles[title].add(series)
 
     def _get_used_title_series(self):
+        # type: () -> dict
         return self._graph_titles
+
+    def _get_tensorboard_series_prefix(self):
+        # type: () -> Optional[str]
+        """
+        :return str: return a string prefix to put in front of every report combing from tensorboard
+        """
+        return self._tensorboard_series_force_prefix
+
+    def _set_tensorboard_series_prefix(self, prefix):
+        # type: (Optional[str]) -> ()
+        """
+        :param str prefix: Set a string prefix to put in front of every report combing from tensorboard
+        """
+        self._tensorboard_series_force_prefix = str(prefix) if prefix else None
 
     @classmethod
     def _get_tensorboard_auto_group_scalars(cls):
+        # type: () -> bool
         """
-        :return: return True if we preserve Tensorboard backward compatibility behaviour,
-            i.e. Scalars without specific title will be under the "Scalars" graph
+        :return: True, if we preserve Tensorboard backward compatibility behaviour,
+            i.e., scalars without specific title will be under the "Scalars" graph
             default is False: Tensorboard scalars without title will have title/series with the same tag
         """
         return cls._tensorboard_logging_auto_group_scalars
 
     @classmethod
     def _get_tensorboard_single_series_per_graph(cls):
+        # type: () -> bool
         """
-        :return: return True if we generate a separate graph (plot) for each Tensorboard scalar series
+        :return: True, if we generate a separate graph (plot) for each Tensorboard scalar series
             default is False: Tensorboard scalar series will be grouped according to their title
         """
         return cls._tensorboard_single_series_per_graph

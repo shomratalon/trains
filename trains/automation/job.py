@@ -21,7 +21,7 @@ class TrainsJob(object):
             parent=None,  # type: Optional[str]
             **kwargs  # type: Any
     ):
-        # type: (...) -> TrainsJob
+        # type: (...) -> ()
         """
         Create a new Task based in a base_task_id with a different set of parameters
 
@@ -53,7 +53,7 @@ class TrainsJob(object):
 
         :param str title: Graph title (metric)
         :param str series: Series on the specific graph (variant)
-        :return tuple: min value, max value, last value
+        :return: A tuple of min value, max value, last value
         """
         title = hashlib.md5(str(title).encode('utf-8')).hexdigest()
         series = hashlib.md5(str(series).encode('utf-8')).hexdigest()
@@ -100,19 +100,23 @@ class TrainsJob(object):
         """
         Return the time in seconds since job started. Return -1 if job is still pending
 
-        :return float: seconds from start
+        :return: Seconds from start.
         """
         if not self.task_started and str(self.task.status) != Task.TaskStatusEnum.in_progress:
             return -1
         self.task_started = True
-        return (datetime.now() - self.task.data.started).timestamp()
+        if not self.task.data.started:
+            self.task.reload()
+            if not self.task.data.started:
+                return -1
+        return (datetime.now(tz=self.task.data.started.tzinfo) - self.task.data.started).total_seconds()
 
     def iterations(self):
         # type: () -> int
         """
         Return the last iteration value of the current job. -1 if job has not started yet
 
-        :return int: Task last iteration
+        :return: Task last iteration.
         """
         if not self.task_started and self.task.status != Task.TaskStatusEnum.in_progress:
             return -1
@@ -124,27 +128,27 @@ class TrainsJob(object):
         """
         Return the Task id.
 
-        :return str: Task id
+        :return: The Task ID.
         """
         return self.task.id
 
     def status(self):
-        # type: () -> Task.TaskStatusEnum
+        # type: () -> str
         """
         Return the Job Task current status, see Task.TaskStatusEnum
 
-        :return str: Task status Task.TaskStatusEnum in string
+        :return: Task status Task.TaskStatusEnum in string.
         """
         return self.task.status
 
     def wait(self, timeout=None, pool_period=30.):
         # type: (Optional[float], float) -> bool
         """
-        Wait until the task is fully executed (i.e. aborted/completed/failed)
+        Wait until the task is fully executed (i.e., aborted/completed/failed)
 
         :param timeout: maximum time (minutes) to wait for Task to finish
         :param pool_period: check task status every pool_period seconds
-        :return bool: Return True is Task finished.
+        :return: True, if Task finished.
         """
         tic = time()
         while timeout is None or time() - tic < timeout * 60.:
@@ -161,7 +165,7 @@ class TrainsJob(object):
         Returned console outputs are retrieved from the most updated console outputs.
 
         :param int number_of_reports: number of reports to return, default 1, the last (most updated) console output
-        :return list: List of strings each entry corresponds to one report.
+        :return: List of strings each entry corresponds to one report.
         """
         return self.task.get_reported_console_output(number_of_reports=number_of_reports)
 
@@ -170,7 +174,7 @@ class TrainsJob(object):
         """
         Return the current worker id executing this Job. If job is pending, returns None
 
-        :return str: Worker ID (str) executing / executed the job, or None if job is still pending.
+        :return: ID of the worker executing / executed the job, or None if job is still pending.
         """
         if self.is_pending():
             return self._worker
@@ -187,31 +191,54 @@ class TrainsJob(object):
     def is_running(self):
         # type: () -> bool
         """
-        Return True if job is currently running (pending is considered False)
+        Return True, if job is currently running (pending is considered False)
 
-        :return bool: True iff the task is currently in progress
+        :return: True, if the task is currently in progress.
         """
         return self.task.status == Task.TaskStatusEnum.in_progress
 
     def is_stopped(self):
         # type: () -> bool
         """
-        Return True if job is has executed and is not any more
+        Return True, if job is has executed and is not any more
 
-        :return bool: True the task is currently one of these states, stopped / completed / failed
+        :return: True the task is currently one of these states, stopped / completed / failed / published.
         """
         return self.task.status in (
             Task.TaskStatusEnum.stopped, Task.TaskStatusEnum.completed,
             Task.TaskStatusEnum.failed, Task.TaskStatusEnum.published)
 
+    def is_failed(self):
+        # type: () -> bool
+        """
+        Return True, if job is has executed and failed
+
+        :return: True the task is currently in failed state
+        """
+        return self.task.status in (Task.TaskStatusEnum.failed, )
+
     def is_pending(self):
         # type: () -> bool
         """
-        Return True if job is waiting for execution
+        Return True, if job is waiting for execution
 
-        :return bool: True the task is currently is currently queued
+        :return: True the task is currently is currently queued.
         """
         return self.task.status in (Task.TaskStatusEnum.queued, Task.TaskStatusEnum.created)
+
+    def started(self):
+        # type: () -> bool
+        """
+        Return True, if job already started, or ended. False, if created/pending.
+
+        :return: False, if the task is currently in draft mode or pending.
+        """
+        if not self.task_started and self.task.status in (
+                Task.TaskStatusEnum.in_progress, Task.TaskStatusEnum.created):
+            return False
+
+        self.task_started = True
+        return True
 
 
 # noinspection PyMethodMayBeStatic, PyUnusedLocal
@@ -227,7 +254,7 @@ class _JobStub(object):
             tags=None,  # type: Optional[Sequence[str]]
             **kwargs  # type: Any
      ):
-        # type: (...) -> _JobStub
+        # type: (...) -> ()
         self.task = None
         self.base_task_id = base_task_id
         self.parameter_override = parameter_override
@@ -251,7 +278,7 @@ class _JobStub(object):
         """
         Return the time in seconds since job started. Return -1 if job is still pending
 
-        :return float: seconds from start
+        :return: Seconds from start.
         """
         if self.task_started is None:
             return -1
@@ -261,7 +288,7 @@ class _JobStub(object):
         # type: () -> int
         """
         Return the last iteration value of the current job. -1 if job has not started yet
-        :return int: Task last iteration
+        :return: Task last iteration.
         """
         if self.task_started is None:
             return -1
@@ -274,7 +301,7 @@ class _JobStub(object):
 
         :param str title: Graph title (metric)
         :param str series: Series on the specific graph (variant)
-        :return list: min value, max value, last value
+        :return: min value, max value, last value
         """
         return 0, 1.0, 0.123
 
@@ -293,11 +320,11 @@ class _JobStub(object):
     def wait(self, timeout=None, pool_period=30.):
         # type: (Optional[float], float) -> bool
         """
-        Wait for the task to be processed (i.e. aborted/completed/failed)
+        Wait for the task to be processed (i.e., aborted/completed/failed)
 
         :param timeout: maximum time (minutes) to wait for Task to finish
         :param pool_period: check task status every pool_period seconds
-        :return bool: Return True is Task finished.
+        :return: True, if the Task finished.
         """
         return True
 
@@ -309,7 +336,7 @@ class _JobStub(object):
 
 
         :param int number_of_reports: number of reports to return, default 1, the last (most updated) console output
-        :return list: List of strings each entry corresponds to one report.
+        :return: List of strings each entry corresponds to one report.
         """
         return []
 
@@ -324,3 +351,7 @@ class _JobStub(object):
     def is_pending(self):
         # type: () -> bool
         return self.task_started is None
+
+    def started(self):
+        # type: () -> bool
+        return not self.is_pending()

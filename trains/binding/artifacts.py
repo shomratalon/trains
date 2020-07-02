@@ -2,6 +2,7 @@ import hashlib
 import json
 import mimetypes
 import os
+import pickle
 from six.moves.urllib.parse import quote
 from copy import deepcopy
 from datetime import datetime
@@ -17,7 +18,7 @@ import six
 from PIL import Image
 from pathlib2 import Path
 from six.moves.urllib.parse import urlparse
-from typing import Dict, Union, Optional, Any
+from typing import Dict, Union, Optional, Any, Sequence
 
 from ..backend_api import Session
 from ..backend_api.services import tasks
@@ -27,12 +28,18 @@ from ..storage.helper import remote_driver_schemes
 
 try:
     import pandas as pd
+    DataFrame = pd.DataFrame
 except ImportError:
     pd = None
+    DataFrame = None
 try:
     import numpy as np
 except ImportError:
     np = None
+try:
+    from pathlib import Path as pathlib_Path
+except ImportError:
+    pathlib_Path = None
 
 
 class Artifact(object):
@@ -44,7 +51,7 @@ class Artifact(object):
     def url(self):
         # type: () -> str
         """
-        :return: url of uploaded artifact
+        :return: The URL of uploaded artifact.
         """
         return self._url
 
@@ -52,7 +59,7 @@ class Artifact(object):
     def name(self):
         # type: () -> str
         """
-        :return: name of artifact
+        :return: The name of artifact.
         """
         return self._name
 
@@ -60,7 +67,7 @@ class Artifact(object):
     def size(self):
         # type: () -> int
         """
-        :return: size in bytes of artifact
+        :return: The size in bytes of artifact.
         """
         return self._size
 
@@ -68,7 +75,7 @@ class Artifact(object):
     def type(self):
         # type: () -> str
         """
-        :return: type (str) of of artifact
+        :return: The type (str) of of artifact.
         """
         return self._type
 
@@ -76,7 +83,7 @@ class Artifact(object):
     def mode(self):
         # type: () -> Union["input", "output"]
         """
-        :return: mode (str) of of artifact. either "input" or "output"
+        :return: The mode (str) of of artifact: "input" or "output".
         """
         return self._mode
 
@@ -108,7 +115,7 @@ class Artifact(object):
     def preview(self):
         # type: () -> str
         """
-        :return: string (str) representation of the artifact.
+        :return: A string (str) representation of the artifact.
         """
         return self._preview
 
@@ -137,13 +144,14 @@ class Artifact(object):
         Currently supported types: Numpy.array, pandas.DataFrame, PIL.Image, dict (json)
         All other types will return a pathlib2.Path object pointing to a local copy of the artifacts file (or directory)
 
-        :return: One of the following objects Numpy.array, pandas.DataFrame, PIL.Image, dict (json), pathlib2.Path
+        :return: One of the following objects Numpy.array, pandas.DataFrame, PIL.Image, dict (json), or pathlib2.Path.
         """
         if self._object:
             return self._object
 
         local_file = self.get_local_copy(raise_on_error=True)
 
+        # noinspection PyProtectedMember
         if self.type == 'numpy' and np:
             self._object = np.load(local_file)[self.name]
         elif self.type in ('pandas', Artifacts._pd_artifact_type) and pd:
@@ -153,6 +161,9 @@ class Artifact(object):
         elif self.type == 'JSON':
             with open(local_file, 'rt') as f:
                 self._object = json.load(f)
+        elif self.type == 'pickle':
+            with open(local_file, 'rb') as f:
+                self._object = pickle.load(f)
 
         local_file = Path(local_file)
 
@@ -168,7 +179,8 @@ class Artifact(object):
             The returned path will be a temporary folder containing the archive content
         :param bool raise_on_error: If True and the artifact could not be downloaded,
             raise ValueError, otherwise return None on failure and output log warning.
-        :return: a local path to a downloaded copy of the artifact
+        :raise: Raises error if local copy not found.
+        :return: A local path to a downloaded copy of the artifact.
         """
         from trains.storage import StorageManager
         local_copy = StorageManager.get_local_copy(
@@ -189,6 +201,8 @@ class Artifact(object):
 
 
 class Artifacts(object):
+    max_preview_size_bytes = 65536
+
     _flush_frequency_sec = 300.
     # notice these two should match
     _save_format = '.csv.gz'
@@ -261,7 +275,7 @@ class Artifacts(object):
         self._storage_prefix = None
 
     def register_artifact(self, name, artifact, metadata=None, uniqueness_columns=True):
-        # type: (str, object, Optional[dict], bool) -> ()
+        # type: (str, DataFrame, Optional[dict], Union[bool, Sequence[str]]) -> ()
         """
         :param str name: name of the artifacts. Notice! it will override previous artifacts if name already exists.
         :param pandas.DataFrame artifact: artifact object, supported artifacts object types: pandas.DataFrame
@@ -285,8 +299,8 @@ class Artifacts(object):
         self._unregister_request.add(name)
         self.flush()
 
-    def upload_artifact(self, name, artifact_object=None, metadata=None, delete_after_upload=False):
-        # type: (str, Optional[object], Optional[dict], bool) -> bool
+    def upload_artifact(self, name, artifact_object=None, metadata=None, delete_after_upload=False, auto_pickle=True):
+        # type: (str, Optional[object], Optional[dict], bool, bool) -> bool
         if not Session.check_min_api_version('2.3'):
             LoggerRoot.get_base_logger().warning('Artifacts not supported by your TRAINS-server version, '
                                                  'please upgrade to the latest server version')
@@ -294,6 +308,16 @@ class Artifacts(object):
 
         if name in self._artifacts_container:
             raise ValueError("Artifact by the name of {} is already registered, use register_artifact".format(name))
+
+        # convert string to object if try is a file/folder (dont try to serialize long texts
+        if isinstance(artifact_object, six.string_types) and len(artifact_object) < 2048:
+            # noinspection PyBroadException
+            try:
+                artifact_path = Path(artifact_object)
+                if artifact_path.exists():
+                    artifact_object = artifact_path
+            except Exception:
+                pass
 
         artifact_type_data = tasks.ArtifactTypeData()
         override_filename_in_uri = None
@@ -339,22 +363,20 @@ class Artifacts(object):
             fd, local_filename = mkstemp(prefix=quote(name, safe="") + '.', suffix=override_filename_ext_in_uri)
             os.write(fd, bytes(preview.encode()))
             os.close(fd)
-            artifact_type_data.preview = preview
+            if len(preview) < self.max_preview_size_bytes:
+                artifact_type_data.preview = preview
+            else:
+                artifact_type_data.preview = '# full json too large to store, storing first {}kb\n{}'.format(
+                    len(preview)//1024, preview[:self.max_preview_size_bytes]
+                )
+
             delete_after_upload = True
-        elif (
-            isinstance(artifact_object, six.string_types)
-            and urlparse(artifact_object).scheme in remote_driver_schemes
-        ):
-            # we should not upload this, just register
-            local_filename = None
-            uri = artifact_object
-            artifact_type = 'custom'
-            artifact_type_data.content_type = mimetypes.guess_type(artifact_object)[0]
-        elif isinstance(artifact_object, six.string_types + (Path,)):
+        elif isinstance(artifact_object, (Path, pathlib_Path,) if pathlib_Path is not None else (Path,)):
             # check if single file
             artifact_object = Path(artifact_object)
 
             artifact_object.expanduser().absolute()
+            # noinspection PyBroadException
             try:
                 create_zip_file = not artifact_object.is_file()
             except Exception:  # Hack for windows pathlib2 bug, is_file isn't valid.
@@ -392,7 +414,7 @@ class Artifacts(object):
                     # failed uploading folder:
                     LoggerRoot.get_base_logger().warning('Exception {}\nFailed zipping artifact folder {}'.format(
                         folder, e))
-                    return None
+                    return False
                 finally:
                     os.close(fd)
 
@@ -410,6 +432,32 @@ class Artifacts(object):
                 artifact_type = 'custom'
                 artifact_type_data.content_type = mimetypes.guess_type(artifact_object)[0]
                 local_filename = artifact_object
+        elif (
+                isinstance(artifact_object, six.string_types)
+                and urlparse(artifact_object).scheme in remote_driver_schemes
+        ):
+            # we should not upload this, just register
+            local_filename = None
+            uri = artifact_object
+            artifact_type = 'custom'
+            artifact_type_data.content_type = mimetypes.guess_type(artifact_object)[0]
+        elif auto_pickle:
+            # if we are here it means we do not know what to do with the object, so we serialize it with pickle.
+            artifact_type = 'pickle'
+            artifact_type_data.content_type = 'application/pickle'
+            artifact_type_data.preview = str(artifact_object.__repr__())[:self.max_preview_size_bytes]
+            delete_after_upload = True
+            override_filename_ext_in_uri = '.pkl'
+            override_filename_in_uri = name + override_filename_ext_in_uri
+            fd, local_filename = mkstemp(prefix=quote(name, safe="") + '.', suffix=override_filename_ext_in_uri)
+            os.close(fd)
+            try:
+                with open(local_filename, 'wb') as f:
+                    pickle.dump(artifact_object, f)
+            except Exception as ex:
+                # cleanup and raise exception
+                os.unlink(local_filename)
+                raise
         else:
             raise ValueError("Artifact type {} not supported".format(type(artifact_object)))
 
@@ -467,7 +515,7 @@ class Artifacts(object):
         self._flush_event.set()
 
     def stop(self, wait=True):
-        # type: (str) -> ()
+        # type: (bool) -> ()
         # stop the daemon thread and quit
         # wait until thread exists
         self._exit_flag = True
@@ -477,6 +525,7 @@ class Artifacts(object):
                 self._thread.join()
             # remove all temp folders
             for f in self._temp_folder:
+                # noinspection PyBroadException
                 try:
                     Path(f).rmdir()
                 except Exception:
@@ -535,6 +584,7 @@ class Artifacts(object):
             previous_sha2 = self._last_artifacts_upload[name]
             if previous_sha2 == current_sha2:
                 # nothing to do, we can skip the upload
+                # noinspection PyBroadException
                 try:
                     local_csv.unlink()
                 except Exception:
@@ -604,6 +654,7 @@ class Artifacts(object):
         _, uri = ev.get_target_full_upload_uri(upload_uri)
 
         # send for upload
+        # noinspection PyProtectedMember
         self._task.reporter._report(ev)
 
         return uri
@@ -659,11 +710,13 @@ class Artifacts(object):
             # build intersection summary
             for i, (name, shape, unique_hash) in enumerate(artifacts_summary):
                 summary += '[{name}]: shape={shape}, {unique} unique rows, {percentage:.1f}% uniqueness\n'.format(
-                    name=name, shape=shape, unique=len(unique_hash), percentage=100 * len(unique_hash) / float(shape[0]))
+                    name=name, shape=shape, unique=len(unique_hash),
+                    percentage=100 * len(unique_hash) / float(shape[0]))
                 for name2, shape2, unique_hash2 in artifacts_summary[i + 1:]:
                     intersection = len(unique_hash & unique_hash2)
                     summary += '\tIntersection with [{name2}] {intersection} rows: {percentage:.1f}%\n'.format(
-                        name2=name2, intersection=intersection, percentage=100 * intersection / float(len(unique_hash2)))
+                        name2=name2, intersection=intersection,
+                        percentage=100 * intersection / float(len(unique_hash2)))
         except Exception as e:
             LoggerRoot.get_base_logger().warning(str(e))
         finally:
@@ -682,6 +735,7 @@ class Artifacts(object):
     def _get_storage_uri_prefix(self):
         # type: () -> str
         if not self._storage_prefix:
+            # noinspection PyProtectedMember
             self._storage_prefix = self._task._get_output_destination_suffix()
         return self._storage_prefix
 
@@ -699,6 +753,7 @@ class Artifacts(object):
                 # skip header
                 if skip_header:
                     file_hash.update(f.read(skip_header))
+                # noinspection PyUnresolvedReferences
                 for n in iter(lambda: f.readinto(mv), 0):
                     h.update(mv[:n])
                     if skip_header:

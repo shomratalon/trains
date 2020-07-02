@@ -8,11 +8,12 @@ from argparse import ArgumentParser
 from tempfile import mkstemp
 
 try:
+    # noinspection PyCompatibility
     from collections.abc import Callable, Sequence as CollectionsSequence
 except ImportError:
     from collections import Callable, Sequence as CollectionsSequence
 
-from typing import Optional, Union, Mapping, Sequence, Any, Dict, List, TYPE_CHECKING
+from typing import Optional, Union, Mapping, Sequence, Any, Dict, Iterable, TYPE_CHECKING
 
 import psutil
 import six
@@ -23,10 +24,9 @@ from .backend_api.session.session import Session, ENV_ACCESS_KEY, ENV_SECRET_KEY
 from .backend_interface.metrics import Metrics
 from .backend_interface.model import Model as BackendModel
 from .backend_interface.task import Task as _Task
-from .backend_interface.task.args import _Arguments
 from .backend_interface.task.development.worker import DevWorker
 from .backend_interface.task.repo import ScriptInfo
-from .backend_interface.util import get_single_result, exact_match_regex, make_message
+from .backend_interface.util import get_single_result, exact_match_regex, make_message, mutually_exclusive
 from .binding.absl_bind import PatchAbsl
 from .binding.artifacts import Artifacts, Artifact
 from .binding.environ_bind import EnvironmentBind, PatchOsFork
@@ -50,6 +50,8 @@ from .utilities.proxy_object import ProxyDictPreWrite, ProxyDictPostWrite, flatt
     nested_from_flat_dictionary, naive_nested_from_flat_dictionary
 from .utilities.resource_monitor import ResourceMonitor
 from .utilities.seed import make_deterministic
+# noinspection PyProtectedMember
+from .backend_interface.task.args import _Arguments
 
 
 if TYPE_CHECKING:
@@ -78,10 +80,16 @@ class Task(_Task):
 
     For detailed information about creating Task objects, see the following methods:
 
-    - :meth:`Task.init` - Create a new reproducible Task, or reuse one.
-    - :meth:`Task.create` - Create a new non-reproducible Task.
-    - :meth:`Task.current_task` - Get the current running Task.
-    - :meth:`Task.get_task` - Get another Task (whose metadata the **Trains Server** maintains).
+    - Create a new reproducible Task - :meth:`Task.init`
+
+      .. important::
+        In some cases, ``Task.init`` may return a Task object which is already stored in **Trains Server** (already
+        initialized), instead of creating a new Task. For a detailed explanation of those cases, see the ``Task.init``
+        method.
+
+    - Create a new non-reproducible Task - :meth:`Task.create`
+    - Get the current running Task - :meth:`Task.current_task`
+    - Get another (different) Task - :meth:`Task.get_task`
 
     .. note::
        The **Trains** documentation often refers to a Task as, "Task (experiment)".
@@ -96,8 +104,8 @@ class Task(_Task):
        Therefore, a "Task" is effectively an "experiment", and "Task (experiment)" encompasses its usage throughout
        the Trains.
 
-        The exception to this Task behavior is sub-tasks (non-reproducible Tasks), which do not use the main execution
-        Task. Creating a sub-task always creates a new Task with a new Task Id.
+       The exception to this Task behavior is sub-tasks (non-reproducible Tasks), which do not use the main execution
+       Task. Creating a sub-task always creates a new Task with a new  Task ID.
     """
 
     TaskTypes = _Task.TaskTypes
@@ -105,7 +113,7 @@ class Task(_Task):
     NotSet = object()
 
     __create_protection = object()
-    __main_task = None  # type: Task
+    __main_task = None  # type: Optional[Task]
     __exit_hook = None
     __forked_proc_main_pid = None
     __task_id_reuse_time_window_in_hours = float(config.get('development.task_reuse_time_window_in_hours', 24.0))
@@ -145,6 +153,7 @@ class Task(_Task):
         self._detect_repo_async_thread = None
         self._resource_monitor = None
         self._artifacts_manager = Artifacts(self)
+        self._calling_filename = None
         # register atexit, so that we mark the task as stopped
         self._at_exit_called = False
 
@@ -173,53 +182,81 @@ class Task(_Task):
     ):
         # type: (...) -> Task
         """
-        Creates a new Task (experiment), or returns the existing Task, depending upon the following:
+        Creates a new Task (experiment) if:
 
-        - if **any** of the following are true, Trains creates a new Task and a new Task Id:
+        - The Task never ran before. No Task with the same ``task_name`` and ``project_name`` is stored in
+          **Trains Server**.
+        - The Task has run before (the same ``task_name`` and ``project_name``), and (a) it stored models and / or
+          artifacts, or (b) its status is Published , or (c) it is Archived.
+        - A new Task is forced by calling ``Task.init`` with ``reuse_last_task_id=False``.
 
-          - a Task in the same project with same name does not exist, **or**
-          - a Task in the same project with same name does exist and its status is ``Published``, **or**
-          - the :paramref:`~.init.reuse_last_task_id` parameter is assigned ``False``.
+        Otherwise, the already initialized Task object for the same ``task_name`` and ``project_name`` is returned.
 
-        - if **all** of the following are true, Trains returns the existing Task with the existing Task Id:
+        .. note::
+            To reference another Task, instead of initializing the same Task more than once, call
+            :meth:`Task.get_task`. For example, to "share" the same experiment in more than one script,
+            call ``Task.get_task``. See the ``Task.get_task`` method for an example.
 
-          - a Task in the same project with the same name does exist, **and**
-          - the Task's status is ``Draft``, ``Completed``, ``Failed``, or ``Aborted``, **and**
-          - the ``reuse_last_task_id`` parameter is the default value of ``True``.
+        For example:
 
-            .. warning::
-               When a Python experiment script runs using an existing Task, it overwrites previous experiment output.
+            The first time the following code runs, it will create a new Task. The status will be Completed.
+
+            .. code-block:: py
+
+                from trains import Task
+                task = Task.init('myProject', 'myTask')
+
+            If this code runs again, it will not create a new Task. It does not store a model or artifact,
+            it is not Published (its status Completed) , it was not Archived, and a new Task is not forced.
+
+            If the Task is Published or Archived, and run again, it will create a new Task with a new Task ID.
+
+            The following code will create a new Task every time it runs, because it stores an artifact.
+
+            .. code-block:: py
+
+                task = Task.init('myProject', 'myOtherTask')
+
+                d = {'a': '1'}
+                task.upload_artifact('myArtifact', d)
 
         :param str project_name: The name of the project in which the experiment will be created. If the project does
             not exist, it is created. If ``project_name`` is ``None``, the repository name is used. (Optional)
         :param str task_name: The name of Task (experiment). If ``task_name`` is ``None``, the Python experiment
             script's file name is used. (Optional)
-        :param task_type: The task type.
+        :param TaskTypes task_type: The task type.
 
-            The values are:
+            Valid task types:
 
-            - ``TaskTypes.training`` (Default)
-            - ``TaskTypes.train``
+            - ``TaskTypes.training`` (default)
             - ``TaskTypes.testing``
             - ``TaskTypes.inference``
-        :type task_type: TaskTypeEnum(value)
-        :param bool reuse_last_task_id: Force a new Task (experiment) with a new Task Id, but
+            - ``TaskTypes.data_processing``
+            - ``TaskTypes.application``
+            - ``TaskTypes.monitor``
+            - ``TaskTypes.controller``
+            - ``TaskTypes.optimizer``
+            - ``TaskTypes.service``
+            - ``TaskTypes.qc``
+            - ``TaskTypes.custom``
+
+        :param bool reuse_last_task_id: Force a new Task (experiment) with a new  Task ID, but
             the same project and Task names.
 
             .. note::
-               Trains creates the new Task Id using the previous Id, which is stored in the data cache folder.
+               Trains creates the new  Task ID using the previous Id, which is stored in the data cache folder.
 
             The values are:
 
-            - ``True`` - Reuse the last Task Id. (Default)
+            - ``True`` - Reuse the last  Task ID. (default)
             - ``False`` - Force a new Task (experiment).
-            - A string - In addition to a boolean, you can use a string to set a specific value for Task Id
+            - A string - In addition to a boolean, you can use a string to set a specific value for  Task ID
               (instead of the system generated UUID).
 
         :param str output_uri: The default location for output models and other artifacts. In the default location,
             Trains creates a subfolder for the output. The subfolder structure is the following:
 
-                <output destination name> / <project name> / <task name>.<Task Id>
+                <output destination name> / <project name> / <task name>.< Task ID>
 
             The following are examples of ``output_uri`` values for the supported locations:
 
@@ -238,11 +275,11 @@ class Task(_Task):
 
             The values are:
 
-            - ``True`` - Automatically connect. (Default)
+            - ``True`` - Automatically connect. (default)
             -  ``False`` - Do not automatically connect.
             - A dictionary - In addition to a boolean, you can use a dictionary for fined grained control of connected
-              arguments. The dictionary keys are argparse variable names and the values are booleans,
-              False value will exclude the specified argument from the Task's parameter section.
+              arguments. The dictionary keys are argparse variable names and the values are booleans.
+              The ``False`` value excludes the specified argument from the Task's parameter section.
               Keys missing from the dictionary default to ``True``, and an empty dictionary defaults to ``False``.
 
             For example:
@@ -260,7 +297,7 @@ class Task(_Task):
 
             The values are:
 
-            - ``True`` - Automatically connect (Default)
+            - ``True`` - Automatically connect (default)
             -  ``False`` - Do not automatically connect
             - A dictionary - In addition to a boolean, you can use a dictionary for fined grained control of connected
               frameworks. The dictionary keys are frameworks and the values are booleans.
@@ -273,14 +310,13 @@ class Task(_Task):
                auto_connect_frameworks={'matplotlib': True, 'tensorflow': True, 'pytorch': True,
                     'xgboost': True, 'scikit': True}
 
-        :type auto_connect_frameworks: bool or dict
         :param bool auto_resource_monitoring: Automatically create machine resource monitoring plots?
             These plots appear in in the **Trains Web-App (UI)**, **RESULTS** tab, **SCALARS** sub-tab,
             with a title of **:resource monitor:**.
 
             The values are:
 
-            - ``True`` - Automatically create resource monitoring plots. (Default)
+            - ``True`` - Automatically create resource monitoring plots. (default)
             - ``False`` - Do not automatically create.
 
         :return: The main execution Task (Task context).
@@ -326,6 +362,7 @@ class Task(_Task):
                 cls.__main_task.get_logger()
                 cls.__main_task._artifacts_manager = Artifacts(cls.__main_task)
                 # unregister signal hooks, they cause subprocess to hang
+                # noinspection PyProtectedMember
                 cls.__main_task.__register_at_exit(cls.__main_task._at_exit)
                 # TODO: Check if the signal handler method is safe enough, for the time being, do not unhook
                 # cls.__main_task.__register_at_exit(None, only_remove_signal_and_exception_hooks=True)
@@ -335,6 +372,7 @@ class Task(_Task):
 
             return cls.__main_task
 
+        is_sub_process_task_id = None
         # check that we are not a child process, in that case do nothing.
         # we should not get here unless this is Windows platform, all others support fork
         if cls.__is_subprocess():
@@ -370,7 +408,7 @@ class Task(_Task):
             if task_type not in Task.TaskTypes.__members__:
                 raise ValueError("Task type '{}' not supported, options are: {}".format(
                     task_type, Task.TaskTypes.__members__.keys()))
-            task_type = Task.TaskTypes.__members__[task_type]
+            task_type = Task.TaskTypes.__members__[str(task_type)]
 
         try:
             if not running_remotely():
@@ -453,8 +491,8 @@ class Task(_Task):
 
                 # Check if parse args already called. If so, sync task parameters with parser
                 if argparser_parseargs_called():
-                    parser, parsed_args = get_argparser_last_args()
-                    task._connect_argparse(parser=parser, parsed_args=parsed_args)
+                    for parser, parsed_args in get_argparser_last_args():
+                        task._connect_argparse(parser=parser, parsed_args=parsed_args)
             elif argparser_parseargs_called():
                 # actually we have nothing to do, in remote running, the argparser will ignore
                 # all non argparser parameters, only caveat if parameter connected with the same name
@@ -468,11 +506,7 @@ class Task(_Task):
         # show the debug metrics page in the log, it is very convenient
         if not is_sub_process_task_id:
             logger.report_text(
-                'TRAINS results page: {}/projects/{}/experiments/{}/output/log'.format(
-                    task._get_app_server(),
-                    task.project if task.project is not None else '*',
-                    task.id,
-                ),
+                'TRAINS results page: {}'.format(task.get_output_log_web_page()),
             )
         # Make sure we start the dev worker if required, otherwise it will only be started when we write
         # something to the log.
@@ -487,25 +521,30 @@ class Task(_Task):
         Create a new, non-reproducible Task (experiment). This is called a sub-task.
 
         .. note::
-           - This method always creates a new Task.
-           - To create reproducible Tasks, use the :meth:`Task.init` method.
+           This method always creates a new, non-reproducible Task. To create a reproducible Task, call the
+           :meth:`Task.init` method. To reference another Task, call the  :meth:`Task.get_task` method .
 
         :param str project_name: The name of the project in which the experiment will be created.
             If ``project_name`` is ``None``, and the main execution Task is initialized (see :meth:`Task.init`),
             then the main execution Task's project is used. Otherwise, if the project does
             not exist, it is created. (Optional)
         :param str task_name: The name of Task (experiment).
-        :param task_type: The task type. (Optional)
+        :param TaskTypes task_type: The task type.
 
-            The values are:
+            Valid task types:
 
             - ``TaskTypes.training`` (default)
             - ``TaskTypes.testing``
-            - ``TaskTypes.dataset_import``
-            - ``TaskTypes.annotation``
-            - ``TaskTypes.annotation_manual``
+            - ``TaskTypes.inference``
+            - ``TaskTypes.data_processing``
+            - ``TaskTypes.application``
+            - ``TaskTypes.monitor``
+            - ``TaskTypes.controller``
+            - ``TaskTypes.optimizer``
+            - ``TaskTypes.service``
+            - ``TaskTypes.qc``
+            - ``TaskTypes.custom``
 
-        :type task_type: TaskTypeEnum(value)
         :return: A new experiment.
         """
         if not project_name:
@@ -533,12 +572,42 @@ class Task(_Task):
         """
         Get a Task by Id, or project name / task name combination.
 
+        For example:
+
+            The following code demonstrates calling ``Task.get_task`` to report a scalar to another Task. The output
+            of :meth:`.Logger.report_scalar` from testing is associated with the Task named ``training``. It allows
+            training and testing to run concurrently, because they initialized different Tasks (see :meth:`Task.init`
+            for information about initializing Tasks).
+
+            The training script:
+
+            .. code-block:: py
+
+                # initialize the training Task
+                task = Task.init('myProject', 'training')
+
+                # do some training
+
+            The testing script:
+
+            .. code-block:: py
+
+                # initialize the testing Task
+                task = Task.init('myProject', 'testing')
+
+                # get the training Task
+                train_task = Task.get_task(project_name='myProject', task_name='training')
+
+                # report metrics in the training Task
+                for x in range(10):
+                    train_task.get_logger().report_scalar('title', 'series', value=x * 2, iteration=x)
+
         :param str task_id: The Id (system UUID) of the experiment to get.
             If specified, ``project_name`` and ``task_name`` are ignored.
         :param str project_name: The project name of the Task to get.
         :param str task_name: The name of the Task within ``project_name`` to get.
 
-        :return: The Task specified by Id, or project name / experiment name combination.
+        :return: The Task specified by ID, or project name / experiment name combination.
         """
         return cls.__get_task(task_id=task_id, project_name=project_name, task_name=task_name)
 
@@ -548,7 +617,7 @@ class Task(_Task):
         """
         Get a list of Tasks by one of the following:
 
-        - A list of specific Task Ids.
+        - A list of specific  Task IDs.
         - All Tasks in a project matching a full or partial Task name.
         - All Tasks in any project matching a full or partial Task name.
 
@@ -567,6 +636,7 @@ class Task(_Task):
             Return any partial match of task_name, regular expressions matching is also supported
             If None is passed, returns all tasks within the project
         :param dict task_filter: filter and order Tasks. See service.tasks.GetAllRequest for details
+
         :return: The Tasks specified by the parameter combinations (see the parameters).
         """
         return cls.__get_tasks(task_ids=task_ids, project_name=project_name,
@@ -609,11 +679,11 @@ class Task(_Task):
 
     @property
     def models(self):
-        # type: () -> Dict[str, List[Model]]
+        # type: () -> Dict[str, Sequence[Model]]
         """
         Read-only dictionary of the Task's loaded/stored models
 
-        :return: dictionary of models loaded/stored {'input': list(Model), 'output': list(Model)}
+        :return: A dictionary of models loaded/stored {'input': list(Model), 'output': list(Model)}.
         """
         return self.get_models()
 
@@ -633,7 +703,7 @@ class Task(_Task):
 
         Use this method to manage experiments and for autoML.
 
-        :param str source_task: The Task to clone. Specify a Task object or a Task Id. (Optional)
+        :param str source_task: The Task to clone. Specify a Task object or a  Task ID. (Optional)
         :param str name: The name of the new cloned Task. (Optional)
         :param str comment: A comment / description for the new cloned Task. (Optional)
         :param str parent: The Id of the parent Task of the new Task.
@@ -667,7 +737,7 @@ class Task(_Task):
 
     @classmethod
     def enqueue(cls, task, queue_name=None, queue_id=None):
-        # type: (Task, Optional[str], Optional[str]) -> Any
+        # type: (Union[Task, str], Optional[str], Optional[str]) -> Any
         """
         Enqueue a Task for execution, by adding it to an execution queue.
 
@@ -676,8 +746,7 @@ class Task(_Task):
            see `Use Case Examples <../trains_agent_ref/#use-case-examples>`_ on the "Trains Agent
            Reference page.
 
-        :param task: The Task to enqueue. Specify a Task object or Task Id.
-        :type task: Task object / str
+        :param Task/str task: The Task to enqueue. Specify a Task object or  Task ID.
         :param str queue_name: The name of the queue. If not specified, then ``queue_id`` must be specified.
         :param str queue_id: The Id of the queue. If not specified, then ``queue_name`` must be specified.
 
@@ -709,11 +778,15 @@ class Task(_Task):
               - ``last_update`` - The last Task update time, including Task creation, update, change, or events for
                 this task (ISO 8601 format).
               - ``execution.queue`` - The Id of the queue where the Task is enqueued. ``null`` indicates not enqueued.
+
         """
         assert isinstance(task, (six.string_types, Task))
         if not Session.check_min_api_version('2.4'):
             raise ValueError("Trains-server does not support DevOps features, "
                              "upgrade trains-server to 0.12.0 or above")
+
+        # make sure we have wither name ot id
+        mutually_exclusive(queue_name=queue_name, queue_id=queue_id)
 
         task_id = task if isinstance(task, six.string_types) else task.id
         session = cls._get_default_session()
@@ -738,8 +811,7 @@ class Task(_Task):
         """
         Dequeue (remove) a Task from an execution queue.
 
-        :param task: The Task to dequeue. Specify a Task object or Task Id.
-        :type task: Task object / str
+        :param Task/str task: The Task to dequeue. Specify a Task object or  Task ID.
 
         :return: A dequeue JSON response.
 
@@ -770,6 +842,7 @@ class Task(_Task):
           - ``execution.queue`` - The Id of the queue where the Task is enqueued. ``null`` indicates not enqueued.
 
         - ``updated`` - The number of Tasks updated (an integer or ``null``).
+
         """
         assert isinstance(task, (six.string_types, Task))
         if not Session.check_min_api_version('2.4'):
@@ -790,7 +863,6 @@ class Task(_Task):
         this method has no effect).
 
         :param tags: A list of tags which describe the Task to add.
-        :type tags: str or iterable of str
         """
 
         if not running_remotely() or not self.is_main_task():
@@ -864,8 +936,6 @@ class Task(_Task):
               A local path must be relative path. When executing a Task remotely in a worker, the contents brought
               from the **Trains Server** (backend) overwrites the contents of the file.
 
-        :type configuration: dict, pathlib.Path/str
-
         :return: If a dictionary is specified, then a dictionary is returned. If pathlib2.Path / string is
             specified, then a path to a local configuration file is returned. Configuration object.
         """
@@ -876,6 +946,7 @@ class Task(_Task):
         # parameter dictionary
         if isinstance(configuration, dict):
             def _update_config_dict(task, config_dict):
+                # noinspection PyProtectedMember
                 task._set_model_config(config_dict=config_dict)
 
             if not running_remotely() or not self.is_main_task():
@@ -954,22 +1025,28 @@ class Task(_Task):
         """
         return self._get_logger()
 
-    def mark_started(self):
+    def mark_started(self, force=False):
+        # type: (bool) -> ()
         """
         Manually mark a Task as started (happens automatically)
+
+        :param bool force: If True the task status will be changed to `started` regardless of the current Task state.
         """
         # UI won't let us see metrics if we're not started
-        self.started()
+        self.started(force=force)
         self.reload()
 
-    def mark_stopped(self):
+    def mark_stopped(self, force=False):
+        # type: (bool) -> ()
         """
         Manually mark a Task as stopped (also used in :meth:`_at_exit`)
+
+        :param bool force: If True the task status will be changed to `stopped` regardless of the current Task state.
         """
         # flush any outstanding logs
         self.flush(wait_for_uploads=True)
         # mark task as stopped
-        self.stopped()
+        self.stopped(force=force)
 
     def flush(self, wait_for_uploads=False):
         # type: (bool) -> bool
@@ -979,7 +1056,7 @@ class Task(_Task):
         :param bool wait_for_uploads: Wait for all outstanding uploads to complete before existing the flush?
 
             - ``True`` - Wait
-            - ``False`` - Do not wait (Default)
+            - ``False`` - Do not wait (default)
         """
 
         # make sure model upload is done
@@ -1006,12 +1083,12 @@ class Task(_Task):
         :param bool set_started_on_success: If successful, automatically set the Task to started?
 
             - ``True`` - If successful, set to started.
-            - ``False`` - If successful, do not set to started. (Default)
+            - ``False`` - If successful, do not set to started. (default)
 
         :param bool force: Force a Task reset, even when executing the Task (experiment) remotely in a worker?
 
             - ``True`` - Force
-            - ``False`` - Do not force (Default)
+            - ``False`` - Do not force (default)
         """
         if not running_remotely() or not self.is_main_task() or force:
             super(Task, self).reset(set_started_on_success=set_started_on_success)
@@ -1064,7 +1141,6 @@ class Task(_Task):
         :param uniqueness_columns: A Sequence of columns for artifact uniqueness comparison criteria, or the default
             value of ``True``. If ``True``, the artifact uniqueness comparison criteria is all the columns,
             which is the same as ``artifact.columns``.
-        :type uniqueness_columns: sequence, str, ``True``
         """
         if not isinstance(uniqueness_columns, CollectionsSequence) and uniqueness_columns is not True:
             raise ValueError('uniqueness_columns should be a List (sequence) or True')
@@ -1101,9 +1177,10 @@ class Task(_Task):
     def upload_artifact(
         self,
         name,  # type: str
-        artifact_object,  # type: Union[str, Mapping, pandas.DataFrame, numpy.ndarray, Image.Image]
+        artifact_object,  # type: Union[str, Mapping, pandas.DataFrame, numpy.ndarray, Image.Image, Any]
         metadata=None,  # type: Optional[Mapping]
-        delete_after_upload=False  # type: bool
+        delete_after_upload=False,  # type: bool
+        auto_pickle=True,  # type: bool
     ):
         # type: (...) -> bool
         """
@@ -1117,6 +1194,7 @@ class Task(_Task):
         - pandas.DataFrame - Trains stores a pandas.DataFrame as ``.csv.gz`` (compressed CSV) file and uploads it.
         - numpy.ndarray - Trains stores a numpy.ndarray as ``.npz`` file and uploads it.
         - PIL.Image - Trains stores a PIL.Image as ``.png`` file and uploads it.
+        - Any - If called with auto_pickle=True, the object will be pickled and uploaded.
 
         :param str name: The artifact name.
 
@@ -1129,7 +1207,11 @@ class Task(_Task):
         :param bool delete_after_upload: After the upload, delete the local copy of the artifact?
 
             - ``True`` - Delete the local copy of the artifact.
-            - ``False`` - Do not delete. (Default)
+            - ``False`` - Do not delete. (default)
+
+        :param bool auto_pickle: If True (default) and the artifact_object is not one of the following types:
+            pathlib2.Path, dict, pandas.DataFrame, numpy.ndarray, PIL.Image, url (string), local_file (string)
+            the artifact_object will be pickled and uploaded as pickle file artifact (with file extension .pkl)
 
         :return: The status of the upload.
 
@@ -1138,19 +1220,26 @@ class Task(_Task):
 
         :raise: If the artifact object type is not supported, raise a ``ValueError``.
         """
-        return self._artifacts_manager.upload_artifact(name=name, artifact_object=artifact_object,
-                                                       metadata=metadata, delete_after_upload=delete_after_upload)
+        return self._artifacts_manager.upload_artifact(
+            name=name, artifact_object=artifact_object, metadata=metadata,
+            delete_after_upload=delete_after_upload, auto_pickle=auto_pickle)
 
     def get_models(self):
-        # type: () -> Dict[str, List[Model]]
+        # type: () -> Dict[str, Sequence[Model]]
         """
         Return a dictionary with {'input': [], 'output': []} loaded/stored models of the current Task
         Input models are files loaded in the task, either manually or automatically logged
         Output models are files stored in the task, either manually or automatically logged
         Automatically logged frameworks are for example: TensorFlow, Keras, PyTorch, ScikitLearn(joblib) etc.
 
-        :return dict: dict with keys input/output, each is list of Model objects.
-            Example: {'input': [trains.Model()], 'output': [trains.Model()]}
+        :return: A dictionary with keys input/output, each is list of Model objects.
+
+            Example:
+
+            .. code-block:: py
+
+                {'input': [trains.Model()], 'output': [trains.Model()]}
+
         """
         task_models = {'input': self._get_models(model_type='input'),
                        'output': self._get_models(model_type='output')}
@@ -1168,6 +1257,7 @@ class Task(_Task):
 
             - ``True`` - Is the main execution Task.
             - ``False`` - Is not the main execution Task.
+
         """
         return self.is_main_task()
 
@@ -1188,6 +1278,7 @@ class Task(_Task):
 
             - ``True`` - Is the main execution Task.
             - ``False`` - Is not the main execution Task.
+
         """
         return self is self.__main_task
 
@@ -1195,7 +1286,7 @@ class Task(_Task):
         # type: (Optional[str], Optional[Mapping]) -> None
         """
         .. deprecated:: 0.14.1
-            Use :meth:`Task.connect_configuration` instead
+            Use :meth:`Task.connect_configuration` instead.
         """
         self._set_model_config(config_text=config_text, config_dict=config_dict)
 
@@ -1203,7 +1294,7 @@ class Task(_Task):
         # type: () -> str
         """
         .. deprecated:: 0.14.1
-            Use :meth:`Task.connect_configuration` instead
+            Use :meth:`Task.connect_configuration` instead.
         """
         return self._get_model_config_text()
 
@@ -1211,7 +1302,7 @@ class Task(_Task):
         # type: () -> Dict
         """
         .. deprecated:: 0.14.1
-            Use :meth:`Task.connect_configuration` instead
+            Use :meth:`Task.connect_configuration` instead.
         """
         return self._get_model_config_dict()
 
@@ -1248,24 +1339,13 @@ class Task(_Task):
         self._reload_last_iteration()
         return max(self.data.last_iteration, self._reporter.max_iteration if self._reporter else 0)
 
-    def set_last_iteration(self, last_iteration):
-        # type: (int) -> None
-        """
-        Forcefully set the last reported iteration, which is the last iteration for which the Task reported a metric.
-
-        :param last_iteration: The last reported iteration number.
-        :type last_iteration: int
-        """
-        self.data.last_iteration = int(last_iteration)
-        self._edit(last_iteration=self.data.last_iteration)
-
     def set_initial_iteration(self, offset=0):
         # type: (int) -> int
         """
         Set initial iteration, instead of zero. Useful when continuing training from previous checkpoints
 
         :param int offset: Initial iteration (at starting point)
-        :return: newly set initial offset
+        :return: Newly set initial offset.
         """
         return super(Task, self).set_initial_iteration(offset=offset)
 
@@ -1275,7 +1355,7 @@ class Task(_Task):
         Return the initial iteration offset, default is 0
         Useful when continuing training from previous checkpoints
 
-        :return int: initial iteration offset
+        :return: Initial iteration offset.
         """
         return super(Task, self).get_initial_iteration()
 
@@ -1316,6 +1396,7 @@ class Task(_Task):
 
         .. note::
            The values are not parsed. They are returned as is.
+
         """
         return naive_nested_from_flat_dictionary(self.get_parameters())
 
@@ -1327,6 +1408,99 @@ class Task(_Task):
         is the same behavior as the :meth:`Task.connect` method.
         """
         self._arguments.copy_from_dict(flatten_dictionary(dictionary))
+
+    def execute_remotely(self, queue_name=None, clone=False, exit_process=True):
+        # type: (Optional[str], bool, bool) -> ()
+        """
+        If task is running locally (i.e., not by ``trains-agent``), then clone the Task and enqueue it for remote
+        execution; or, stop the execution of the current Task, reset its state, and enqueue it. If ``exit==True``,
+        *exit* this process.
+
+        .. note::
+            If the task is running remotely (i.e., ``trains-agent`` is executing it), this call is a no-op
+            (i.e., does nothing).
+
+        :param queue_name: The queue name used for enqueueing the task. If ``None``, this call exits the process
+            without enqueuing the task.
+        :param clone: Clone the Task and execute the newly cloned Task?
+
+            The values are:
+
+            - ``True`` - A cloned copy of the Task will be created, and enqueued, instead of this Task.
+            - ``False`` - The Task will be enqueued.
+
+        :param exit_process: The function call will leave the calling process at the end?
+
+            - ``True`` - Exit the process (exit(0)).
+            - ``False`` - Do not exit the process.
+
+            .. warning::
+
+                If ``clone==False``, then ``exit_process`` must be ``True``.
+        """
+        # do nothing, we are running remotely
+        if running_remotely():
+            return
+
+        if not clone and not exit_process:
+            raise ValueError(
+                "clone==False and exit_process==False is not supported. "
+                "Task enqueuing itself must exit the process afterwards.")
+
+        # make sure we analyze the process
+        if self.status in (Task.TaskStatusEnum.in_progress, ):
+            if clone:
+                # wait for repository detection (5 minutes should be reasonable time to detect all packages)
+                self.flush(wait_for_uploads=True)
+                if self._logger and not self.__is_subprocess():
+                    self._wait_for_repo_detection(timeout=300.)
+            else:
+                # close ourselves (it will make sure the repo is updated)
+                self.close()
+
+        # clone / reset Task
+        if clone:
+            task = Task.clone(self)
+        else:
+            task = self
+            self.reset()
+
+        # enqueue ourselves
+        if queue_name:
+            Task.enqueue(task, queue_name=queue_name)
+            LoggerRoot.get_base_logger().warning(
+                'Switching to remote execution, output log page {}'.format(task.get_output_log_web_page()))
+
+        # leave this process.
+        if exit_process:
+            LoggerRoot.get_base_logger().warning('Terminating local execution process')
+            exit(0)
+
+        return
+
+    def wait_for_status(
+            self,
+            status=(_Task.TaskStatusEnum.completed, _Task.TaskStatusEnum.stopped, _Task.TaskStatusEnum.closed),
+            raise_on_status=(tasks.TaskStatusEnum.failed,),
+            check_interval_sec=60.,
+    ):
+        # type: (Iterable[Task.TaskStatusEnum], Optional[Iterable[Task.TaskStatusEnum]], float) -> ()
+        """
+        Wait for a task to reach a defined status.
+
+        :param status: Status to wait for. Defaults to ('completed', 'stopped', 'closed', )
+        :param raise_on_status: Raise RuntimeError if the status of the tasks matches one of these values.
+            Defaults to ('failed').
+        :param check_interval_sec: Interval in seconds between two checks. Defaults to 60 seconds.
+
+        :raise: RuntimeError if the status is one of {raise_on_status}.
+        """
+        stopped_status = list(status) + (list(raise_on_status) if raise_on_status else [])
+        while self.status not in stopped_status:
+            time.sleep(check_interval_sec)
+
+        if raise_on_status and self.status in raise_on_status:
+            raise RuntimeError("Task {} has status: {}.".format(self.task_id, self.status))
 
     @classmethod
     def set_credentials(cls, api_host=None, web_host=None, files_host=None, key=None, secret=None, host=None):
@@ -1384,6 +1558,7 @@ class Task(_Task):
         :param config_dict: model configuration parameters dictionary.
             If `config_dict` is not None, `config_text` must not be provided.
         """
+        # noinspection PyProtectedMember
         design = OutputModel._resolve_config(config_text=config_text, config_dict=config_dict)
         super(Task, self)._set_model_design(design=design)
 
@@ -1393,7 +1568,7 @@ class Task(_Task):
         Get Task model configuration text (before creating an output model)
         When an output model is created it will inherit these properties
 
-        :return: model config_text (unconstrained text string)
+        :return: The model config_text (unconstrained text string).
         """
         return super(Task, self).get_model_design()
 
@@ -1403,9 +1578,10 @@ class Task(_Task):
         Get Task model configuration dictionary (before creating an output model)
         When an output model is created it will inherit these properties
 
-        :return: config_dict: model configuration parameters dictionary
+        :return: config_dict: model configuration parameters dictionary.
         """
         config_text = self._get_model_config_text()
+        # noinspection PyProtectedMember
         return OutputModel._text_to_config_dict(config_text)
 
     @classmethod
@@ -1452,6 +1628,7 @@ class Task(_Task):
 
         closed_old_task = False
         default_task_id = None
+        task = None
         in_dev_mode = not running_remotely()
 
         if in_dev_mode:
@@ -1515,6 +1692,10 @@ class Task(_Task):
             # set default docker image from env.
             task._set_default_docker_image()
 
+        # mark us as the main Task, there should only be one dev Task at a time.
+        if not Task.__main_task:
+            Task.__main_task = task
+
         # mark the task as started
         task.started()
         # reload, making sure we are synced
@@ -1534,6 +1715,18 @@ class Task(_Task):
 
         # update current repository and put warning into logs
         if detect_repo:
+            # noinspection PyBroadException
+            try:
+                import traceback
+                stack = traceback.extract_stack(limit=10)
+                # NOTICE WE ARE ALWAYS 3 down from caller in stack!
+                for i in range(len(stack)-1, 0, -1):
+                    # look for the Task.init call, then the one above it is the callee module
+                    if stack[i].name == 'init':
+                        task._calling_filename = os.path.abspath(stack[i-1].filename)
+                        break
+            except Exception:
+                pass
             if in_dev_mode and cls.__detect_repo_async:
                 task._detect_repo_async_thread = threading.Thread(target=task._update_repository)
                 task._detect_repo_async_thread.daemon = True
@@ -1651,6 +1844,7 @@ class Task(_Task):
         # noinspection PyBroadException
         try:
             if 'IPython' in sys.modules:
+                # noinspection PyPackageRequirements
                 from IPython import get_ipython
                 ip = get_ipython()
                 if ip is not None and 'IPKernelApp' in ip.config:
@@ -1664,11 +1858,19 @@ class Task(_Task):
             argparser_update_currenttask(self)
 
         if (parser is None or parsed_args is None) and argparser_parseargs_called():
-            _parser, _parsed_args = get_argparser_last_args()
-            if parser is None:
-                parser = _parser
-            if parsed_args is None and parser == _parser:
-                parsed_args = _parsed_args
+            # if we have a parser but nor parsed_args, we need to find the parser
+            if parser and not parsed_args:
+                for _parser, _parsed_args in get_argparser_last_args():
+                    if _parser == parser:
+                        parsed_args = _parsed_args
+                        break
+            else:
+                # prefer the first argparser (hopefully it is more relevant?!
+                for _parser, _parsed_args in get_argparser_last_args():
+                    if parser is None:
+                        parser = _parser
+                    if parsed_args is None and parser == _parser:
+                        parsed_args = _parsed_args
 
         if running_remotely() and self.is_main_task():
             self._arguments.copy_to_parser(parser, parsed_args)
@@ -1679,14 +1881,17 @@ class Task(_Task):
 
     def _connect_dictionary(self, dictionary):
         def _update_args_dict(task, config_dict):
+            # noinspection PyProtectedMember
             task._arguments.copy_from_dict(flatten_dictionary(config_dict))
 
         def _refresh_args_dict(task, config_dict):
             # reread from task including newly added keys
-            flat_dict = task._arguments.copy_to_dict(flatten_dictionary(config_dict))
+            # noinspection PyProtectedMember
+            a_flat_dict = task._arguments.copy_to_dict(flatten_dictionary(config_dict))
+            # noinspection PyProtectedMember
             nested_dict = config_dict._to_dict()
             config_dict.clear()
-            config_dict.update(nested_from_flat_dictionary(nested_dict, flat_dict))
+            config_dict.update(nested_from_flat_dictionary(nested_dict, a_flat_dict))
 
         self._try_set_connected_parameter_type(self._ConnectedParametersType.dictionary)
 
@@ -1793,6 +1998,7 @@ class Task(_Task):
         with self._repo_detect_lock:
             if not self._detect_repo_async_thread:
                 return
+            # noinspection PyBroadException
             try:
                 if self._detect_repo_async_thread.is_alive():
                     # if negative timeout, just kill the thread:
@@ -1861,9 +2067,10 @@ class Task(_Task):
                     is_exception = self.__exit_hook.exception
                     # check if we are running inside a debugger
                     if not is_exception and sys.modules.get('pydevd'):
+                        # noinspection PyBroadException
                         try:
                             is_exception = sys.last_type
-                        except:
+                        except Exception:
                             pass
 
                     if (is_exception and not isinstance(self.__exit_hook.exception, KeyboardInterrupt)) \
@@ -1909,15 +2116,17 @@ class Task(_Task):
                         # notice: this will close the jupyter monitoring
                         ScriptInfo.close()
                 if self.is_main_task():
+                    # noinspection PyBroadException
                     try:
                         from .storage.helper import StorageHelper
                         StorageHelper.close_async_threads()
-                    except:
+                    except Exception:
                         pass
 
                 if print_done_waiting:
                     self.log.info('Finished uploading')
             elif self._logger:
+                # noinspection PyProtectedMember
                 self._logger._flush_stdout_handler()
 
             # from here, do not check worker status
@@ -1943,6 +2152,7 @@ class Task(_Task):
 
             if self._logger:
                 self._logger.set_flush_period(None)
+                # noinspection PyProtectedMember
                 self._logger._close_stdout_handler(wait=wait_for_uploads or wait_for_std_log)
 
             # this is so in theory we can close a main task and start a new one
@@ -1952,10 +2162,10 @@ class Task(_Task):
             # make sure we do not interrupt the exit process
             pass
         # delete locking object (lock file)
-        # noinspection PyBroadException
         if self._edit_lock:
+            # noinspection PyBroadException
             try:
-                del self._edit_lock
+                del self.__edit_lock
             except Exception:
                 pass
             self._edit_lock = None
@@ -1978,6 +2188,7 @@ class Task(_Task):
 
             def update_callback(self, callback):
                 if self._exit_callback and not six.PY2:
+                    # noinspection PyBroadException
                     try:
                         atexit.unregister(self._exit_callback)
                     except Exception:
@@ -1990,10 +2201,10 @@ class Task(_Task):
                     if self._orig_exc_handler:
                         sys.excepthook = self._orig_exc_handler
                         self._orig_exc_handler = None
-                    for s in self._org_handlers:
+                    for h in self._org_handlers:
                         # noinspection PyBroadException
                         try:
-                            signal.signal(s, self._org_handlers[s])
+                            signal.signal(h, self._org_handlers[h])
                         except Exception:
                             pass
                     self._org_handlers = {}
@@ -2018,11 +2229,11 @@ class Task(_Task):
                     else:
                         catch_signals = [signal.SIGINT, signal.SIGTERM, signal.SIGSEGV, signal.SIGABRT,
                                          signal.SIGILL, signal.SIGFPE, signal.SIGQUIT]
-                    for s in catch_signals:
+                    for c in catch_signals:
                         # noinspection PyBroadException
                         try:
-                            self._org_handlers[s] = signal.getsignal(s)
-                            signal.signal(s, self.signal_handler)
+                            self._org_handlers[c] = signal.getsignal(c)
+                            signal.signal(c, self.signal_handler)
                         except Exception:
                             pass
 
@@ -2032,13 +2243,16 @@ class Task(_Task):
 
             def exc_handler(self, exctype, value, traceback, *args, **kwargs):
                 if self._except_recursion_protection_flag:
+                    # noinspection PyArgumentList
                     return sys.__excepthook__(exctype, value, traceback, *args, **kwargs)
 
                 self._except_recursion_protection_flag = True
                 self.exception = value
                 if self._orig_exc_handler:
+                    # noinspection PyArgumentList
                     ret = self._orig_exc_handler(exctype, value, traceback, *args, **kwargs)
                 else:
+                    # noinspection PyNoneFunctionAssignment, PyArgumentList
                     ret = sys.__excepthook__(exctype, value, traceback, *args, **kwargs)
                 self._except_recursion_protection_flag = False
 
@@ -2072,6 +2286,7 @@ class Task(_Task):
                 # remove stdout logger, just in case
                 # noinspection PyBroadException
                 try:
+                    # noinspection PyProtectedMember
                     Logger._remove_std_logger()
                 except Exception:
                     pass
@@ -2187,7 +2402,7 @@ class Task(_Task):
             cls._get_default_session(),
             tasks.GetAllRequest(
                 id=task_ids,
-                project=[project.id] if project else None,
+                project=[project.id] if project else kwargs.pop('project', None),
                 name=task_name if task_name else None,
                 only_fields=only_fields,
                 **kwargs
@@ -2287,7 +2502,7 @@ class Task(_Task):
         :param task_data: A mapping from 'id', 'name', 'project', 'type' keys
             to the task's values, as saved in the cache.
 
-        :return: True if the task is relevant for reuse, False if not.
+        :return: True, if the task is relevant for reuse. False, if not.
         """
         if not task_data:
             return False
@@ -2314,6 +2529,14 @@ class Task(_Task):
 
             if project:
                 project_name = project.name
+
+        if task_data.get('type') and \
+                task_data.get('type') not in (cls.TaskTypes.training, cls.TaskTypes.testing) and \
+                not Session.check_min_api_version(2.8):
+            print('WARNING: Changing task type to "{}" : '
+                  'trains-server does not support task type "{}", '
+                  'please upgrade trains-server.'.format(cls.TaskTypes.training, task_data['type'].value))
+            task_data['type'] = cls.TaskTypes.training
 
         compares = (
             (task.name, 'name'),
