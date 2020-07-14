@@ -10,7 +10,7 @@ jobs:
         uses: actions/checkout@v2
       - run: |
           pwd
-          ls -la
+          ls -la /home/runner/work/trains/trains/.github/actions/get_stats
       - name: Get stats
         uses: ./.github/actions/get_stats@master
         with:
