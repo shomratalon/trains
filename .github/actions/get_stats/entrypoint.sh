@@ -1,0 +1,9 @@
+#!/bin/bash
+
+python3 get_stats.py
+
+while true
+do
+    echo "Press [CTRL+C] to stop.."
+    sleep 1
+done

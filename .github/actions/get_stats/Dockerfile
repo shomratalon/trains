@@ -6,4 +6,5 @@ RUN apt-get update
 RUN apt-get dist-upgrade -y
 RUN apt-get install -y curl python3-pip git
 
-ENTRYPOINT ["python3",  "/github/workspace/.github/actions/get_stats.py"]
+ENTRYPOINT ["/usr/entrypoint.sh"]
+#ENTRYPOINT ["python3",  "/github/workspace/.github/actions/get_stats.py"]
