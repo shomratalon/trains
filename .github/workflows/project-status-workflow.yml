@@ -9,7 +9,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v2
       - name: Get stats
-        uses: ./.github/actions/get_stats@master
+        uses: ./get_stats@master
         with:
           TRIGGER_PHRASE: "/get-stats"
         env:
