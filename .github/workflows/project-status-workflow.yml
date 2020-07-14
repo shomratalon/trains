@@ -12,7 +12,7 @@ jobs:
           pwd
           ls -la /home/runner/work/trains/trains/.github/actions/get_stats
       - name: Get stats
-        uses: ./.github/actions/get_stats@master
+        uses: ./.github/actions/get_stats
         with:
           TRIGGER_PHRASE: "/get-stats"
         env:
