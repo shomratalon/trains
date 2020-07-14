@@ -1,16 +1,19 @@
-name: Upload payload
+name: Get project stats
 on: [issue_comment]
 
 jobs:
-  see-payload:
+  get-stats:
+    if: contains(github.event.comment.body, '/get-stats')
     runs-on: ubuntu-latest
     steps:
-
-    - name: write payload
-      run: |
-        cat $GITHUB_EVENT_PATH > payload.json
-    - name: Upload payload
-      uses: actions/upload-artifact@v1
-      with:
-        name: payload
-        path: payload.json
+      - name: Check out repository
+        uses: actions/checkout@v2
+      - name: Get stats
+        uses: ./.github/actions/get_stats@master
+        with:
+          TRIGGER_PHRASE: "/get-stats"
+        env:
+          TRAINS_API_ACCESS_KEY: ${{ secrets.ACCESS_KEY }}
+          TRAINS_API_SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      - name: Setup tmate session
+          uses: mxschmitt/action-tmate@v2
