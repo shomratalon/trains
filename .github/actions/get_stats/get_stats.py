@@ -27,10 +27,12 @@ def create_stats_comment(project_stats):
     with open(payload_fname, 'r') as f:
         payload = json.load(f)
     print(f"Payload: {payload}")
-    owner, repo = payload.repository.full_name.split("/")
-    gh = login(token=os.getenv("secrets.GITHUB_TOKEN"))
-    issue = gh.issue(owner, repo, payload.issue.number)
-    issue.create_comment(project_stats)
+    owner, repo = payload.get("repository", {}).get("full_name", "").split("/")
+    if owner and repo:
+        gh = login(token=os.getenv("secrets.GITHUB_TOKEN"))
+        issue = gh.issue(owner, repo, payload.get("issue", {}).get("number"))
+        if issue:
+            issue.create_comment(project_stats)
 
 
 if __name__ == "__main__":
