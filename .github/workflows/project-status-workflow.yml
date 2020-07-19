@@ -19,3 +19,4 @@ jobs:
           TRAINS_API_ACCESS_KEY: ${{ secrets.ACCESS_KEY }}
           TRAINS_API_SECRET_KEY: ${{ secrets.SECRET_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TRAINS_API_HOST: ${{ secrets.TRAINS_API_HOST }}
