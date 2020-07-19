@@ -31,7 +31,7 @@ def create_stats_comment(project_stats):
         if gh:
             issue = gh.issue(owner, repo, payload.get("issue", {}).get("number"))
             if issue:
-                issue.create_comment(project_stats)
+                issue.create_comment(project_stats.to_html())
             else:
                 print(f'can not comment issue, {payload.get("issue", {}).get("number")}')
         else:
