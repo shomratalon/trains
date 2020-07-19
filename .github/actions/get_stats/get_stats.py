@@ -23,18 +23,19 @@ def get_project_stats():
 
 def create_stats_comment(project_stats):
     payload_fname = os.getenv('GITHUB_EVENT_PATH')
-    # print(f"payload_fname: {payload_fname}")
     with open(payload_fname, 'r') as f:
         payload = json.load(f)
-    # print(f"Payload: {payload}")
     owner, repo = payload.get("repository", {}).get("full_name", "").split("/")
     if owner and repo:
-        print(f"GITHUB_TOKEN {os.getenv('secrets.GITHUB_TOKEN')}")
-        gh = login(token=os.getenv("secrets.GITHUB_TOKEN"))
+        gh = login(token=os.getenv("GITHUB_TOKEN"))
         if gh:
             issue = gh.issue(owner, repo, payload.get("issue", {}).get("number"))
             if issue:
                 issue.create_comment(project_stats)
+            else:
+                print(f'can not comment issue, {payload.get("issue", {}).get("number")}')
+        else:
+            print(f"can not log in to gh, {os.getenv('GITHUB_TOKEN')}")
 
 
 if __name__ == "__main__":
