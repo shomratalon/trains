@@ -10,8 +10,8 @@ jobs:
         uses: actions/checkout@v2
       - name: Get stats
         uses: ./.github/actions/get_stats
-        with:
-          trigger: "/get-stats"
+#        with:
+#          trigger: "/get-stats"
         env:
           TRAINS_API_ACCESS_KEY: ${{ secrets.ACCESS_KEY }}
           TRAINS_API_SECRET_KEY: ${{ secrets.SECRET_KEY }}
