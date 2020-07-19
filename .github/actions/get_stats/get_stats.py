@@ -18,7 +18,8 @@ def get_project_stats():
             stats_dict[key] += 1
         else:
             stats_dict[key] = 1
-    return pd.DataFrame(stats_dict, columns=["Status", "Count"])
+
+    return pd.DataFrame(data=stats_dict.items(), columns=["Status", "Count"])
 
 
 def create_stats_comment(project_stats):
