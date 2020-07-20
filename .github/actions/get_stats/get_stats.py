@@ -26,7 +26,7 @@ def get_project_stats():
             df = pd.DataFrame(data=stats_dict.items(), columns=["Status", "Count"])
             table = tabulate(df, tablefmt="github", headers="keys", showindex=False)
             host = project.service.session.host.replace('api.', 'app.', 1)
-            return f"Project {projects_id} Results\n\n{table}\n\n" \
+            return f"Project {project_name} Results\n\n{table}\n\n" \
                    f"Results can be found [here]({host}/projects/{projects_id})"
         else:
             return f"Can not find any tasks for project {project_name}.\n\n"
