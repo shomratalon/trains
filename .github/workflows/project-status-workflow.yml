@@ -22,7 +22,7 @@ jobs:
       steps:
         - name: Check out repository
           uses: actions/checkout@v2
-        - name: Get stats
+        - name: Get scalars
           uses: ./.github/actions/report_scalars
           env:
             TRAINS_API_ACCESS_KEY: ${{ secrets.ACCESS_KEY }}

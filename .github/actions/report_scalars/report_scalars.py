@@ -22,14 +22,15 @@ def get_project_scalars():
     client = APIClient()
     task_id = os.getenv('TASK_ID')
     if task_id:
-        task = client.tasks.get_by_id(task=task_id)
-        last_metrics = task.last_metrics
+        task = client.tasks.get_all(id=[task_id], only_fields=["last_metrics"])
+        last_metrics = task._result.response_data['tasks'][0]['last_metrics']
         data = []
         columns = []
-        for _, metric_val in list(last_metrics.values())[0].items():
-            data.append([val for val in metric_val.values()])
-            if not columns:
-                columns = [key for key in metric_val.keys()]
+        for metric in list(last_metrics.values()):
+            for metric_vals in list(metric.values()):
+                data.append(list(metric_vals.values()))
+                if not columns:
+                    columns = list(metric_vals.keys())
         df = pd.DataFrame(data=data, columns=columns)
         table = tabulate(df, tablefmt="github", headers="keys", showindex=False)
         return f"Task {task_id} Results\n\n{table}\n\n"
