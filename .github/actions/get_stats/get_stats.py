@@ -23,7 +23,8 @@ def get_project_stats():
 
     df = pd.DataFrame(data=stats_dict.items(), columns=["Status", "Count"])
     table = tabulate(df, tablefmt="github", headers="keys", showindex=False)
-    return f"Project {projects_id} Results\n\n{table}\n\n"
+    return f"Project {projects_id} Results\n\n{table}\n\n" \
+           f"Results can be found [here]({project.service.session.host}/{projects_id})"
 
 
 def create_stats_comment(project_stats):
