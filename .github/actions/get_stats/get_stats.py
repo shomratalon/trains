@@ -1,6 +1,7 @@
 import json
 import os
 
+from tabulate import tabulate
 import pandas as pd
 from github3 import login
 
@@ -9,8 +10,9 @@ from trains.backend_api.session.client import APIClient
 
 def get_project_stats():
     client = APIClient()
-    project = client.projects.get_all(name="Tal-Proj")
-    tasks = client.tasks.get_all(project=[project._result.response_data['projects'][0]['id']])
+    project = client.projects.get_all(name="examples")
+    projects_id = project._result.response_data['projects'][0]['id']
+    tasks = client.tasks.get_all(project=[projects_id])
     stats_dict = {}
     for task in tasks:
         key = str(task.status)
@@ -19,7 +21,9 @@ def get_project_stats():
         else:
             stats_dict[key] = 1
 
-    return pd.DataFrame(data=stats_dict.items(), columns=["Status", "Count"])
+    df = pd.DataFrame(data=stats_dict.items(), columns=["Status", "Count"])
+    table = tabulate(df, tablefmt="github", headers="keys", showindex=False)
+    return f"Project {projects_id} Results\n\n{table}\n\n"
 
 
 def create_stats_comment(project_stats):
@@ -32,7 +36,7 @@ def create_stats_comment(project_stats):
         if gh:
             issue = gh.issue(owner, repo, payload.get("issue", {}).get("number"))
             if issue:
-                issue.create_comment(project_stats.to_html())
+                issue.create_comment(project_stats)
             else:
                 print(f'can not comment issue, {payload.get("issue", {}).get("number")}')
         else:
