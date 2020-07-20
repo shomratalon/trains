@@ -8,9 +8,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v2
-      - name: cat payload
-        run: |
-          cat $GITHUB_EVENT_PATH
       - name: Get stats
         uses: ./.github/actions/get_stats
         env:
@@ -19,3 +16,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TRAINS_API_HOST: ${{ secrets.TRAINS_API_HOST }}
           PROJECT_NAME: ${{ secrets.PROJECT_NAME }}
+  get-scalars:
+      if: contains(github.event.comment.body, '/get-scalars')
+      runs-on: ubuntu-latest
+      steps:
+        - name: Check out repository
+          uses: actions/checkout@v2
+        - name: Get stats
+          uses: ./.github/actions/report_scalars
+          env:
+            TRAINS_API_ACCESS_KEY: ${{ secrets.ACCESS_KEY }}
+            TRAINS_API_SECRET_KEY: ${{ secrets.SECRET_KEY }}
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            TRAINS_API_HOST: ${{ secrets.TRAINS_API_HOST }}
+            TASK_ID: ${{ secrets.TASK_ID }}
