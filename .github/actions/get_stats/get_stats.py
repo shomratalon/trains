@@ -1,3 +1,12 @@
+"""
+Get the statistics of your task's in a project
+
+Need to define in project secrets the follow:
+ - TRAINS_API_ACCESS_KEY
+ - TRAINS_API_SECRET_KEY
+ - TRAINS_API_HOST
+ - PROJECT_NAME
+"""
 import json
 import os
 
@@ -52,5 +61,5 @@ def create_stats_comment(project_stats):
 
 
 if __name__ == "__main__":
-    stats = get_project_stats()  # Need to add project name as env or secret
+    stats = get_project_stats()
     create_stats_comment(stats)
