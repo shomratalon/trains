@@ -25,11 +25,11 @@ def get_project_stats():
                     stats_dict[key] = 1
             df = pd.DataFrame(data=stats_dict.items(), columns=["Status", "Count"])
             table = tabulate(df, tablefmt="github", headers="keys", showindex=False)
+            host = project.service.session.host.replace('api.', 'app.', 1)
             return f"Project {projects_id} Results\n\n{table}\n\n" \
-                   f"Results can be found [here]({project.service.session.host}/projects/{projects_id})"
+                   f"Results can be found [here]({host}/projects/{projects_id})"
         else:
-            return f"Can not find any tasks for project {project_name}.\n\n" \
-                   f"You can view all your projects [here]({project.service.session.host}/projects)"
+            return f"Can not find any tasks for project {project_name}.\n\n"
     else:
         return f"Please add `PROJECT_NAME` to repo's secrets."
 
