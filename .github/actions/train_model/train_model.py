@@ -31,3 +31,7 @@ def clone_and_queue():
                     print(f'can not comment issue, {payload.get("issue", {}).get("number")}')
             else:
                 print(f"can not log in to gh, {os.getenv('GITHUB_TOKEN')}")
+
+
+if __name__ == "__main__":
+    clone_and_queue()
