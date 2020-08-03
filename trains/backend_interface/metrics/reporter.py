@@ -277,7 +277,7 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
         :type iter: int
         :param path: A path to an image file. Required unless matrix is provided.
         :type path: str
-        :param stream: File stream
+        :param stream: File/String stream
         :param file_extension: file extension to use when stream is passed
         :param max_history: maximum number of files to store per metric/variant combination
         use negative value for unlimited. default is set in global configuration (default=5)
@@ -288,6 +288,9 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
             raise ValueError('Upload configuration is required (use setup_upload())')
         if len([x for x in (path, stream) if x is not None]) != 1:
             raise ValueError('Expected only one of [filename, stream]')
+        if isinstance(stream, six.string_types):
+            stream = six.StringIO(stream)
+
         kwargs = dict(metric=self._normalize_name(title), variant=self._normalize_name(series), iter=iter,
                       file_history_size=max_history)
         ev = MediaEvent(stream=stream, upload_uri=upload_uri, local_image_path=path,
@@ -520,7 +523,7 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
         )
 
     def report_value_matrix(self, title, series, data, iter, xtitle=None, ytitle=None, xlabels=None, ylabels=None,
-                            comment=None, layout_config=None):
+                            yaxis_reversed=False, comment=None, layout_config=None):
         """
         Report a heat-map matrix
 
@@ -536,6 +539,7 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
         :param str ytitle: optional y-axis title
         :param xlabels: optional label per column of the matrix
         :param ylabels: optional label per row of the matrix
+        :param bool yaxis_reversed: If False 0,0 is at the bottom left corner. If True 0,0 is at the Top left corner
         :param comment: comment underneath the title
         :param layout_config: optional dictionary for layout configuration, passed directly to plotly
         :type layout_config: dict or None
@@ -550,6 +554,7 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
             comment=comment,
             xtitle=xtitle,
             ytitle=ytitle,
+            yaxis_reversed=yaxis_reversed,
             layout_config=layout_config,
         )
 
@@ -654,7 +659,7 @@ class Reporter(InterfaceBase, AbstractContextManager, SetupUploadMixin, AsyncMan
 
         # Hack: if the url doesn't start with http/s then the plotly will not be able to show it,
         # then we put the link under images not plots
-        if not url.startswith('http'):
+        if not url.startswith('http') and not self._offline_mode:
             return self.report_image_and_upload(title=title, series=series, iter=iter, path=path, image=matrix,
                                                 upload_uri=upload_uri, max_image_history=max_image_history)
 

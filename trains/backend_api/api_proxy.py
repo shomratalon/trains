@@ -31,7 +31,7 @@ class ApiServiceProxy(object):
                     ]]
 
             # get the most advanced service version that supports our api
-            version = [str(v) for v in ApiServiceProxy._available_versions if Version(Session.api_version) >= v][-1]
+            version = [str(v) for v in ApiServiceProxy._available_versions if Session.check_min_api_version(v)][-1]
             self.__dict__["__wrapped_version__"] = Session.api_version
             name = ".v{}.{}".format(
                 version.replace(".", "_"), self.__dict__.get("__wrapped_name__")
@@ -42,9 +42,10 @@ class ApiServiceProxy(object):
 
     def _import_module(self, name, package):
         # type: (str, str) -> Any
+        # noinspection PyBroadException
         try:
             return importlib.import_module(name, package=package)
-        except:
+        except Exception:
             return None
 
 
@@ -56,10 +57,10 @@ class ExtApiServiceProxy(ApiServiceProxy):
         for module_path in self._get_services_modules():
             try:
                 return importlib.import_module(name, package=module_path)
-            except ModuleNotFoundError:
+            except ImportError:
                 pass
 
-        raise ModuleNotFoundError(
+        raise ImportError(
             "No module '{}' in all predefined services module paths".format(name)
         )
 

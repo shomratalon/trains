@@ -1,7 +1,8 @@
-import os
+import json
 import sys
 import time
-from logging import LogRecord, getLogger, basicConfig, getLevelName, INFO, WARNING, Formatter, makeLogRecord
+from pathlib2 import Path
+from logging import LogRecord, getLogger, basicConfig, getLevelName, INFO, WARNING, Formatter, makeLogRecord, warning
 from logging.handlers import BufferingHandler
 from threading import Thread, Event
 from six.moves.queue import Queue
@@ -18,6 +19,7 @@ class TaskHandler(BufferingHandler):
     __wait_for_flush_timeout = 10.
     __max_event_size = 1024 * 1024
     __once = False
+    __offline_filename = 'log.jsonl'
 
     @property
     def task_id(self):
@@ -27,10 +29,10 @@ class TaskHandler(BufferingHandler):
     def task_id(self, value):
         self._task_id = value
 
-    def __init__(self, session, task_id, capacity=buffer_capacity):
+    def __init__(self, task, capacity=buffer_capacity):
         super(TaskHandler, self).__init__(capacity)
-        self.task_id = task_id
-        self.session = session
+        self.task_id = task.id
+        self.session = task.session
         self.last_timestamp = 0
         self.counter = 1
         self._last_event = None
@@ -38,6 +40,11 @@ class TaskHandler(BufferingHandler):
         self._queue = None
         self._thread = None
         self._pending = 0
+        self._offline_log_filename = None
+        if task.is_offline():
+            offline_folder = Path(task.get_offline_mode_folder())
+            offline_folder.mkdir(parents=True, exist_ok=True)
+            self._offline_log_filename = offline_folder / self.__offline_filename
 
     def shouldFlush(self, record):
         """
@@ -67,10 +74,11 @@ class TaskHandler(BufferingHandler):
             return True
 
         # if the first entry in the log was too long ago.
+        # noinspection PyBroadException
         try:
             if len(self.buffer) and (time.time() - self.buffer[0].created) > self.__flush_max_history_seconds:
                 return True
-        except:
+        except Exception:
             pass
 
         return False
@@ -124,6 +132,7 @@ class TaskHandler(BufferingHandler):
         if not self.buffer:
             return
 
+        buffer = None
         self.acquire()
         if self.buffer:
             buffer = self.buffer
@@ -133,6 +142,7 @@ class TaskHandler(BufferingHandler):
         if not buffer:
             return
 
+        # noinspection PyBroadException
         try:
             record_events = [r for record in buffer for r in self._record_to_event(record)] + [self._last_event]
             self._last_event = None
@@ -179,6 +189,7 @@ class TaskHandler(BufferingHandler):
         self._task_id = None
 
         if wait and _thread:
+            # noinspection PyBroadException
             try:
                 timeout = 1. if self._queue.empty() else self.__wait_for_flush_timeout
                 _thread.join(timeout=timeout)
@@ -186,18 +197,24 @@ class TaskHandler(BufferingHandler):
                     self.__log_stderr('Flush timeout {}s exceeded, dropping last {} lines'.format(
                         timeout, self._queue.qsize()))
                 # self.__log_stderr('Closing {} wait done'.format(os.getpid()))
-            except:
+            except Exception:
                 pass
         # call super and remove the handler
         super(TaskHandler, self).close()
 
     def _send_events(self, a_request):
         try:
+            self._pending -= 1
+
+            if self._offline_log_filename:
+                with open(self._offline_log_filename.as_posix(), 'at') as f:
+                    f.write(json.dumps([b.to_dict() for b in a_request.requests]) + '\n')
+                return
+
             # if self._thread is None:
             #     self.__log_stderr('Task.close() flushing remaining logs ({})'.format(self._pending))
-            self._pending -= 1
             res = self.session.send(a_request)
-            if not res.ok():
+            if res and not res.ok():
                 self.__log_stderr("failed logging task to backend ({:d} lines, {})".format(
                     len(a_request.requests), str(res.meta)), level=WARNING)
         except MaxRequestSizeError:
@@ -219,9 +236,10 @@ class TaskHandler(BufferingHandler):
             # pull from queue
             request = None
             if self._queue:
+                # noinspection PyBroadException
                 try:
                     request = self._queue.get(block=not leave)
-                except:
+                except Exception:
                     pass
             if request:
                 self._send_events(request)
@@ -235,3 +253,31 @@ class TaskHandler(BufferingHandler):
         write('{asctime} - {name} - {levelname} - {message}\n'.format(
             asctime=Formatter().formatTime(makeLogRecord({})),
             name='trains.log', levelname=getLevelName(level), message=msg))
+
+    @classmethod
+    def report_offline_session(cls, task, folder):
+        filename = Path(folder) / cls.__offline_filename
+        if not filename.is_file():
+            return False
+        with open(filename, 'rt') as f:
+            i = 0
+            while True:
+                try:
+                    line = f.readline()
+                    if not line:
+                        break
+                    list_requests = json.loads(line)
+                    for r in list_requests:
+                        r.pop('task', None)
+                    i += 1
+                except StopIteration:
+                    break
+                except Exception as ex:
+                    warning('Failed reporting log, line {} [{}]'.format(i, ex))
+                batch_requests = events.AddBatchRequest(
+                    requests=[events.TaskLogEvent(task=task.id, **r) for r in list_requests])
+                res = task.session.send(batch_requests)
+                if res and not res.ok():
+                    warning("failed logging task to backend ({:d} lines, {})".format(
+                        len(batch_requests.requests), str(res.meta)))
+        return True

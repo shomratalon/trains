@@ -52,6 +52,8 @@ def make_message(s, **kwargs):
 
 def get_or_create_project(session, project_name, description=None):
     res = session.send(projects.GetAllRequest(name=exact_match_regex(project_name)))
+    if not res:
+        return None
     if res.response.projects:
         return res.response.projects[0].id
     res = session.send(projects.CreateRequest(name=project_name, description=description))
@@ -114,9 +116,9 @@ def mutually_exclusive(_exception_cls=Exception, _require_at_least_one=True, _ch
 def validate_dict(obj, key_types, value_types, desc=''):
     if not isinstance(obj, dict):
         raise ValueError('%sexpected a dictionary' % ('%s: ' % desc if desc else ''))
-    if not all(isinstance(l, key_types) for l in obj.keys()):
+    if not all(isinstance(x, key_types) for x in obj.keys()):
         raise ValueError('%skeys must all be strings' % ('%s ' % desc if desc else ''))
-    if not all(isinstance(l, value_types) for l in obj.values()):
+    if not all(isinstance(x, value_types) for x in obj.values()):
         raise ValueError('%svalues must all be integers' % ('%s ' % desc if desc else ''))
 
 

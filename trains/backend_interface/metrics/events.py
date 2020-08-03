@@ -1,4 +1,5 @@
 import abc
+import hashlib
 import time
 from multiprocessing import Lock
 
@@ -192,7 +193,8 @@ class UploadEvent(MetricsEventAdapter):
                  file_history_size=None, delete_after_upload=False, **kwargs):
         # param override_filename: override uploaded file name (notice extension will be added from local path
         # param override_filename_ext: override uploaded file extension
-        if image_data is not None and (not hasattr(image_data, 'shape') and not isinstance(image_data, six.BytesIO)):
+        if image_data is not None and (
+                not hasattr(image_data, 'shape') and not isinstance(image_data, (six.StringIO, six.BytesIO))):
             raise ValueError('Image must have a shape attribute')
         self._image_data = image_data
         self._local_image_path = local_image_path
@@ -263,7 +265,7 @@ class UploadEvent(MetricsEventAdapter):
         last_count = self._get_metric_count(self.metric, self.variant, next=False)
         if abs(self._count - last_count) > self._file_history_size:
             output = None
-        elif isinstance(self._image_data, six.BytesIO):
+        elif isinstance(self._image_data, (six.StringIO, six.BytesIO)):
             output = self._image_data
         elif self._image_data is not None:
             image_data = self._image_data
@@ -308,13 +310,26 @@ class UploadEvent(MetricsEventAdapter):
         )
 
     def get_target_full_upload_uri(self, storage_uri, storage_key_prefix=None, quote_uri=True):
+        def limit_path_folder_length(folder_path):
+            if not folder_path or len(folder_path) <= 250:
+                return folder_path
+            parts = folder_path.split('.')
+            if len(parts) > 1:
+                prefix = hashlib.md5(str('.'.join(parts[:-1])).encode('utf-8')).hexdigest()
+                new_path = '{}.{}'.format(prefix, parts[-1])
+                if len(new_path) <= 250:
+                    return new_path
+            return hashlib.md5(str(folder_path).encode('utf-8')).hexdigest()
+
         e_storage_uri = self._upload_uri or storage_uri
         # if we have an entry (with or without a stream), we'll generate the URL and store it in the event
         filename = self._upload_filename
         if self._override_storage_key_prefix or not storage_key_prefix:
             storage_key_prefix = self._override_storage_key_prefix
         key = '/'.join(x for x in (storage_key_prefix, self._replace_slash(self.metric),
-                                   self._replace_slash(self.variant), self._replace_slash(filename)) if x)
+                                   self._replace_slash(self.variant), self._replace_slash(filename)
+                                   ) if x)
+        key = '/'.join(limit_path_folder_length(x) for x in key.split('/'))
         url = '/'.join(x.strip('/') for x in (e_storage_uri, key))
         # make sure we preserve local path root
         if e_storage_uri.startswith('/'):

@@ -572,6 +572,7 @@ class Logger(object):
             yaxis=None,  # type: Optional[str]
             xlabels=None,  # type: Optional[List[str]]
             ylabels=None,  # type: Optional[List[str]]
+            yaxis_reversed=False,  # type: bool
             comment=None,  # type: Optional[str]
             extra_layout=None,  # type: Optional[dict]
     ):
@@ -594,6 +595,7 @@ class Logger(object):
         :param str yaxis: The y-axis title. (Optional)
         :param list(str) xlabels: Labels for each column of the matrix. (Optional)
         :param list(str) ylabels: Labels for each row of the matrix. (Optional)
+        :param bool yaxis_reversed: If False 0,0 is at the bottom left corner. If True 0,0 is at the Top left corner
         :param str comment: A comment displayed with the plot, underneath the title.
         :param dict extra_layout: optional dictionary for layout configuration, passed directly to plotly
             example: extra_layout={'xaxis': {'type': 'date', 'range': ['2020-01-01', '2020-01-31']}}
@@ -614,6 +616,7 @@ class Logger(object):
             ytitle=yaxis,
             xlabels=xlabels,
             ylabels=ylabels,
+            yaxis_reversed=yaxis_reversed,
             comment=comment,
             layout_config=extra_layout,
         )
@@ -628,6 +631,7 @@ class Logger(object):
             yaxis=None,  # type: Optional[str]
             xlabels=None,  # type: Optional[List[str]]
             ylabels=None,  # type: Optional[List[str]]
+            yaxis_reversed=False,  # type: bool
             extra_layout=None,  # type: Optional[dict]
     ):
         """
@@ -644,12 +648,14 @@ class Logger(object):
         :param str yaxis: The y-axis title. (Optional)
         :param list(str) xlabels: Labels for each column of the matrix. (Optional)
         :param list(str) ylabels: Labels for each row of the matrix. (Optional)
+        :param bool yaxis_reversed: If False 0,0 is at the bottom left corner. If True 0,0 is at the Top left corner
         :param dict extra_layout: optional dictionary for layout configuration, passed directly to plotly
             example: extra_layout={'xaxis': {'type': 'date', 'range': ['2020-01-01', '2020-01-31']}}
         """
         self._touch_title_series(title, series)
         return self.report_confusion_matrix(title, series, matrix, iteration,
                                             xaxis=xaxis, yaxis=yaxis, xlabels=xlabels, ylabels=ylabels,
+                                            yaxis_reversed=yaxis_reversed,
                                             extra_layout=extra_layout)
 
     def report_surface(
@@ -828,7 +834,7 @@ class Logger(object):
             series,  # type: str
             iteration,  # type: int
             local_path=None,  # type: Optional[str]
-            stream=None,  # type: Optional[six.BytesIO]
+            stream=None,  # type: Optional[Union[six.BytesIO, six.StringIO]]
             file_extension=None,  # type: Optional[str]
             max_history=None,  # type: Optional[int]
             delete_after_upload=False,  # type: bool
@@ -910,7 +916,7 @@ class Logger(object):
             title,  # type: str
             series,  # type: str
             iteration,  # type: int
-            figure,  # type: Union[Dict, "Figure"]
+            figure,  # type: Union[Dict, "Figure"]  # noqa: F821
     ):
         """
         Report a ``Plotly`` figure (plot) directly
@@ -976,6 +982,7 @@ class Logger(object):
 
             For example: ``s3://bucket/directory/``, or ``file:///tmp/debug/``.
         """
+        # noinspection PyProtectedMember
         return self._default_upload_destination or self._task._get_default_report_storage_uri()
 
     def flush(self):
@@ -1029,7 +1036,7 @@ class Logger(object):
             series,  # type: str
             iteration,  # type: int
             path=None,  # type: Optional[str]
-            matrix=None,  # type: # type: Optional[Union[np.ndarray, Image.Image]]
+            matrix=None,  # type: Optional[Union[np.ndarray, Image.Image]]
             max_image_history=None,  # type: Optional[int]
             delete_after_upload=False  # type: bool
     ):

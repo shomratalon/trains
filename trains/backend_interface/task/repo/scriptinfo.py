@@ -49,21 +49,21 @@ class ScriptRequirements(object):
         # noinspection PyBroadException
         try:
             # noinspection PyPackageRequirements,PyUnresolvedReferences
-            import boto3
+            import boto3  # noqa: F401
             modules.add('boto3', 'trains.storage', 0)
         except Exception:
             pass
         # noinspection PyBroadException
         try:
             # noinspection PyPackageRequirements,PyUnresolvedReferences
-            from google.cloud import storage
+            from google.cloud import storage  # noqa: F401
             modules.add('google_cloud_storage', 'trains.storage', 0)
         except Exception:
             pass
         # noinspection PyBroadException
         try:
             # noinspection PyPackageRequirements,PyUnresolvedReferences
-            from azure.storage.blob import ContentSettings
+            from azure.storage.blob import ContentSettings  # noqa: F401
             modules.add('azure_storage_blob', 'trains.storage', 0)
         except Exception:
             pass
@@ -81,9 +81,9 @@ class ScriptRequirements(object):
             try:
                 # see if this version of torch support tensorboard
                 # noinspection PyPackageRequirements,PyUnresolvedReferences
-                import torch.utils.tensorboard
+                import torch.utils.tensorboard  # noqa: F401
                 # noinspection PyPackageRequirements,PyUnresolvedReferences
-                import tensorboard
+                import tensorboard  # noqa: F401
                 modules.add('tensorboard', 'torch', 0)
             except Exception:
                 pass
@@ -128,7 +128,10 @@ class ScriptRequirements(object):
                         name = 'torch'
                     k, v = reqs_lower.get(name, (None, None))
                     if k and v is not None:
-                        conda_requirements += '{0} {1} {2}\n'.format(k, '==', v.version)
+                        if v.version:
+                            conda_requirements += '{0} {1} {2}\n'.format(k, '==', v.version)
+                        else:
+                            conda_requirements += '{0}\n'.format(k)
         except Exception:
             conda_requirements = ''
 
@@ -147,7 +150,10 @@ class ScriptRequirements(object):
         if local_pks:
             requirements_txt += '\n# Local modules found - skipping:\n'
             for k, v in local_pks.sorted_items():
-                requirements_txt += '# {0} == {1}\n'.format(k, v.version)
+                if v.version:
+                    requirements_txt += '# {0} == {1}\n'.format(k, v.version)
+                else:
+                    requirements_txt += '# {0}\n'.format(k)
 
         # requirement summary
         requirements_txt += '\n'
@@ -158,9 +164,11 @@ class ScriptRequirements(object):
                 if forced_version:
                     version = forced_version
             # requirements_txt += ''.join(['# {0}\n'.format(c) for c in v.comments.sorted_items()])
-            if k == '-e':
-                requirements_txt += '{0} {1}\n'.format(k, version)
-            elif v:
+            if k == '-e' and version:
+                requirements_txt += '{0}\n'.format(version)
+            elif k.startswith('-e '):
+                requirements_txt += '{0} {1}\n'.format(k.replace('-e ', '', 1), version or '')
+            elif version:
                 requirements_txt += '{0} {1} {2}\n'.format(k, '==', version)
             else:
                 requirements_txt += '{0}\n'.format(k)
@@ -592,6 +600,7 @@ class ScriptInfo(object):
         script_dir = scripts_dir[0]
         script_path = scripts_path[0]
         messages = []
+        auxiliary_git_diff = None
 
         if not plugin:
             log.info("No repository found, storing script code instead")
@@ -625,7 +634,10 @@ class ScriptInfo(object):
                 messages.append(
                     "======> WARNING! Git diff to large to store "
                     "({}kb), skipping uncommitted changes <======".format(len(diff)//1024))
-                diff = ''
+                auxiliary_git_diff = diff
+                diff = '# WARNING! git diff too large to store, clear this section to execute without it.\n' \
+                       '# full git diff available in Artifacts/auxiliary_git_diff\n' \
+                       '# Clear the section before enqueueing Task!\n'
 
         else:
             diff = ''
@@ -665,7 +677,7 @@ class ScriptInfo(object):
         if not any(script_info.values()):
             script_info = None
 
-        return (ScriptInfoResult(script=script_info, warning_messages=messages),
+        return (ScriptInfoResult(script=script_info, warning_messages=messages, auxiliary_git_diff=auxiliary_git_diff),
                 script_requirements)
 
     @classmethod
@@ -724,6 +736,7 @@ class ScriptInfo(object):
 class ScriptInfoResult(object):
     script = attr.ib(default=None)
     warning_messages = attr.ib(factory=list)
+    auxiliary_git_diff = attr.ib(default=None)
 
 
 class _JupyterHistoryLogger(object):
@@ -766,7 +779,7 @@ class _JupyterHistoryLogger(object):
             if 'google.colab' in self._ip.extension_manager.loaded:
                 self._ip._org_run_cell = self._ip.run_cell
                 self._ip.run_cell = partial(self._patched_run_cell, self._ip)
-        except Exception as ex:
+        except Exception:
             pass
 
         # start with the current history

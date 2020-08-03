@@ -18,7 +18,6 @@ try:
 except ImportError:
     from io import IOBase as FileType  # py3
 
-from .log import logger
 from .utils import parse_git_config
 from .modules import ImportedModules
 
@@ -374,7 +373,11 @@ def _search_path(path):
                     git_url = '{vcs}+{url}@{commit}#egg={package}'.format(
                         vcs=vcs_info['vcs_info']['vcs'], url=vcs_info['url'],
                         commit=vcs_info['vcs_info']['commit_id'], package=pkg_name)
-                    mapping[pkg_name] = ('-e', git_url)
+
+                    # Bugfix: package name should be the URL link, because we need it unique
+                    # mapping[pkg_name] = ('-e', git_url)
+                    mapping[pkg_name] = ('-e {}'.format(git_url), '')
+
                     continue
                 except Exception:
                     pass
@@ -435,6 +438,8 @@ def _search_path(path):
                 git_url = 'git+{0}@{1}#egg={2}'.format(url, branch, pkg_name)
                 with open(top_level, 'r') as f:
                     for line in f:
-                        mapping[line.strip()] = ('-e', git_url)
+                        # Bugfix: package name should be the URL link, because we need it unique
+                        # mapping[line.strip()] = ('-e', git_url)
+                        mapping[line.strip()] = ('-e {}'.format(git_url), '')
 
     return mapping

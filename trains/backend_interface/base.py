@@ -7,12 +7,11 @@ from ..backend_api import Session, CallResult
 from ..backend_api.session.session import MaxRequestSizeError
 from ..backend_api.session.response import ResponseMeta
 from ..backend_api.session import BatchRequest
-from ..backend_api.session.defs import ENV_ACCESS_KEY, ENV_SECRET_KEY
+from ..backend_api.session.defs import ENV_ACCESS_KEY, ENV_SECRET_KEY, ENV_OFFLINE_MODE
 
 from ..config import config_obj
 from ..config.defs import LOG_LEVEL_ENV_VAR
 from ..debugging import get_logger
-from ..version import __version__
 from .session import SendError, SessionInterface
 
 
@@ -20,6 +19,7 @@ class InterfaceBase(SessionInterface):
     """ Base class for a backend manager class """
     _default_session = None
     _num_retry_warning_display = 1
+    _offline_mode = ENV_OFFLINE_MODE.get()
 
     @property
     def session(self):
@@ -45,6 +45,9 @@ class InterfaceBase(SessionInterface):
     @classmethod
     def _send(cls, session, req, ignore_errors=False, raise_on_errors=True, log=None, async_enable=False):
         """ Convenience send() method providing a standardized error reporting """
+        if cls._offline_mode:
+            return None
+
         num_retries = 0
         while True:
             error_msg = ''
@@ -152,7 +155,7 @@ class IdObjectBase(InterfaceBase):
         pass
 
     def reload(self):
-        if not self.id:
+        if not self.id and not self._offline_mode:
             raise ValueError('Failed reloading %s: missing id' % type(self).__name__)
         # noinspection PyBroadException
         try:

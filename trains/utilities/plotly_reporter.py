@@ -147,7 +147,8 @@ def create_2d_scatter_series(np_row_wise, title="Scatter", series_name="Series",
     :param layout_config: optional dictionary for layout configuration, passed directly to plotly
     :return: Plotly chart dict.
     """
-    plotly_obj = _plotly_scatter_layout_dict(title=title, xaxis_title=xtitle, yaxis_title=ytitle, comment=comment)
+    plotly_obj = _plotly_scatter_layout_dict(  # noqa: F841
+        title=title, xaxis_title=xtitle, yaxis_title=ytitle, comment=comment)
     assert np_row_wise.ndim == 2, "Expected a 2D numpy array"
     assert np_row_wise.shape[1] == 2, "Expected two columns X/Y e.g. [(x0,y0), (x1,y1) ...]"
 
@@ -217,7 +218,7 @@ def create_3d_scatter_series(np_row_wise, title="Scatter", series_name="Series",
 
 
 def create_value_matrix(np_value_matrix, title="Heatmap Matrix", xlabels=None, ylabels=None, xtitle="X", ytitle="Y",
-                        custom_colors=True, series=None, comment=None, layout_config=None):
+                        custom_colors=True, series=None, comment=None, yaxis_reversed=False, layout_config=None):
     conf_matrix_plot = {
         "data": [
             {
@@ -240,6 +241,8 @@ def create_value_matrix(np_value_matrix, title="Heatmap Matrix", xlabels=None, y
             "name": series,
         }
     }
+    if yaxis_reversed:
+        conf_matrix_plot['layout']['yaxis']['autorange'] = "reversed"
 
     if custom_colors:
         scale, bar = _get_z_colorbar_data()
@@ -479,7 +482,8 @@ def create_plotly_table(table_plot, title, series, layout_config=None):
     """
     if not pd:
         raise UsageError(
-            "pandas is required in order to support reporting tables using CSV or a URL, please install the pandas python package"
+            "pandas is required in order to support reporting tables using CSV or a URL, "
+            "please install the pandas python package"
         )
     index_added = not isinstance(table_plot.index, pd.RangeIndex)
     headers_values = list([col] for col in table_plot.columns)

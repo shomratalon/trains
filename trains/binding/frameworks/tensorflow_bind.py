@@ -51,6 +51,7 @@ class IsTensorboardInit(object):
         return original_init(self, *args, **kwargs)
 
 
+# noinspection PyProtectedMember
 class WeightsGradientHistHelper(object):
     def __init__(self, logger, report_freq=100, histogram_update_freq_multiplier=10, histogram_granularity=50):
         self._logger = logger
@@ -138,6 +139,7 @@ class WeightsGradientHistHelper(object):
         if minmax is None:
             minmax = hist[:, 0].min(), hist[:, 0].max()
         else:
+            # noinspection PyUnresolvedReferences
             minmax = min(minmax[0], hist[:, 0].min()), max(minmax[1], hist[:, 0].max())
 
         # update the cache
@@ -185,6 +187,7 @@ class WeightsGradientHistHelper(object):
             camera=(-0.1, +1.3, 1.4))
 
 
+# noinspection PyMethodMayBeStatic,PyProtectedMember,SpellCheckingInspection
 class EventTrainsWriter(object):
     """
     TF SummaryWriter implementation that converts the tensorboard's summary into
@@ -347,6 +350,7 @@ class EventTrainsWriter(object):
             image = np.asarray(im)
             output.close()
             if height > 0 and width > 0:
+                # noinspection PyArgumentList
                 val = image.reshape(height, width, -1).astype(np.uint8)
             else:
                 val = image.astype(np.uint8)
@@ -369,6 +373,7 @@ class EventTrainsWriter(object):
         return val
 
     def _add_image_numpy(self, tag, step, img_data_np, max_keep_images=None):
+        # type: (str, int, np.ndarray, int) -> ()
         # only report images every specific interval
         if step % self.image_report_freq != 0:
             return None
@@ -390,6 +395,7 @@ class EventTrainsWriter(object):
         if img_data_np.ndim == 4:
             dims = img_data_np.shape
             stack_dim = int(np.sqrt(dims[0]))
+            # noinspection PyArgumentList
             res = img_data_np.reshape(stack_dim, stack_dim, *dims[1:]).transpose((0, 2, 1, 3, 4))
             tile_size = res.shape[0] * res.shape[1]
             img_data_np = res.reshape(tile_size, tile_size, -1)
@@ -440,9 +446,10 @@ class EventTrainsWriter(object):
         num, value = self._scalar_report_cache.get((title, series), (0, 0))
         # nan outputs is a string, it's probably a NaN
         if isinstance(scalar_data, six.string_types):
+            # noinspection PyBroadException
             try:
                 scalar_data = float(scalar_data)
-            except:
+            except Exception:
                 scalar_data = float('nan')
         # nan outputs nan
         self._scalar_report_cache[(title, series)] = \
@@ -554,6 +561,23 @@ class EventTrainsWriter(object):
             max_history=self.max_keep_images,
         )
 
+    def _add_text(self, tag, step, tensor_bytes):
+        # noinspection PyProtectedMember
+        title, series = self.tag_splitter(tag, num_split_parts=3, default_title='Text', logdir_header='title',
+                                          auto_reduce_num_split=True,
+                                          force_add_prefix=self._logger._get_tensorboard_series_prefix())
+        step = self._fix_step_counter(title, series, step)
+
+        text = tensor_bytes.decode('utf-8', errors='replace')
+        self._logger.report_media(
+            title=title,
+            series=series,
+            iteration=step,
+            stream=six.StringIO(text),
+            file_extension='.txt',
+            max_history=self.max_keep_images,
+        )
+
     @staticmethod
     def _fix_step_counter(title, series, step):
         key = (title, series)
@@ -572,7 +596,7 @@ class EventTrainsWriter(object):
         wraparound_counter['last_step'] = step
         return step + wraparound_counter['adjust_counter']
 
-    def add_event(self, event, step=None, walltime=None, **kwargs):
+    def add_event(self, event, step=None, walltime=None, **_):
         supported_metrics = {
             'simpleValue', 'image', 'histo', 'tensor', 'audio'
         }
@@ -602,6 +626,7 @@ class EventTrainsWriter(object):
                     'event summary not found, message type unsupported: %s' % keys_list)
                 return
             value_dicts = summary.get('value')
+            # noinspection PyUnusedLocal
             walltime = walltime or msg_dict.get('step')
             step = step or msg_dict.get('step')
             if step is None:
@@ -645,9 +670,8 @@ class EventTrainsWriter(object):
                         self._generic_tensor_type_name_lookup[tag] = plugin_type
                         self._add_audio(tag, step, None, tensor_bytes)
                     elif plugin_type == 'text':
-                        # text, just print to console
-                        text = tensor_bytes.decode('utf-8', errors='replace')
-                        self._logger.report_text(msg='SUMMARY LOG: {} {}'.format(tag, text), print_console=False)
+                        self._generic_tensor_type_name_lookup[tag] = plugin_type
+                        self._add_text(tag, step, tensor_bytes)
                     else:
                         # we do not support it
                         pass
@@ -699,6 +723,7 @@ class EventTrainsWriter(object):
         # ~/torch/utils/tensorboard/summary.py
         def _clean_tag(name):
             import re as _re
+            # noinspection RegExpRedundantEscape
             _INVALID_TAG_CHARACTERS = _re.compile(r'[^-/\w\.]')
             if name is not None:
                 new_name = _INVALID_TAG_CHARACTERS.sub('_', name)
@@ -710,6 +735,7 @@ class EventTrainsWriter(object):
             return name
 
         main_path = self._logdir
+        # noinspection PyBroadException
         try:
             main_path = _clean_tag(main_path)
             origin_tag = main_path.rpartition("/")[2].replace(title_prefix, "", 1)
@@ -722,6 +748,7 @@ class EventTrainsWriter(object):
         return origin_tag
 
 
+# noinspection PyCallingNonCallable
 class ProxyEventsWriter(object):
     def __init__(self, events):
         IsTensorboardInit.set_tensorboard_used()
@@ -770,6 +797,7 @@ class ProxyEventsWriter(object):
         return ret
 
 
+# noinspection PyPep8Naming
 class PatchSummaryToEventTransformer(object):
     __main_task = None
     __original_getattribute = None
@@ -784,6 +812,7 @@ class PatchSummaryToEventTransformer(object):
     @staticmethod
     def trains_object(self):
         if isinstance(self.event_writer, ProxyEventsWriter):
+            # noinspection PyProtectedMember
             trains_writer = [e for e in self.event_writer._events if isinstance(e, EventTrainsWriter)]
             return trains_writer[0] if trains_writer else None
         elif isinstance(self.event_writer, EventTrainsWriter):
@@ -823,6 +852,7 @@ class PatchSummaryToEventTransformer(object):
             try:
                 # only patch once
                 if PatchSummaryToEventTransformer._original_add_eventT is None:
+                    # noinspection PyUnresolvedReferences
                     from torch.utils.tensorboard.writer import FileWriter as FileWriterT
                     PatchSummaryToEventTransformer._original_add_eventT = FileWriterT.add_event
                     FileWriterT.add_event = PatchSummaryToEventTransformer._patched_add_eventT
@@ -837,6 +867,7 @@ class PatchSummaryToEventTransformer(object):
             try:
                 # only patch once
                 if PatchSummaryToEventTransformer.__original_getattributeX is None:
+                    # noinspection PyUnresolvedReferences
                     from tensorboardX.writer import SummaryToEventTransformer as SummaryToEventTransformerX
                     PatchSummaryToEventTransformer.__original_getattributeX = \
                         SummaryToEventTransformerX.__getattribute__
@@ -868,6 +899,7 @@ class PatchSummaryToEventTransformer(object):
         if not hasattr(self, 'trains') or not PatchSummaryToEventTransformer.__main_task:
             return PatchSummaryToEventTransformer._original_add_eventT(self, *args, **kwargs)
         if not self.trains:
+            # noinspection PyBroadException
             try:
                 logdir = self.get_logdir()
             except Exception:
@@ -886,6 +918,7 @@ class PatchSummaryToEventTransformer(object):
         if not hasattr(self, 'trains') or not PatchSummaryToEventTransformer.__main_task:
             return PatchSummaryToEventTransformer._original_add_eventX(self, *args, **kwargs)
         if not self.trains:
+            # noinspection PyBroadException
             try:
                 logdir = self.get_logdir()
             except Exception:
@@ -923,6 +956,7 @@ class PatchSummaryToEventTransformer(object):
 
         # patch the events writer field, and add a double Event Logger (Trains and original)
         base_eventwriter = __dict__['event_writer']
+        # noinspection PyBroadException
         try:
             logdir = base_eventwriter.get_logdir()
         except Exception:
@@ -983,6 +1017,7 @@ class PatchModelCheckPointCallback(object):
     @staticmethod
     def trains_object(self):
         if isinstance(self.model, _ModelAdapter):
+            # noinspection PyProtectedMember
             return self.model._output_model
         if not self.__dict__.get('_trains_defaults'):
             self.__dict__['_trains_defaults'] = {}
@@ -1004,14 +1039,14 @@ class PatchModelCheckPointCallback(object):
         callbacks = None
         if is_keras:
             try:
-                import keras.callbacks as callbacks
+                import keras.callbacks as callbacks  # noqa: F401
             except ImportError:
                 is_keras = False
         if not is_keras and is_tf_keras:
             try:
                 # hack: make sure tensorflow.__init__ is called
-                import tensorflow
-                import tensorflow.python.keras.callbacks as callbacks
+                import tensorflow  # noqa: F401
+                import tensorflow.python.keras.callbacks as callbacks  # noqa: F811
             except ImportError:
                 is_tf_keras = False
                 callbacks = None
@@ -1066,6 +1101,7 @@ class PatchModelCheckPointCallback(object):
         return get_base(self, attr)
 
 
+# noinspection PyProtectedMember,PyUnresolvedReferences
 class PatchTensorFlowEager(object):
     __main_task = None
     __original_fn_scalar = None
@@ -1091,8 +1127,8 @@ class PatchTensorFlowEager(object):
         if 'tensorflow' in sys.modules:
             try:
                 # hack: make sure tensorflow.__init__ is called
-                import tensorflow
-                from tensorflow.python.ops import gen_summary_ops
+                import tensorflow  # noqa: F401
+                from tensorflow.python.ops import gen_summary_ops  # noqa: F401
                 PatchTensorFlowEager.__original_fn_scalar = gen_summary_ops.write_scalar_summary
                 gen_summary_ops.write_scalar_summary = PatchTensorFlowEager._write_scalar_summary
                 PatchTensorFlowEager.__original_fn_image = gen_summary_ops.write_image_summary
@@ -1115,23 +1151,27 @@ class PatchTensorFlowEager(object):
         if not PatchTensorFlowEager.__main_task:
             return None
         if not PatchTensorFlowEager.__trains_event_writer.get(id(writer)):
+            # noinspection PyBroadException
             try:
                 logdir = writer.get_logdir()
             except Exception:
                 # check if we are in eager mode, let's get the global context lopdir
+                # noinspection PyBroadException
                 try:
                     from tensorflow.python.eager import context
                     logdir = context.context().summary_writer._init_op_fn.keywords.get('logdir')
-                except:
+                except Exception:
+                    # noinspection PyBroadException
                     try:
                         from tensorflow.python.ops.summary_ops_v2 import _summary_state
                         logdir = _summary_state.writer._init_op_fn.keywords.get('logdir')
-                    except:
+                    except Exception:
                         logdir = None
+                # noinspection PyBroadException
                 try:
                     if logdir is not None:
                         logdir = logdir.numpy().decode()
-                except:
+                except Exception:
                     logdir = None
 
             PatchTensorFlowEager.__trains_event_writer[id(writer)] = EventTrainsWriter(
@@ -1150,6 +1190,7 @@ class PatchTensorFlowEager(object):
     def _write_summary(writer, step, tensor, tag, summary_metadata, name=None, **kwargs):
         event_writer = PatchTensorFlowEager._get_event_writer(writer)
         if event_writer:
+            # noinspection PyBroadException
             try:
                 plugin_type = summary_metadata.decode()
                 if plugin_type.endswith('scalars'):
@@ -1165,6 +1206,11 @@ class PatchTensorFlowEager(object):
                         tag=str(tag), step=int(step.numpy()) if not isinstance(step, int) else step,
                         hist_data=tensor.numpy()
                     )
+                elif plugin_type.endswith('text'):
+                    event_writer._add_text(
+                        tag=str(tag), step=int(step.numpy()) if not isinstance(step, int) else step,
+                        tensor_bytes=tensor.numpy()
+                    )
                 elif 'audio' in plugin_type:
                     audio_bytes_list = [a for a in tensor.numpy().flatten() if a]
                     for i, audio_bytes in enumerate(audio_bytes_list):
@@ -1173,7 +1219,7 @@ class PatchTensorFlowEager(object):
                                                 values=None, audio_data=audio_bytes)
                 else:
                     pass  # print('unsupported plugin_type', plugin_type)
-            except Exception as ex:
+            except Exception:
                 pass
         return PatchTensorFlowEager.__write_summary(writer, step, tensor, tag, summary_metadata, name, **kwargs)
 
@@ -1219,8 +1265,8 @@ class PatchTensorFlowEager(object):
         if img_data_np.ndim == 1 and img_data_np.size >= 3 and \
                 (len(img_data_np[0]) < 10 and len(img_data_np[1]) < 10):
             # this is just for making sure these are actually valid numbers
-            width = int(img_data_np[0].decode())
-            height = int(img_data_np[1].decode())
+            width = int(img_data_np[0].decode())  # noqa: F841
+            height = int(img_data_np[1].decode())  # noqa: F841
             for i in range(2, img_data_np.size):
                 img_data = {'width': -1, 'height': -1,
                             'colorspace': 'RGB', 'encodedImageString': img_data_np[i]}
@@ -1235,13 +1281,14 @@ class PatchTensorFlowEager(object):
                                           max_keep_images=kwargs.get('max_images'))
 
 
+# noinspection PyPep8Naming,SpellCheckingInspection
 class PatchKerasModelIO(object):
     __main_task = None
     __patched_keras = None
     __patched_tensorflow = None
 
     @staticmethod
-    def update_current_task(task, **kwargs):
+    def update_current_task(task, **_):
         PatchKerasModelIO.__main_task = task
         PatchKerasModelIO._patch_model_checkpoint()
         PostImportHookPatching.add_on_import('tensorflow', PatchKerasModelIO._patch_model_checkpoint)
@@ -1275,19 +1322,19 @@ class PatchKerasModelIO(object):
         if 'tensorflow' in sys.modules and not PatchKerasModelIO.__patched_tensorflow:
             try:
                 # hack: make sure tensorflow.__init__ is called
-                import tensorflow
+                import tensorflow  # noqa: F401
                 from tensorflow.python.keras.engine.network import Network
             except ImportError:
                 Network = None
             try:
                 # hack: make sure tensorflow.__init__ is called
-                import tensorflow
+                import tensorflow  # noqa: F811
                 from tensorflow.python.keras.engine.sequential import Sequential
             except ImportError:
                 Sequential = None
             try:
                 # hack: make sure tensorflow.__init__ is called
-                import tensorflow
+                import tensorflow  # noqa: F401, F811
                 from tensorflow.python.keras import models as keras_saving
             except ImportError:
                 keras_saving = None
@@ -1308,6 +1355,7 @@ class PatchKerasModelIO(object):
                 Sequential._updated_config = _patched_call(Sequential._updated_config,
                                                            PatchKerasModelIO._updated_config)
                 if hasattr(Sequential.from_config, '__func__'):
+                    # noinspection PyUnresolvedReferences
                     Sequential.from_config = classmethod(_patched_call(Sequential.from_config.__func__,
                                                                        PatchKerasModelIO._from_config))
                 else:
@@ -1316,6 +1364,7 @@ class PatchKerasModelIO(object):
             if Network is not None:
                 Network._updated_config = _patched_call(Network._updated_config, PatchKerasModelIO._updated_config)
                 if hasattr(Sequential.from_config, '__func__'):
+                    # noinspection PyUnresolvedReferences
                     Network.from_config = classmethod(_patched_call(Network.from_config.__func__,
                                                                     PatchKerasModelIO._from_config))
                 else:
@@ -1461,9 +1510,10 @@ class PatchKerasModelIO(object):
             filepath = kwargs['filepath'] if 'filepath' in kwargs else args[0]
 
             # this will already generate an output model
+            # noinspection PyBroadException
             try:
                 config = self._updated_config()
-            except Exception as ex:
+            except Exception:
                 # we failed to convert the network to json, for some reason (most likely internal keras error)
                 config = {}
 
@@ -1532,7 +1582,7 @@ class PatchTensorflowModelIO(object):
     __patched = None
 
     @staticmethod
-    def update_current_task(task, **kwargs):
+    def update_current_task(task, **_):
         PatchTensorflowModelIO.__main_task = task
         PatchTensorflowModelIO._patch_model_checkpoint()
         PostImportHookPatching.add_on_import('tensorflow', PatchTensorflowModelIO._patch_model_checkpoint)
@@ -1550,6 +1600,7 @@ class PatchTensorflowModelIO(object):
         try:
             # hack: make sure tensorflow.__init__ is called
             import tensorflow
+            # noinspection PyUnresolvedReferences
             from tensorflow.python.training.saver import Saver
             # noinspection PyBroadException
             try:
@@ -1569,7 +1620,7 @@ class PatchTensorflowModelIO(object):
         # noinspection PyBroadException
         try:
             # make sure we import the correct version of save
-            import tensorflow
+            import tensorflow  # noqa: F811
             from tensorflow.saved_model import save
             # actual import
             from tensorflow.python.saved_model import save as saved_model
@@ -1578,7 +1629,7 @@ class PatchTensorflowModelIO(object):
             try:
                 # make sure we import the correct version of save
                 import tensorflow
-                from tensorflow.saved_model.experimental import save
+                from tensorflow.saved_model.experimental import save  # noqa: F401
                 # actual import
                 import tensorflow.saved_model.experimental as saved_model
             except ImportError:
@@ -1595,9 +1646,10 @@ class PatchTensorflowModelIO(object):
         # noinspection PyBroadException
         try:
             # make sure we import the correct version of save
-            import tensorflow
+            import tensorflow  # noqa: F811
             # actual import
-            from tensorflow.saved_model import load
+            from tensorflow.saved_model import load  # noqa: F401
+            # noinspection PyUnresolvedReferences
             import tensorflow.saved_model as saved_model_load
             saved_model_load.load = _patched_call(saved_model_load.load, PatchTensorflowModelIO._load)
         except ImportError:
@@ -1608,8 +1660,9 @@ class PatchTensorflowModelIO(object):
         # noinspection PyBroadException
         try:
             # make sure we import the correct version of save
-            import tensorflow
+            import tensorflow  # noqa: F811
             # actual import
+            # noinspection PyUnresolvedReferences
             from tensorflow.saved_model import loader as loader1
             loader1.load = _patched_call(loader1.load, PatchTensorflowModelIO._load)
         except ImportError:
@@ -1620,8 +1673,9 @@ class PatchTensorflowModelIO(object):
         # noinspection PyBroadException
         try:
             # make sure we import the correct version of save
-            import tensorflow
+            import tensorflow  # noqa: F811
             # actual import
+            # noinspection PyUnresolvedReferences
             from tensorflow.compat.v1.saved_model import loader as loader2
             loader2.load = _patched_call(loader2.load, PatchTensorflowModelIO._load)
         except ImportError:
@@ -1631,7 +1685,7 @@ class PatchTensorflowModelIO(object):
 
         # noinspection PyBroadException
         try:
-            import tensorflow
+            import tensorflow  # noqa: F401, F811
             from tensorflow.train import Checkpoint
             # noinspection PyBroadException
             try:
@@ -1765,7 +1819,7 @@ class PatchTensorflow2ModelIO(object):
     __patched = None
 
     @staticmethod
-    def update_current_task(task, **kwargs):
+    def update_current_task(task, **_):
         PatchTensorflow2ModelIO.__main_task = task
         PatchTensorflow2ModelIO._patch_model_checkpoint()
         PostImportHookPatching.add_on_import('tensorflow', PatchTensorflow2ModelIO._patch_model_checkpoint)
@@ -1782,7 +1836,7 @@ class PatchTensorflow2ModelIO(object):
         # noinspection PyBroadException
         try:
             # hack: make sure tensorflow.__init__ is called
-            import tensorflow
+            import tensorflow  # noqa: F401
             from tensorflow.python.training.tracking import util
             # noinspection PyBroadException
             try:
@@ -1805,6 +1859,7 @@ class PatchTensorflow2ModelIO(object):
     def _save(original_fn, self, file_prefix, *args, **kwargs):
         model = original_fn(self, file_prefix, *args, **kwargs)
         # store output Model
+        # noinspection PyBroadException
         try:
             WeightsFileHandler.create_output_model(self, file_prefix, Framework.tensorflow,
                                                    PatchTensorflow2ModelIO.__main_task)
@@ -1820,6 +1875,7 @@ class PatchTensorflow2ModelIO(object):
         # Hack: disabled
         if False and running_remotely():
             # register/load model weights
+            # noinspection PyBroadException
             try:
                 save_path = WeightsFileHandler.restore_weights_file(self, save_path, Framework.tensorflow,
                                                                     PatchTensorflow2ModelIO.__main_task)
@@ -1831,6 +1887,7 @@ class PatchTensorflow2ModelIO(object):
         # load model, if something is wrong, exception will be raised before we register the input model
         model = original_fn(self, save_path, *args, **kwargs)
         # register/load model weights
+        # noinspection PyBroadException
         try:
             WeightsFileHandler.restore_weights_file(self, save_path, Framework.tensorflow,
                                                     PatchTensorflow2ModelIO.__main_task)
